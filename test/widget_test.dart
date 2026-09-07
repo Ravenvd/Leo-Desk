@@ -6,7 +6,8 @@ void main() {
   testWidgets('Leo Desk app starts', (WidgetTester tester) async {
     await tester.pumpWidget(const LeoDeskApp());
 
-    expect(find.text('Leo Desk'), findsOneWidget);
-    expect(find.text('Database initialized successfully'), findsOneWidget);
+    expect(find.text('Leo Desk'), findsWidgets);
+    expect(find.text('Dashboard'), findsWidgets);
+    expect(find.text('Customers'), findsOneWidget);
   });
 }
