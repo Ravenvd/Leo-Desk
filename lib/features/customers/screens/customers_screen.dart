@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
+import 'customer_form_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
-  const CustomersScreen({
-    super.key,
-    required this.repository,
-  });
+  const CustomersScreen({super.key, required this.repository});
 
   final CustomerRepository repository;
 
@@ -17,7 +15,6 @@ class CustomersScreen extends StatefulWidget {
 
 class _CustomersScreenState extends State<CustomersScreen> {
   final _searchController = TextEditingController();
-
   List<Customer> _customers = [];
   bool _isLoading = true;
   String? _error;
@@ -35,78 +32,72 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _loadCustomers() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+    setState(() { _isLoading = true; _error = null; });
     try {
       final customers = await widget.repository.getAll();
-
       if (!mounted) return;
-
-      setState(() {
-        _customers = customers;
-        _isLoading = false;
-      });
-    } catch (error) {
+      setState(() { _customers = customers; _isLoading = false; });
+    } catch (_) {
       if (!mounted) return;
-
-      setState(() {
-        _error = 'Unable to load customers.';
-        _isLoading = false;
-      });
+      setState(() { _error = 'Unable to load customers.'; _isLoading = false; });
     }
   }
 
   Future<void> _searchCustomers(String query) async {
     try {
       final customers = await widget.repository.search(query);
-
       if (!mounted) return;
-
-      setState(() {
-        _customers = customers;
-        _error = null;
-      });
-    } catch (error) {
+      setState(() { _customers = customers; _error = null; });
+    } catch (_) {
       if (!mounted) return;
-
-      setState(() {
-        _error = 'Unable to search customers.';
-      });
+      setState(() { _error = 'Unable to search customers.'; });
     }
+  }
+
+  Future<void> _openAddCustomer() async {
+    final result = await Navigator.of(context).push<Customer>(
+      MaterialPageRoute(
+        builder: (_) => CustomerFormScreen(repository: widget.repository),
+      ),
+    );
+    if (result != null && mounted) await _loadCustomers();
+  }
+
+  Future<void> _openEditCustomer(Customer customer) async {
+    final result = await Navigator.of(context).push<Customer>(
+      MaterialPageRoute(
+        builder: (_) => CustomerFormScreen(
+          repository: widget.repository,
+          customer: customer,
+        ),
+      ),
+    );
+    if (result != null && mounted) await _loadCustomers();
   }
 
   Future<void> _deleteCustomer(Customer customer) async {
     if (customer.id == null) return;
-
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete customer?'),
-          content: Text(
-            'Are you sure you want to delete ${customer.name}?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: const Text('Delete customer?'),
+        content: Text('Are you sure you want to delete ${customer.name}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
     );
-
     if (confirmed != true) return;
-
-    await widget.repository.delete(customer.id!);
-    await _loadCustomers();
+    try {
+      await widget.repository.delete(customer.id!);
+      await _loadCustomers();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to delete customer.')),
+      );
+    }
   }
 
   @override
@@ -135,24 +126,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Customers',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
+              Text('Customers', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
-              Text(
-                '${_customers.length} customer${_customers.length == 1 ? '' : 's'}',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
+              Text('${_customers.length} customer${_customers.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodyLarge),
             ],
           ),
         ),
         FilledButton.icon(
-          onPressed: () {
-            // Add customer screen will be added next.
-          },
+          onPressed: _openAddCustomer,
           icon: const Icon(Icons.person_add_rounded),
           label: const Text('Add Customer'),
         ),
@@ -180,22 +161,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 )
               : null,
           filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         ),
       ),
     );
   }
 
   Widget _buildContent() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
         child: Column(
@@ -205,19 +178,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
             const SizedBox(height: 16),
             Text(_error!),
             const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: _loadCustomers,
-              child: const Text('Try Again'),
-            ),
+            OutlinedButton(onPressed: _loadCustomers, child: const Text('Try Again')),
           ],
         ),
       );
     }
-
-    if (_customers.isEmpty) {
-      return _buildEmptyState();
-    }
-
+    if (_customers.isEmpty) return _buildEmptyState();
     return ListView.separated(
       itemCount: _customers.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -225,6 +191,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         final customer = _customers[index];
         return _CustomerCard(
           customer: customer,
+          onEdit: () => _openEditCustomer(customer),
           onDelete: () => _deleteCustomer(customer),
         );
       },
@@ -233,28 +200,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Widget _buildEmptyState() {
     final hasSearch = _searchController.text.trim().isNotEmpty;
-
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            hasSearch
-                ? Icons.search_off_rounded
-                : Icons.people_outline_rounded,
-            size: 64,
-          ),
+          Icon(hasSearch ? Icons.search_off_rounded : Icons.people_outline_rounded, size: 64),
           const SizedBox(height: 20),
-          Text(
-            hasSearch ? 'No customers found' : 'No customers yet',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text(hasSearch ? 'No customers found' : 'No customers yet', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          Text(
-            hasSearch
-                ? 'Try a different search.'
-                : 'Add your first customer to get started.',
-          ),
+          Text(hasSearch ? 'Try a different search.' : 'Add your first customer to get started.'),
         ],
       ),
     );
@@ -262,50 +216,32 @@ class _CustomersScreenState extends State<CustomersScreen> {
 }
 
 class _CustomerCard extends StatelessWidget {
-  const _CustomerCard({
-    required this.customer,
-    required this.onDelete,
-  });
+  const _CustomerCard({required this.customer, required this.onEdit, required this.onDelete});
 
   final Customer customer;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final contact = customer.phone ??
-        customer.whatsapp ??
-        customer.email ??
-        'No contact information';
-
+    final contact = customer.phone ?? customer.whatsapp ?? customer.email ?? 'No contact information';
     return Card(
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 10,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         leading: CircleAvatar(
-          child: Text(
-            customer.name.isEmpty
-                ? '?'
-                : customer.name.substring(0, 1).toUpperCase(),
-          ),
+          child: Text(customer.name.isEmpty ? '?' : customer.name.substring(0, 1).toUpperCase()),
         ),
-        title: Text(
-          customer.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(contact),
+        onTap: onEdit,
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
-            if (value == 'delete') {
-              onDelete();
-            }
+            if (value == 'edit') onEdit();
+            if (value == 'delete') onDelete();
           },
           itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: 'delete',
-              child: Text('Delete'),
-            ),
+            PopupMenuItem(value: 'edit', child: Text('Edit')),
+            PopupMenuItem(value: 'delete', child: Text('Delete')),
           ],
         ),
       ),

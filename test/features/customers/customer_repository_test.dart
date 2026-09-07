@@ -1,132 +1,294 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
-import 'package:leo_desk/core/database/app_database.dart';
+
+Customer makeCustomer({
+  required String name,
+  String? phone,
+  String? whatsapp,
+  String? email,
+  String? address,
+  String? notes,
+  String customerType = 'personal',
+  String serviceRequired = 'embroidery',
+}) {
+  final now = DateTime.now();
+
+  return Customer(
+    name: name,
+    phone: phone,
+    whatsapp: whatsapp,
+    email: email,
+    address: address,
+    notes: notes,
+    customerType: customerType,
+    serviceRequired: serviceRequired,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
 
 void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+
   late Database database;
   late CustomerRepository repository;
 
-  setUp(() async {
-    database = await AppDatabase.openTestDatabase();
-    repository = CustomerRepository(database: database);
-  });
-
+ setUp(() async {
+  database = await AppDatabase.openTestDatabase();
+  repository = CustomerRepository(database: database);
+});
   tearDown(() async {
     await database.close();
   });
 
-  Customer createCustomer({
-    String name = 'Test Customer',
-    String phone = '9876543210',
-  }) {
-    final now = DateTime.now();
+  group('CustomerRepository', () {
+    test('inserts and retrieves a customer', () async {
+      final customer = makeCustomer(
+        name: 'Alice',
+        phone: '9876543210',
+        whatsapp: '9876543210',
+        email: 'alice@example.com',
+        address: 'Kanyakumari',
+        notes: 'Regular customer',
+        customerType: 'personal',
+        serviceRequired: 'embroidery',
+      );
 
-    return Customer(
-      name: name,
-      phone: phone,
-      whatsapp: phone,
-      email: 'test@example.com',
-      address: 'Test Address',
-      notes: 'Test Notes',
-      createdAt: now,
-      updatedAt: now,
-    );
-  }
+      final id = await repository.insert(customer);
 
-  test('inserts and retrieves a customer', () async {
-    final customer = createCustomer();
+      expect(id, greaterThan(0));
 
-    final id = await repository.insert(customer);
+      final savedCustomer = await repository.getById(id);
 
-    expect(id, greaterThan(0));
+      expect(savedCustomer, isNotNull);
+      expect(savedCustomer!.id, id);
+      expect(savedCustomer.name, 'Alice');
+      expect(savedCustomer.phone, '9876543210');
+      expect(savedCustomer.whatsapp, '9876543210');
+      expect(savedCustomer.email, 'alice@example.com');
+      expect(savedCustomer.address, 'Kanyakumari');
+      expect(savedCustomer.notes, 'Regular customer');
+      expect(savedCustomer.customerType, 'personal');
+      expect(savedCustomer.serviceRequired, 'embroidery');
+    });
 
-    final retrieved = await repository.getById(id);
+    test('gets all customers ordered by name', () async {
+      await repository.insert(
+        makeCustomer(
+          name: 'Zebra',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
 
-    expect(retrieved, isNotNull);
-    expect(retrieved!.id, id);
-    expect(retrieved.name, 'Test Customer');
-    expect(retrieved.phone, '9876543210');
-  });
+      await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
 
-  test('gets all customers ordered by name', () async {
-    await repository.insert(createCustomer(name: 'Zebra'));
-    await repository.insert(createCustomer(name: 'Alpha'));
+      final customers = await repository.getAll();
 
-    final customers = await repository.getAll();
+      expect(customers.length, 2);
+      expect(customers[0].name, 'Alice');
+      expect(customers[1].name, 'Zebra');
+    });
 
-    expect(customers.length, 2);
-    expect(customers[0].name, 'Alpha');
-    expect(customers[1].name, 'Zebra');
-  });
+    test('updates a customer', () async {
+      final id = await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          phone: '1111111111',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
 
-  test('searches customers by name', () async {
-    await repository.insert(
-      createCustomer(name: 'John Embroidery'),
-    );
+      final existing = await repository.getById(id);
 
-    await repository.insert(
-      createCustomer(name: 'Mary Textiles'),
-    );
+      expect(existing, isNotNull);
 
-    final results = await repository.search('Embroidery');
+      final updated = existing!.copyWith(
+        name: 'Alice Updated',
+        phone: '2222222222',
+        customerType: 'business',
+        serviceRequired: 'stitching',
+        notes: 'Updated customer',
+      );
 
-    expect(results.length, 1);
-    expect(results.first.name, 'John Embroidery');
-  });
+      final affectedRows = await repository.update(updated);
 
-  test('searches customers by phone', () async {
-    await repository.insert(
-      createCustomer(
-        name: 'John',
-        phone: '9999999999',
-      ),
-    );
+      expect(affectedRows, 1);
 
-    final results = await repository.search('9999999999');
+      final result = await repository.getById(id);
 
-    expect(results.length, 1);
-    expect(results.first.name, 'John');
-  });
+      expect(result, isNotNull);
+      expect(result!.name, 'Alice Updated');
+      expect(result.phone, '2222222222');
+      expect(result.customerType, 'business');
+      expect(result.serviceRequired, 'stitching');
+      expect(result.notes, 'Updated customer');
+    });
 
-  test('updates a customer', () async {
-    final id = await repository.insert(
-      createCustomer(name: 'Original Name'),
-    );
+    test('deletes a customer', () async {
+      final id = await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
 
-    final original = await repository.getById(id);
+      final affectedRows = await repository.delete(id);
 
-    final updated = original!.copyWith(
-      name: 'Updated Name',
-      phone: '8888888888',
-      updatedAt: DateTime.now(),
-    );
+      expect(affectedRows, 1);
 
-    final rows = await repository.update(updated);
+      final result = await repository.getById(id);
 
-    expect(rows, 1);
+      expect(result, isNull);
+    });
 
-    final result = await repository.getById(id);
+    test('searches customers by name', () async {
+      await repository.insert(
+        makeCustomer(
+          name: 'Alice Embroidery',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
 
-    expect(result!.name, 'Updated Name');
-    expect(result.phone, '8888888888');
-  });
+      await repository.insert(
+        makeCustomer(
+          name: 'Bob Stitching',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
 
-  test('deletes a customer', () async {
-    final id = await repository.insert(
-      createCustomer(),
-    );
+      final results = await repository.search('Alice');
 
-    final rows = await repository.delete(id);
+      expect(results.length, 1);
+      expect(results.first.name, 'Alice Embroidery');
+    });
 
-    expect(rows, 1);
+    test('searches customers by phone', () async {
+      await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          phone: '9876543210',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
 
-    final result = await repository.getById(id);
+      await repository.insert(
+        makeCustomer(
+          name: 'Bob',
+          phone: '9123456789',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
 
-    expect(result, isNull);
+      final results = await repository.search('9876543210');
+
+      expect(results.length, 1);
+      expect(results.first.name, 'Alice');
+    });
+
+    test('searches customers by WhatsApp number', () async {
+      await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          whatsapp: '9876543210',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
+
+      await repository.insert(
+        makeCustomer(
+          name: 'Bob',
+          whatsapp: '9123456789',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
+
+      final results = await repository.search('9876543210');
+
+      expect(results.length, 1);
+      expect(results.first.name, 'Alice');
+    });
+
+    test('searches customers by email', () async {
+      await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          email: 'alice@example.com',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
+
+      await repository.insert(
+        makeCustomer(
+          name: 'Bob',
+          email: 'bob@example.com',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
+
+      final results = await repository.search('alice@example.com');
+
+      expect(results.length, 1);
+      expect(results.first.name, 'Alice');
+    });
+
+    test('returns all customers when search query is empty', () async {
+      await repository.insert(
+        makeCustomer(
+          name: 'Alice',
+          customerType: 'personal',
+          serviceRequired: 'embroidery',
+        ),
+      );
+
+      await repository.insert(
+        makeCustomer(
+          name: 'Bob',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
+
+      final results = await repository.search('   ');
+
+      expect(results.length, 2);
+    });
+
+    test('stores business and stitching customer correctly', () async {
+      final id = await repository.insert(
+        makeCustomer(
+          name: 'Leo Designs',
+          customerType: 'business',
+          serviceRequired: 'stitching',
+        ),
+      );
+
+      final customer = await repository.getById(id);
+
+      expect(customer, isNotNull);
+      expect(customer!.customerType, 'business');
+      expect(customer.serviceRequired, 'stitching');
+    });
   });
 }

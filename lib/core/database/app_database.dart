@@ -41,20 +41,20 @@ class AppDatabase {
   }
 
   /// Creates an isolated in-memory database for tests.
-static Future<Database> openTestDatabase() {
-  return openDatabase(
-    ':memory:',
-    version: _databaseVersion,
-    onConfigure: (db) async {
-      await db.execute('PRAGMA foreign_keys = ON');
-    },
-    onCreate: (db, version) async {
-      for (final statement in DatabaseSchema.createStatements) {
-        await db.execute(statement);
-      }
-    },
-  );
-}
+  static Future<Database> openTestDatabase() {
+    return openDatabase(
+      inMemoryDatabasePath,
+      version: _databaseVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
+      onCreate: (db, version) async {
+        for (final statement in DatabaseSchema.createStatements) {
+          await db.execute(statement);
+        }
+      },
+    );
+  }
 
   static Future<void> close() async {
     await _database?.close();
