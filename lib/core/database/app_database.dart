@@ -37,6 +37,13 @@ class AppDatabase {
           await db.execute(statement);
         }
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 3) {
+          for (final statement in DatabaseSchema.upgradeToVersion3) {
+            await db.execute(statement);
+          }
+        }
+      },
     );
   }
 
