@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../billing/models/bill.dart';
+import '../../billing/repositories/bill_repository.dart';
+import '../../billing/screens/bill_details_screen.dart';
+import '../../billing/screens/create_bill_screen.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import 'customer_form_screen.dart';
@@ -20,11 +24,84 @@ class CustomerDetailsScreen extends StatefulWidget {
 
 class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   late Customer _customer;
+  final BillRepository _billRepository = BillRepository();
+
+  List<Bill> _bills = [];
+  bool _isLoadingHistory = true;
+  String? _historyError;
 
   @override
   void initState() {
     super.initState();
     _customer = widget.customer;
+    _loadBillHistory();
+  }
+
+  Future<void> _loadBillHistory() async {
+    final customerId = _customer.id;
+
+    if (customerId == null) {
+      setState(() {
+        _bills = [];
+        _isLoadingHistory = false;
+        _historyError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingHistory = true;
+      _historyError = null;
+    });
+
+    try {
+      final bills = await _billRepository.getForCustomer(customerId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _bills = bills;
+        _isLoadingHistory = false;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Load customer bill history error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingHistory = false;
+        _historyError = 'Unable to load billing history.';
+      });
+    }
+  }
+
+  Future<void> _createBill() async {
+    if (_customer.id == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateBillScreen(
+          customer: _customer,
+          repository: _billRepository,
+        ),
+      ),
+    );
+
+    if (mounted) {
+      await _loadBillHistory();
+    }
+  }
+
+  Future<void> _viewBill(Bill bill) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BillDetailsScreen(
+          bill: bill,
+          repository: _billRepository,
+        ),
+      ),
+    );
   }
 
   Future<void> _editCustomer() async {
@@ -78,6 +155,21 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     return '$day/$month/${local.year}';
+  }
+
+  String _formatMoney(int paise) {
+    return '₹${(paise / 100).toStringAsFixed(2)}';
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'paid':
+        return 'Paid';
+      case 'partial':
+        return 'Partial';
+      default:
+        return 'Unpaid';
+    }
   }
 
   @override
@@ -168,6 +260,12 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _customer.id == null ? null : _createBill,
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: const Text('Create Bill'),
+                  ),
                 ],
               ),
             ),
@@ -244,50 +342,138 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
               children: [
                 const Icon(Icons.history_rounded),
                 const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Customer History',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
                 Text(
-                  'Customer History',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  '${_bills.length} bill${_bills.length == 1 ? '' : 's'}',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant,
+            if (_isLoadingHistory)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
                 ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.timeline_rounded,
-                    size: 44,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'History will appear here',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'This section is ready for quotations, orders, invoices, '
-                    'payments, and other customer activity as those modules '
-                    'are added.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
+              )
+            else if (_historyError != null)
+              _buildHistoryError()
+            else if (_bills.isEmpty)
+              _buildEmptyHistory()
+            else
+              _buildBillHistory(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryError() {
+    return Column(
+      children: [
+        const Icon(Icons.error_outline_rounded, size: 44),
+        const SizedBox(height: 12),
+        Text(_historyError!),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _loadBillHistory,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Try Again'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyHistory() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 44,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No bills yet',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Bills created for this customer will appear here.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _customer.id == null ? null : _createBill,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Create First Bill'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillHistory() {
+    return Column(
+      children: _bills.map((bill) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              leading: const CircleAvatar(
+                child: Icon(Icons.receipt_long_rounded),
+              ),
+              title: Text(
+                bill.billNumber,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                '${_formatDate(bill.billDate)} • '
+                '${_statusLabel(bill.paymentStatus)}',
+              ),
+              trailing: SizedBox(
+                width: 145,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      _formatMoney(bill.totalPaise),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              onTap: () => _viewBill(bill),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -324,9 +510,7 @@ class _InfoRow extends StatelessWidget {
                   ),
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
