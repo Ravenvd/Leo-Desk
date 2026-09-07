@@ -119,13 +119,16 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         _isSaving = false;
       });
 
+      debugPrint('Customer save error: $error');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             widget.isEditing
-                ? 'Unable to update customer.'
-                : 'Unable to add customer.',
+                ? 'Unable to update customer: $error'
+                : 'Unable to add customer: $error',
           ),
+          duration: const Duration(seconds: 6),
         ),
       );
     }

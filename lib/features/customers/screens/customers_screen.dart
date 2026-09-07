@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
+import 'customer_details_screen.dart';
 import 'customer_form_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
-  const CustomersScreen({super.key, required this.repository});
+  const CustomersScreen({
+    super.key,
+    required this.repository,
+  });
 
   final CustomerRepository repository;
 
@@ -15,6 +19,7 @@ class CustomersScreen extends StatefulWidget {
 
 class _CustomersScreenState extends State<CustomersScreen> {
   final _searchController = TextEditingController();
+
   List<Customer> _customers = [];
   bool _isLoading = true;
   String? _error;
@@ -32,39 +37,90 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _loadCustomers() async {
-    setState(() { _isLoading = true; _error = null; });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final customers = await widget.repository.getAll();
+
       if (!mounted) return;
-      setState(() { _customers = customers; _isLoading = false; });
-    } catch (_) {
+
+      setState(() {
+        _customers = customers;
+        _isLoading = false;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Load customers error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      setState(() { _error = 'Unable to load customers.'; _isLoading = false; });
+
+      setState(() {
+        _error = 'Unable to load customers.';
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _searchCustomers(String query) async {
     try {
       final customers = await widget.repository.search(query);
+
       if (!mounted) return;
-      setState(() { _customers = customers; _error = null; });
-    } catch (_) {
+
+      setState(() {
+        _customers = customers;
+        _error = null;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Search customers error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      setState(() { _error = 'Unable to search customers.'; });
+
+      setState(() {
+        _error = 'Unable to search customers.';
+      });
     }
   }
 
   Future<void> _openAddCustomer() async {
-    final result = await Navigator.of(context).push<Customer>(
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => CustomerFormScreen(repository: widget.repository),
+        builder: (_) => CustomerFormScreen(
+          repository: widget.repository,
+        ),
       ),
     );
-    if (result != null && mounted) await _loadCustomers();
+
+    if (!mounted) return;
+
+    if (result == true) {
+      await _loadCustomers();
+    }
+  }
+
+  Future<void> _openCustomerDetails(Customer customer) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CustomerDetailsScreen(
+          repository: widget.repository,
+          customer: customer,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _loadCustomers();
   }
 
   Future<void> _openEditCustomer(Customer customer) async {
-    final result = await Navigator.of(context).push<Customer>(
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => CustomerFormScreen(
           repository: widget.repository,
@@ -72,32 +128,91 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
       ),
     );
-    if (result != null && mounted) await _loadCustomers();
+
+    if (!mounted) return;
+
+    if (result == true) {
+      await _loadCustomers();
+    }
   }
 
   Future<void> _deleteCustomer(Customer customer) async {
-    if (customer.id == null) return;
+    final id = customer.id;
+
+    if (id == null) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete customer?'),
-        content: Text('Are you sure you want to delete ${customer.name}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
-        ],
-      ),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete customer?'),
+          content: Text(
+            'Are you sure you want to delete ${customer.name}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
     );
+
     if (confirmed != true) return;
+
     try {
-      await widget.repository.delete(customer.id!);
-      await _loadCustomers();
-    } catch (_) {
+      final affectedRows = await widget.repository.delete(id);
+
       if (!mounted) return;
+
+      if (affectedRows != 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Customer could not be deleted.'),
+          ),
+        );
+        return;
+      }
+
+      await _loadCustomers();
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to delete customer.')),
+        const SnackBar(
+          content: Text('Customer deleted.'),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Delete customer error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to delete customer: $error',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
       );
     }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {});
+    _loadCustomers();
   }
 
   @override
@@ -112,7 +227,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
             const SizedBox(height: 28),
             _buildSearchBar(),
             const SizedBox(height: 24),
-            Expanded(child: _buildContent()),
+            Expanded(
+              child: _buildContent(),
+            ),
           ],
         ),
       ),
@@ -126,14 +243,23 @@ class _CustomersScreenState extends State<CustomersScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Customers', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                'Customers',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
               const SizedBox(height: 6),
-              Text('${_customers.length} customer${_customers.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodyLarge),
+              Text(
+                '${_customers.length} customer'
+                '${_customers.length == 1 ? '' : 's'}',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
             ],
           ),
         ),
         FilledButton.icon(
-          onPressed: _openAddCustomer,
+          onPressed: _isLoading ? null : _openAddCustomer,
           icon: const Icon(Icons.person_add_rounded),
           label: const Text('Add Customer'),
         ),
@@ -142,55 +268,76 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildSearchBar() {
+    final hasSearch = _searchController.text.isNotEmpty;
+
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 600),
+      constraints: const BoxConstraints(
+        maxWidth: 600,
+      ),
       child: TextField(
         controller: _searchController,
         onChanged: _searchCustomers,
         decoration: InputDecoration(
           hintText: 'Search by name, phone, WhatsApp or email',
           prefixIcon: const Icon(Icons.search_rounded),
-          suffixIcon: _searchController.text.isNotEmpty
+          suffixIcon: hasSearch
               ? IconButton(
-                  onPressed: () {
-                    _searchController.clear();
-                    _loadCustomers();
-                    setState(() {});
-                  },
+                  onPressed: _clearSearch,
                   icon: const Icon(Icons.clear_rounded),
+                  tooltip: 'Clear search',
                 )
               : null,
           filled: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildContent() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     if (_error != null) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+            ),
             const SizedBox(height: 16),
             Text(_error!),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: _loadCustomers, child: const Text('Try Again')),
+            OutlinedButton(
+              onPressed: _loadCustomers,
+              child: const Text('Try Again'),
+            ),
           ],
         ),
       );
     }
-    if (_customers.isEmpty) return _buildEmptyState();
+
+    if (_customers.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return ListView.separated(
       itemCount: _customers.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final customer = _customers[index];
+
         return _CustomerCard(
           customer: customer,
+          onTap: () => _openCustomerDetails(customer),
           onEdit: () => _openEditCustomer(customer),
           onDelete: () => _deleteCustomer(customer),
         );
@@ -200,15 +347,38 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Widget _buildEmptyState() {
     final hasSearch = _searchController.text.trim().isNotEmpty;
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(hasSearch ? Icons.search_off_rounded : Icons.people_outline_rounded, size: 64),
+          Icon(
+            hasSearch
+                ? Icons.search_off_rounded
+                : Icons.people_outline_rounded,
+            size: 64,
+          ),
           const SizedBox(height: 20),
-          Text(hasSearch ? 'No customers found' : 'No customers yet', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            hasSearch
+                ? 'No customers found'
+                : 'No customers yet',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
-          Text(hasSearch ? 'Try a different search.' : 'Add your first customer to get started.'),
+          Text(
+            hasSearch
+                ? 'Try a different search.'
+                : 'Add your first customer to get started.',
+          ),
+          if (!hasSearch) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _openAddCustomer,
+              icon: const Icon(Icons.person_add_rounded),
+              label: const Text('Add Customer'),
+            ),
+          ],
         ],
       ),
     );
@@ -216,33 +386,117 @@ class _CustomersScreenState extends State<CustomersScreen> {
 }
 
 class _CustomerCard extends StatelessWidget {
-  const _CustomerCard({required this.customer, required this.onEdit, required this.onDelete});
+  const _CustomerCard({
+    required this.customer,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final Customer customer;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final contact = customer.phone ?? customer.whatsapp ?? customer.email ?? 'No contact information';
+    final contact = customer.phone ??
+        customer.whatsapp ??
+        customer.email ??
+        'No contact information';
+
+    final customerType =
+        customer.customerType == 'business' ? 'Business' : 'Personal';
+
+    final service =
+        customer.serviceRequired == 'stitching' ? 'Stitching' : 'Embroidery';
+
     return Card(
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        leading: CircleAvatar(
-          child: Text(customer.name.isEmpty ? '?' : customer.name.substring(0, 1).toUpperCase()),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 10,
         ),
-        title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(contact),
-        onTap: onEdit,
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') onEdit();
-            if (value == 'delete') onDelete();
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(value: 'edit', child: Text('Edit')),
-            PopupMenuItem(value: 'delete', child: Text('Delete')),
+        leading: CircleAvatar(
+          child: Text(
+            customer.name.isEmpty
+                ? '?'
+                : customer.name.substring(0, 1).toUpperCase(),
+          ),
+        ),
+        title: Text(
+          customer.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(contact),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Chip(
+                  label: Text(customerType),
+                  visualDensity: VisualDensity.compact,
+                ),
+                Chip(
+                  label: Text(service),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
           ],
+        ),
+        isThreeLine: true,
+        onTap: onTap,
+        trailing: PopupMenuButton<String>(
+          tooltip: 'Customer actions',
+          onSelected: (value) {
+            switch (value) {
+              case 'details':
+                onTap();
+                break;
+              case 'edit':
+                onEdit();
+                break;
+              case 'delete':
+                onDelete();
+                break;
+            }
+          },
+          itemBuilder: (context) {
+            return const [
+              PopupMenuItem(
+                value: 'details',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.person_outline_rounded),
+                  title: Text('View Details'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Edit'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.delete_outline_rounded),
+                  title: Text('Delete'),
+                ),
+              ),
+            ];
+          },
         ),
       ),
     );
