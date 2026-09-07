@@ -1,9 +1,12 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'database_schema.dart';
+
 class AppDatabase {
   static const _databaseName = 'leo_desk.db';
-  static const _databaseVersion = 1;
+
+  static const _databaseVersion = DatabaseSchema.version;
 
   static Database? _database;
 
@@ -23,19 +26,13 @@ class AppDatabase {
     return openDatabase(
       path,
       version: _databaseVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE customers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT,
-            email TEXT,
-            address TEXT,
-            notes TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          )
-        ''');
+        for (final statement in DatabaseSchema.createStatements) {
+          await db.execute(statement);
+        }
       },
     );
   }
