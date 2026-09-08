@@ -136,79 +136,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
     }
   }
 
-  Future<void> _deleteCustomer(Customer customer) async {
-    final id = customer.id;
-
-    if (id == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete customer?'),
-          content: Text(
-            'Are you sure you want to delete ${customer.name}?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false);
-              },
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).pop(true);
-              },
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final affectedRows = await widget.repository.delete(id);
-
-      if (!mounted) return;
-
-      if (affectedRows != 1) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Customer could not be deleted.'),
-          ),
-        );
-        return;
-      }
-
-      await _loadCustomers();
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer deleted.'),
-        ),
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Delete customer error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to delete customer: $error',
-          ),
-          duration: const Duration(seconds: 6),
-        ),
-      );
-    }
-  }
-
   void _clearSearch() {
     _searchController.clear();
     setState(() {});
@@ -339,7 +266,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
           customer: customer,
           onTap: () => _openCustomerDetails(customer),
           onEdit: () => _openEditCustomer(customer),
-          onDelete: () => _deleteCustomer(customer),
         );
       },
     );
@@ -390,13 +316,11 @@ class _CustomerCard extends StatelessWidget {
     required this.customer,
     required this.onTap,
     required this.onEdit,
-    required this.onDelete,
   });
 
   final Customer customer;
   final VoidCallback onTap;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -464,9 +388,6 @@ class _CustomerCard extends StatelessWidget {
               case 'edit':
                 onEdit();
                 break;
-              case 'delete':
-                onDelete();
-                break;
             }
           },
           itemBuilder: (context) {
@@ -485,14 +406,6 @@ class _CustomerCard extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.edit_outlined),
                   title: Text('Edit'),
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.delete_outline_rounded),
-                  title: Text('Delete'),
                 ),
               ),
             ];
