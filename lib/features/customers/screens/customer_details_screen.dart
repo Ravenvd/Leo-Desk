@@ -99,6 +99,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         builder: (_) => BillDetailsScreen(
           bill: bill,
           repository: _billRepository,
+          customer: _customer,
         ),
       ),
     );
@@ -161,16 +162,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     return '₹${(paise / 100).toStringAsFixed(2)}';
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'paid':
-        return 'Paid';
-      case 'partial':
-        return 'Partial';
-      default:
-        return 'Unpaid';
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -450,8 +442,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
-                '${_formatDate(bill.billDate)} • '
-                '${_statusLabel(bill.paymentStatus)}',
+                _formatDate(bill.billDate),
               ),
               trailing: SizedBox(
                 width: 145,
