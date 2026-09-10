@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/database/app_database.dart';
-
+import 'core/sync/sync_server.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
 
@@ -17,6 +17,11 @@ Future<void> main() async {
   }
 
   await AppDatabase.database;
+
+  if (Platform.isWindows){
+    final syncServer = SyncServer();
+    await syncServer.start();
+  }
 
   runApp(const LeoDeskApp());
 }
