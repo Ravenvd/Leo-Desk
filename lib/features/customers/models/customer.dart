@@ -1,5 +1,8 @@
+import 'package:uuid/uuid.dart';
+
 class Customer {
   final int? id;
+  final String uuid;
   final String name;
   final String? phone;
   final String? whatsapp;
@@ -11,8 +14,9 @@ class Customer {
   final String customerType;
   final String serviceRequired;
 
-  const Customer({
+  Customer({
     this.id,
+    String? uuid,
     required this.name,
     this.phone,
     this.whatsapp,
@@ -23,10 +27,11 @@ class Customer {
     required this.updatedAt,
     required this.customerType,
     required this.serviceRequired,
-  });
+  }) : uuid = uuid ?? Uuid().v4();
 
   Customer copyWith({
     int? id,
+    String? uuid,
     String? name,
     String? phone,
     String? whatsapp,
@@ -40,6 +45,7 @@ class Customer {
   }) {
     return Customer(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       whatsapp: whatsapp ?? this.whatsapp,
@@ -56,6 +62,7 @@ class Customer {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'uuid' : uuid, 
       'name': name,
       'phone': phone,
       'whatsapp': whatsapp,
@@ -72,6 +79,7 @@ class Customer {
   factory Customer.fromMap(Map<String, Object?> map) {
     return Customer(
       id: map['id'] as int?,
+      uuid: map['uuid'] as String, 
       name: map['name'] as String,
       phone: map['phone'] as String?,
       whatsapp: map['whatsapp'] as String?,

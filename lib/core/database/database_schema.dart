@@ -1,10 +1,14 @@
+import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
+
 class DatabaseSchema {
-  static const int version = 3;
+  static const int version = 4;
 
   static const List<String> createStatements = [
     '''
     CREATE TABLE customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       phone TEXT,
       whatsapp TEXT,
@@ -101,4 +105,33 @@ class DatabaseSchema {
     ON bill_items(bill_id)
     ''',
   ];
+
+  static Future<void> upgradeToVersion4(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute(
+        'ALTER TABLE customers ADD COLUMN uuid TEXT',
+      );
+
+      final customers = await txn.query(
+        'customers',
+        columns: ['id'],
+      );
+
+      const uuidGenerator = Uuid();
+
+      for (final customer in customers) {
+        await txn.update(
+          'customers',
+          {'uuid': uuidGenerator.v4()},
+          where: 'id = ?',
+          whereArgs: [customer['id']],
+        );
+      }
+
+      await txn.execute('''
+        CREATE UNIQUE INDEX idx_customers_uuid
+        ON customers(uuid)
+      ''');
+    });
+  }
 }

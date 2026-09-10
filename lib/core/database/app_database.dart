@@ -43,6 +43,9 @@ class AppDatabase {
             await db.execute(statement);
           }
         }
+        if (oldVersion < 4) {
+          await DatabaseSchema.upgradeToVersion4(db);
+        }
       },
     );
   }
