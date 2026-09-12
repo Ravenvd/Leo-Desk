@@ -21,6 +21,38 @@ class CustomerRepository {
     );
   }
 
+Future<void> upsertFromSync(Customer customer) async {
+  final db = await _db;
+
+  final existing = await db.query(
+    'customers',
+    columns: ['id'],
+    where: 'uuid = ?',
+    whereArgs: [customer.uuid],
+    limit: 1,
+  );
+
+  if (existing.isEmpty) {
+    final map = customer.toMap();
+    map.remove('id');
+
+    await db.insert(
+      'customers',
+      map,
+    );
+    return;
+  }
+
+  final map = customer.toMap();
+  map.remove('id');
+
+  await db.update(
+    'customers',
+    map,
+    where: 'uuid = ?',
+    whereArgs: [customer.uuid],
+  );
+}
   Future<List<Customer>> getAll() async {
     final db = await _db;
 

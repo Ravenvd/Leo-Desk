@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../features/customers/models/customer.dart';
+
 class SyncClient {
   final String serverAddress;
   final int port;
@@ -37,4 +39,46 @@ class SyncClient {
       client.close();
     }
   }
+  Future<List<Customer>> fetchCustomers() async {
+  final client = HttpClient();
+
+  try {
+    final request = await client.getUrl(
+      Uri.parse(
+        'http://$serverAddress:$port/api/customers',
+      ),
+    );
+
+    final response = await request.close();
+
+    if (response.statusCode != HttpStatus.ok) {
+      throw HttpException(
+        'Failed to fetch customers. '
+        'Status code: ${response.statusCode}',
+        uri: request.uri,
+      );
+    }
+
+    final body =
+        await response.transform(utf8.decoder).join();
+
+    final decoded = jsonDecode(body);
+
+    if (decoded is! List) {
+      throw const FormatException(
+        'Invalid customers response.',
+      );
+    }
+
+    return decoded
+        .map(
+          (item) => Customer.fromMap(
+            Map<String, Object?>.from(item as Map),
+          ),
+        )
+        .toList();
+  } finally {
+    client.close();
+  }
+}
 }

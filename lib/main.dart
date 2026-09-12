@@ -8,6 +8,7 @@ import 'core/sync/sync_server.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -44,7 +45,7 @@ class LeoDeskApp extends StatelessWidget {
         ),
       ),
       home: const LeoDeskShell(),
-      );
+    );
   }
 }
 
