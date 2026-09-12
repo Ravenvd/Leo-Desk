@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import '../../features/customers/repositories/customer_repository.dart';
 
 class SyncServer {
   HttpServer? _server;
+
+  final CustomerRepository _customerRepository =
+      CustomerRepository();
 
   bool get isRunning => _server != null;
 
@@ -20,43 +24,55 @@ class SyncServer {
   }
 
   Future<void> _handleRequest(HttpRequest request) async {
-    try {
-      if (request.method == 'GET' &&
-          request.uri.path == '/api/health') {
-        await _sendJson(
-          request.response,
-          200,
-          {
-            'status': 'ok',
-            'service': 'leo-desk-sync',
-          },
-        );
-        return;
-      }
+  try {
+    if (request.method == 'GET' &&
+        request.uri.path == '/api/health') {
+      await _sendJson(
+        request.response,
+        200,
+        {
+          'status': 'ok',
+          'service': 'leo-desk-sync',
+        },
+      );
+      return;
+    }
+
+    if (request.method == 'GET' &&
+        request.uri.path == '/api/customers') {
+      final customers = await _customerRepository.getAll();
 
       await _sendJson(
         request.response,
-        404,
-        {
-          'error': 'Not found',
-        },
+        200,
+        customers.map((customer) => customer.toMap()).toList(),
       );
-    } catch (e) {
-      await _sendJson(
-        request.response,
-        500,
-        {
-          'error': 'Internal server error',
-        },
-      );
+      return;
     }
+
+    await _sendJson(
+      request.response,
+      404,
+      {
+        'error': 'Not found',
+      },
+    );
+  } catch (e) {
+    await _sendJson(
+      request.response,
+      500,
+      {
+        'error': 'Internal server error',
+      },
+    );
   }
+}
 
   Future<void> _sendJson(
-    HttpResponse response,
-    int statusCode,
-    Map<String, Object?> data,
-  ) async {
+  HttpResponse response,
+  int statusCode,
+  Object data,
+) async {
     response.statusCode = statusCode;
     response.headers.contentType = ContentType.json;
     response.write(jsonEncode(data));

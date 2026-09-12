@@ -44,7 +44,7 @@ class LeoDeskApp extends StatelessWidget {
         ),
       ),
       home: const LeoDeskShell(),
-    );
+      );
   }
 }
 
