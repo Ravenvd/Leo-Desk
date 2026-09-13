@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import '../../features/customers/repositories/customer_repository.dart';
+import '../../features/customers/models/customer.dart';
 
 class SyncServer {
   HttpServer? _server;
@@ -46,6 +47,40 @@ class SyncServer {
         request.response,
         200,
         customers.map((customer) => customer.toMap()).toList(),
+      );
+      return;
+    }
+
+    if (request.method == 'POST' &&
+        request.uri.path == '/api/customers') {
+      final body = await utf8.decodeStream(request);
+
+      final decoded = jsonDecode(body);
+
+      if (decoded is! Map) {
+        await _sendJson(
+          request.response,
+          400,
+          {
+            'error': 'Invalid customer data.',
+          },
+        );
+        return;
+      }
+
+      final customer = Customer.fromMap(
+        Map<String, Object?>.from(decoded),
+      );
+
+      await _customerRepository.upsertFromSync(customer);
+
+      await _sendJson(
+        request.response,
+        200,
+        {
+          'status': 'ok',
+          'uuid': customer.uuid,
+        },
       );
       return;
     }

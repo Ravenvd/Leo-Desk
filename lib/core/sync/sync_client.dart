@@ -28,7 +28,10 @@ class SyncClient {
         return false;
       }
 
-      final body = await response.transform(utf8.decoder).join();
+      final body = await response
+          .transform(utf8.decoder)
+          .join();
+
       final data = jsonDecode(body);
 
       return data['status'] == 'ok' &&
@@ -39,46 +42,84 @@ class SyncClient {
       client.close();
     }
   }
+
   Future<List<Customer>> fetchCustomers() async {
-  final client = HttpClient();
+    final client = HttpClient();
 
-  try {
-    final request = await client.getUrl(
-      Uri.parse(
-        'http://$serverAddress:$port/api/customers',
-      ),
-    );
-
-    final response = await request.close();
-
-    if (response.statusCode != HttpStatus.ok) {
-      throw HttpException(
-        'Failed to fetch customers. '
-        'Status code: ${response.statusCode}',
-        uri: request.uri,
+    try {
+      final request = await client.getUrl(
+        Uri.parse(
+          'http://$serverAddress:$port/api/customers',
+        ),
       );
+
+      final response = await request.close();
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException(
+          'Failed to fetch customers. '
+          'Status code: ${response.statusCode}',
+          uri: request.uri,
+        );
+      }
+
+      final body = await response
+          .transform(utf8.decoder)
+          .join();
+
+      final decoded = jsonDecode(body);
+
+      if (decoded is! List) {
+        throw const FormatException(
+          'Invalid customers response.',
+        );
+      }
+
+      return decoded
+          .map(
+            (item) => Customer.fromMap(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList();
+    } finally {
+      client.close();
     }
-
-    final body =
-        await response.transform(utf8.decoder).join();
-
-    final decoded = jsonDecode(body);
-
-    if (decoded is! List) {
-      throw const FormatException(
-        'Invalid customers response.',
-      );
-    }
-
-    return decoded
-        .map(
-          (item) => Customer.fromMap(
-            Map<String, Object?>.from(item as Map),
-          ),
-        )
-        .toList();
-  } finally {
-    client.close();
   }
-}
+  Future<bool> sendCustomer(Customer customer) async {
+    final client = HttpClient();
+
+    try {
+      final request = await client.postUrl(
+        Uri.parse(
+          'http://$serverAddress:$port/api/customers',
+        ),
+      );
+
+      request.headers.contentType = ContentType.json;
+
+      request.write(
+        jsonEncode(customer.toMap()),
+      );
+
+      final response = await request.close();
+
+      if (response.statusCode != HttpStatus.ok) {
+        return false;
+      }
+
+      final body = await response
+          .transform(utf8.decoder)
+          .join();
+
+      final data = jsonDecode(body);
+
+      return data['status'] == 'ok' &&
+          data['uuid'] == customer.uuid;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close();
+    }
+  }
 }
