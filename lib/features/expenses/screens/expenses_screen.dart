@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/database/app_database.dart';
 import '../models/expense.dart';
 import '../repositories/expense_repository.dart';
 
@@ -90,7 +89,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             itemCount: expenses.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final expense = expenses[index];
               return Card(
