@@ -1,0 +1,57 @@
+name: One-time bill conflict test fix
+
+on:
+  push:
+    branches:
+      - fix/customer-sync-ack
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'Fix bill conflict test fixture') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/customer-sync-ack
+      - name: Patch test fixture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('test/core/sync/sync_manager_test.dart')
+          text = path.read_text()
+
+          old = """    final serverBill = makeBill(\n      uuid: 'bill-conflict',\n      customerId: serverCustomer.id!,\n      customerUuid: serverCustomer.uuid,\n      billNumber: 'INV-4001',\n      syncStatus: 'synced',\n      notes: 'Windows version',\n    );"""
+          new = """    final serverBill = makeBill(\n      uuid: 'bill-conflict',\n      customerId: serverCustomer.id!,\n      customerUuid: serverCustomer.uuid,\n      billNumber: 'INV-4001',\n      syncStatus: 'pending',\n      notes: 'Windows version',\n    );"""
+          if old not in text:
+              raise SystemExit('server bill fixture not found')
+          text = text.replace(old, new, 1)
+
+          old = """    await serverBills.markSynced(serverBill.uuid);\n\n    await syncWithRealHttpClient();\n\n    final localBill = makeBill(\n      uuid: 'bill-conflict',\n      customerId: localCustomer.id!,\n      customerUuid: customer.uuid,\n      billNumber: 'INV-4002',\n      notes: 'Android version',\n    );\n    await clientBills.insert(\n      bill: localBill,\n      items: [\n        makeItem(\n          uuid: 'bill-conflict-client-item',\n          description: 'Android item',\n          quantity: 2,\n          ratePaise: 75000,\n          amountPaise: 150000,\n        ),\n      ],\n    );"""
+          new = """    await syncWithRealHttpClient();\n\n    final localBillsBeforeEdit = await clientBills.getAll();\n    expect(localBillsBeforeEdit, hasLength(1));\n    final localBillId = localBillsBeforeEdit.single.id!;\n\n    await clientDatabase.update(\n      'bills',\n      {\n        'bill_number': 'INV-4002',\n        'notes': 'Android version',\n        'sync_status': 'pending',\n      },\n      where: 'id = ?',\n      whereArgs: [localBillId],\n    );\n\n    await clientDatabase.delete(\n      'bill_items',\n      where: 'bill_id = ?',\n      whereArgs: [localBillId],\n    );\n\n    await clientDatabase.insert('bill_items', {\n      'uuid': 'bill-conflict-client-item',\n      'bill_id': localBillId,\n      'description': 'Android item',\n      'quantity': 2,\n      'rate_paise': 75000,\n      'amount_paise': 150000,\n    });"""
+          if old not in text:
+              raise SystemExit('conflict edit fixture block not found')
+          text = text.replace(old, new, 1)
+
+          text = text.replace(
+              "expect(serverBillsList.single.syncStatus, 'synced');",
+              "expect(serverBillsList.single.syncStatus, 'pending');",
+              1,
+          )
+          path.write_text(text)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test/core/sync/sync_manager_test.dart
+          git commit -m "Fix bill conflict test fixture" || exit 0
+          git push origin fix/customer-sync-ack
+      - name: Remove one-time workflow
+        if: success()
+        run: |
+          git rm .github/workflows/one-time-bill-conflict-fix.yml || true
+          git commit -m "Remove one-time bill conflict fix workflow" || exit 0
+          git push origin fix/customer-sync-ack
