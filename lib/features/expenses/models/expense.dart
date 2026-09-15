@@ -1,6 +1,13 @@
 import 'package:uuid/uuid.dart';
 
 class Expense {
+  static const List<String> categories = [
+    'Raw Materials',
+    'Salaries',
+    'Miscellaneous',
+    'Fixed Expenses',
+  ];
+
   final int? id;
   final String uuid;
   final String syncStatus;
