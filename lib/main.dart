@@ -9,8 +9,10 @@ import 'core/database/app_database.dart';
 import 'core/sync/sync_config.dart';
 import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
+import 'features/billing/repositories/bill_repository.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
+import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 
 Future<void> main() async {
@@ -112,10 +114,9 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
   int _selectedIndex = 0;
 
   List<Widget> get _pages => [
-    const _PlaceholderPage(
-      icon: Icons.dashboard_rounded,
-      title: 'Dashboard',
-      subtitle: 'Your business at a glance.',
+    DashboardScreen(
+      customerRepository: CustomerRepository(),
+      billRepository: BillRepository(),
     ),
     CustomersScreen(repository: CustomerRepository()),
     const _PlaceholderPage(
