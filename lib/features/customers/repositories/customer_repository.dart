@@ -22,10 +22,13 @@ class CustomerRepository {
 
   /// Inserts or updates a customer received from sync.
   ///
-  /// Conflict rule: a locally modified (pending) record always wins over
-  /// the server copy — it will be pushed on the next sync. Otherwise the
-  /// server (Windows) is the source of truth and overwrites the local row.
-  Future<void> upsertFromSync(Customer customer) async {
+  /// Returns false when a locally modified (pending) record with the same
+  /// uuid exists. In that case the local copy wins and must remain pending
+  /// so it can be pushed to the server on the next sync.
+  ///
+  /// Otherwise the server copy is applied and the resulting row is marked
+  /// as synced.
+  Future<bool> upsertFromSync(Customer customer) async {
     final db = await _db;
 
     final existing = await db.query(
@@ -37,14 +40,14 @@ class CustomerRepository {
     );
 
     if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
-      return;
+      return false;
     }
 
     final map = customer.copyWith(syncStatus: 'synced').toMap()..remove('id');
 
     if (existing.isEmpty) {
       await db.insert('customers', map);
-      return;
+      return true;
     }
 
     await db.update(
@@ -53,6 +56,7 @@ class CustomerRepository {
       where: 'uuid = ?',
       whereArgs: [customer.uuid],
     );
+    return true;
   }
 
   Future<List<Customer>> getPending() async {
