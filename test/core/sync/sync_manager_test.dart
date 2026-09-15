@@ -133,6 +133,78 @@ void main() {
     expect(serverCustomers.single.name, customer.name);
   });
 
+  test('pulls a Windows customer into the Android database', () async {
+    final clientRepository = CustomerRepository(database: clientDatabase);
+    final serverRepository = CustomerRepository(database: serverDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'windows-pull',
+      name: 'Windows Customer',
+      syncStatus: 'synced',
+    );
+
+    await serverRepository.insert(customer);
+    await serverRepository.markSynced(customer.uuid);
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.customersPushed, 0);
+    expect(result.customersPulled, 1);
+
+    final localCustomers = await clientRepository.getAll();
+
+    expect(localCustomers, hasLength(1));
+    expect(localCustomers.single.uuid, customer.uuid);
+    expect(localCustomers.single.name, 'Windows Customer');
+    expect(localCustomers.single.syncStatus, 'synced');
+  });
+
+  test('Android customer syncs to Windows and later receives Windows changes',
+      () async {
+    final clientRepository = CustomerRepository(database: clientDatabase);
+    final serverRepository = CustomerRepository(database: serverDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'android-authority',
+      name: 'Android Customer',
+    );
+
+    await clientRepository.insert(customer);
+
+    final firstResult = await syncWithRealHttpClient();
+
+    expect(firstResult.connected, isTrue);
+    expect(firstResult.customersPushed, 1);
+
+    final serverCustomers = await serverRepository.getAll();
+    expect(serverCustomers, hasLength(1));
+    expect(serverCustomers.single.name, 'Android Customer');
+    expect(serverCustomers.single.syncStatus, 'synced');
+
+    final serverCustomer = serverCustomers.single;
+    await serverRepository.update(
+      serverCustomer.copyWith(name: 'Windows Authoritative Customer'),
+    );
+
+    final secondResult = await syncWithRealHttpClient();
+
+    expect(secondResult.connected, isTrue);
+    expect(secondResult.customersPushed, 0);
+    expect(secondResult.customersPulled, 1);
+
+    final localCustomers = await clientRepository.getAll();
+
+    expect(localCustomers, hasLength(1));
+    expect(localCustomers.single.uuid, customer.uuid);
+    expect(localCustomers.single.name, 'Windows Authoritative Customer');
+    expect(localCustomers.single.syncStatus, 'synced');
+
+    final finalServerCustomers = await serverRepository.getAll();
+    expect(finalServerCustomers.single.name, 'Windows Authoritative Customer');
+    expect(finalServerCustomers.single.syncStatus, 'pending');
+  });
+
   test('rejected customer push stays pending after full sync', () async {
     final clientRepository = CustomerRepository(database: clientDatabase);
     final serverRepository = CustomerRepository(database: serverDatabase);
