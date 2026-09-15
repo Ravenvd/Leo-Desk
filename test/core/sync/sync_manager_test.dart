@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/core/sync/sync_client.dart';
@@ -10,9 +12,12 @@ import 'package:leo_desk/features/customers/repositories/customer_repository.dar
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
+  late Directory testDirectory;
   late Database serverDatabase;
   late Database clientDatabase;
   late SyncServer server;
@@ -23,6 +28,7 @@ void main() {
     String syncStatus = 'pending',
   }) {
     final now = DateTime.utc(2026, 1, 1);
+
     return Customer(
       uuid: uuid,
       syncStatus: syncStatus,
@@ -40,13 +46,22 @@ void main() {
   }
 
   setUp(() async {
-    serverDatabase = await AppDatabase.openTestDatabase();
-    clientDatabase = await AppDatabase.openTestDatabase();
+    testDirectory =
+        await Directory.systemTemp.createTemp('leo_desk_sync_test_');
+
+    serverDatabase = await AppDatabase.openTestDatabase(
+      path: '${testDirectory.path}${Platform.pathSeparator}server.db',
+    );
+
+    clientDatabase = await AppDatabase.openTestDatabase(
+      path: '${testDirectory.path}${Platform.pathSeparator}client.db',
+    );
 
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
       billRepository: BillRepository(database: serverDatabase),
     );
+
     await server.start(port: 0);
   });
 
@@ -54,6 +69,7 @@ void main() {
     await server.stop();
     await serverDatabase.close();
     await clientDatabase.close();
+    await testDirectory.delete(recursive: true);
   });
 
   SyncManager makeManager() {
@@ -76,6 +92,7 @@ void main() {
       uuid: 'manager-success',
       name: 'New Client Customer',
     );
+
     await clientRepository.insert(customer);
 
     final result = await makeManager().sync();
@@ -86,11 +103,13 @@ void main() {
     final clientCustomer = await clientRepository.getById(
       (await clientRepository.getAll()).single.id!,
     );
+
     expect(clientCustomer, isNotNull);
     expect(clientCustomer!.uuid, customer.uuid);
     expect(clientCustomer.syncStatus, 'synced');
 
     final serverCustomers = await serverRepository.getAll();
+
     expect(serverCustomers, hasLength(1));
     expect(serverCustomers.single.uuid, customer.uuid);
     expect(serverCustomers.single.name, customer.name);
@@ -101,11 +120,13 @@ void main() {
     final serverRepository = CustomerRepository(database: serverDatabase);
 
     const uuid = 'manager-conflict';
+
     final serverCustomer = makeCustomer(
       uuid: uuid,
       name: 'Windows Version',
       syncStatus: 'pending',
     );
+
     final clientCustomer = makeCustomer(
       uuid: uuid,
       name: 'Android Version',
@@ -120,12 +141,14 @@ void main() {
     expect(result.customersPushed, 0);
 
     final localCustomers = await clientRepository.getAll();
+
     expect(localCustomers, hasLength(1));
     expect(localCustomers.single.uuid, uuid);
     expect(localCustomers.single.name, 'Android Version');
     expect(localCustomers.single.syncStatus, 'pending');
 
     final serverCustomers = await serverRepository.getAll();
+
     expect(serverCustomers, hasLength(1));
     expect(serverCustomers.single.name, 'Windows Version');
     expect(serverCustomers.single.syncStatus, 'pending');
