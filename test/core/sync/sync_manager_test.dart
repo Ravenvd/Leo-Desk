@@ -11,6 +11,13 @@ import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+class RealHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -84,6 +91,14 @@ void main() {
     );
   }
 
+  Future<SyncResult> syncWithRealHttpClient() {
+    return HttpOverrides.runZoned(
+      () => makeManager().sync(),
+      createHttpClient: (context) =>
+          RealHttpOverrides().createHttpClient(context),
+    );
+  }
+
   test('successful customer push marks client customer as synced', () async {
     final clientRepository = CustomerRepository(database: clientDatabase);
     final serverRepository = CustomerRepository(database: serverDatabase);
@@ -95,7 +110,7 @@ void main() {
 
     await clientRepository.insert(customer);
 
-    final result = await makeManager().sync();
+    final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
     expect(result.customersPushed, 1);
@@ -135,7 +150,7 @@ void main() {
     await serverRepository.insert(serverCustomer);
     await clientRepository.insert(clientCustomer);
 
-    final result = await makeManager().sync();
+    final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
     expect(result.customersPushed, 0);
