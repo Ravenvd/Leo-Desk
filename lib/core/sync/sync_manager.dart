@@ -48,13 +48,16 @@ class SyncManager {
   final SyncClient _client;
   final CustomerRepository _customerRepository;
   final BillRepository _billRepository;
+  final Future<void> Function(DateTime) _saveLastSyncTime;
 
   SyncManager({
     required this._client,
     CustomerRepository? customerRepository,
     BillRepository? billRepository,
+    Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
-       _billRepository = billRepository ?? BillRepository();
+       _billRepository = billRepository ?? BillRepository(),
+       _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
     return SyncManager(
@@ -117,7 +120,7 @@ class SyncManager {
       syncedAt: DateTime.now(),
     );
 
-    await SyncConfig.saveLastSyncTime(result.syncedAt);
+    await _saveLastSyncTime(result.syncedAt);
 
     return result;
   }
@@ -159,7 +162,7 @@ class SyncManager {
       syncedAt: DateTime.now(),
     );
 
-    await SyncConfig.saveLastSyncTime(result.syncedAt);
+    await _saveLastSyncTime(result.syncedAt);
 
     return result;
   }
