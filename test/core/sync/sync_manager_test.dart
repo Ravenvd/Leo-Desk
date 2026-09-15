@@ -509,7 +509,7 @@ void main() {
       customerId: serverCustomer.id!,
       customerUuid: serverCustomer.uuid,
       billNumber: 'INV-4001',
-      syncStatus: 'synced',
+      syncStatus: 'pending',
       notes: 'Windows version',
     );
     await serverBills.insert(
@@ -524,29 +524,37 @@ void main() {
         ),
       ],
     );
-    await serverBills.markSynced(serverBill.uuid);
-
     await syncWithRealHttpClient();
 
-    final localBill = makeBill(
-      uuid: 'bill-conflict',
-      customerId: localCustomer.id!,
-      customerUuid: customer.uuid,
-      billNumber: 'INV-4002',
-      notes: 'Android version',
+    final localBillsBeforeEdit = await clientBills.getAll();
+    expect(localBillsBeforeEdit, hasLength(1));
+    final localBillId = localBillsBeforeEdit.single.id!;
+
+    await clientDatabase.update(
+      'bills',
+      {
+        'bill_number': 'INV-4002',
+        'notes': 'Android version',
+        'sync_status': 'pending',
+      },
+      where: 'id = ?',
+      whereArgs: [localBillId],
     );
-    await clientBills.insert(
-      bill: localBill,
-      items: [
-        makeItem(
-          uuid: 'bill-conflict-client-item',
-          description: 'Android item',
-          quantity: 2,
-          ratePaise: 75000,
-          amountPaise: 150000,
-        ),
-      ],
+
+    await clientDatabase.delete(
+      'bill_items',
+      where: 'bill_id = ?',
+      whereArgs: [localBillId],
     );
+
+    await clientDatabase.insert('bill_items', {
+      'uuid': 'bill-conflict-client-item',
+      'bill_id': localBillId,
+      'description': 'Android item',
+      'quantity': 2,
+      'rate_paise': 75000,
+      'amount_paise': 150000,
+    });
 
     final result = await syncWithRealHttpClient();
 
@@ -566,7 +574,7 @@ void main() {
     final serverBillsList = await serverBills.getAll();
     expect(serverBillsList, hasLength(1));
     expect(serverBillsList.single.notes, 'Windows version');
-    expect(serverBillsList.single.syncStatus, 'synced');
+    expect(serverBillsList.single.syncStatus, 'pending');
 
     final serverItems = await serverBills.getItems(serverBillsList.single.id!);
     expect(serverItems, hasLength(1));
