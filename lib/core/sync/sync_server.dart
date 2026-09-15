@@ -4,6 +4,8 @@ import 'dart:io';
 import '../../features/billing/repositories/bill_repository.dart';
 import '../../features/customers/models/customer.dart';
 import '../../features/customers/repositories/customer_repository.dart';
+import '../../features/expenses/models/expense.dart';
+import '../../features/expenses/repositories/expense_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
 
@@ -14,14 +16,17 @@ class SyncServer {
 
   final CustomerRepository _customerRepository;
   final BillRepository _billRepository;
+  final ExpenseRepository _expenseRepository;
   final String token;
 
   SyncServer({
     CustomerRepository? customerRepository,
     BillRepository? billRepository,
+    ExpenseRepository? expenseRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
-       _billRepository = billRepository ?? BillRepository();
+       _billRepository = billRepository ?? BillRepository(),
+       _expenseRepository = expenseRepository ?? ExpenseRepository();
 
   bool get isRunning => _server != null;
 
@@ -144,6 +149,50 @@ class SyncServer {
         await _sendJson(request.response, 200, {
           'status': 'ok',
           'uuid': syncBill.bill.uuid,
+        });
+        return;
+      }
+
+      if (request.method == 'GET' && request.uri.path == '/api/expenses') {
+        final expenses = await _expenseRepository.getAll();
+
+        await _sendJson(
+          request.response,
+          200,
+          expenses
+              .map(
+                (expense) => expense.toMap()
+                  ..remove('id')
+                  ..remove('sync_status'),
+              )
+              .toList(),
+        );
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/expenses') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {
+            'error': 'Invalid expense data.',
+          });
+          return;
+        }
+
+        final expense = Expense.fromMap(Map<String, Object?>.from(decoded));
+        final applied = await _expenseRepository.upsertFromSync(expense);
+
+        if (!applied) {
+          await _sendJson(request.response, 409, {
+            'error': 'Expense could not be applied.',
+            'uuid': expense.uuid,
+          });
+          return;
+        }
+
+        await _sendJson(request.response, 200, {
+          'status': 'ok',
+          'uuid': expense.uuid,
         });
         return;
       }
