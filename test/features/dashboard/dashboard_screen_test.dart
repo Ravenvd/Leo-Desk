@@ -9,6 +9,7 @@ import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/dashboard/screens/dashboard_screen.dart';
+import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -17,11 +18,13 @@ void main() {
   late Database database;
   late CustomerRepository customerRepository;
   late BillRepository billRepository;
+  late ExpenseRepository expenseRepository;
 
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     customerRepository = CustomerRepository(database: database);
     billRepository = BillRepository(database: database);
+    expenseRepository = ExpenseRepository(database: database);
 
     // Seed: two customers (one last month, one this month) and bills
     // across both months so every chart has data.
@@ -102,6 +105,7 @@ void main() {
           body: DashboardScreen(
             customerRepository: customerRepository,
             billRepository: billRepository,
+            expenseRepository: expenseRepository,
           ),
         ),
       ),
