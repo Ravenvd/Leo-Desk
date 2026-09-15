@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../features/billing/models/bill.dart';
 import '../../features/billing/models/bill_item.dart';
 import '../../features/customers/models/customer.dart';
+import '../../features/expenses/models/expense.dart';
 
 /// A bill bundled with its line items, as transferred over sync.
 class SyncBill {
@@ -134,6 +135,25 @@ class SyncClient {
 
   Future<bool> sendBill(SyncBill bill) async {
     return _postJson('/api/bills', bill.toMap(), bill.bill.uuid);
+  }
+
+  Future<List<Expense>> fetchExpenses() async {
+    final decoded = await _getJson('/api/expenses');
+
+    if (decoded is! List) {
+      throw const FormatException('Invalid expenses response.');
+    }
+
+    return decoded
+        .map((item) => Expense.fromMap(Map<String, Object?>.from(item as Map)))
+        .toList();
+  }
+
+  Future<bool> sendExpense(Expense expense) async {
+    final map = expense.toMap()
+      ..remove('id')
+      ..remove('sync_status');
+    return _postJson('/api/expenses', map, expense.uuid);
   }
 
   Future<Object?> _getJson(String path) async {
