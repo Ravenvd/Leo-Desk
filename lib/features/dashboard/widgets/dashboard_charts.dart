@@ -163,8 +163,8 @@ class MonthComparisonChart extends StatelessWidget {
   }
 }
 
-/// Cumulative net worth over time: cumulative revenue minus the initial
-/// investment. Negative values are shown below a dashed zero line.
+/// Cumulative net worth over time: initial investment plus cumulative net
+/// profit (revenue minus expenses).
 class NetworthChart extends StatelessWidget {
   const NetworthChart({
     super.key,
@@ -208,7 +208,7 @@ class NetworthChart extends StatelessWidget {
             Text('Net worth', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
             Text(
-              'Cumulative earnings minus the initial investment.',
+              'Initial investment plus cumulative net profit.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
