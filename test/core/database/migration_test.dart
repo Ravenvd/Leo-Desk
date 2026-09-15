@@ -133,4 +133,51 @@ void main() {
     expect(items.first['id'], itemId);
     expect(items.first['description'], 'Logo embroidery');
   });
+
+  test('v6 migration repairs customers table missing sync_status',
+      () async {
+    final now = DateTime.now().toIso8601String();
+
+    // Simulate a database created by an intermediate build: customers
+    // has uuid but no sync_status, yet the version was already stamped.
+    await database.execute('DROP TABLE customers');
+    await database.execute('''
+      CREATE TABLE customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        phone TEXT,
+        whatsapp TEXT,
+        email TEXT,
+        address TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        customer_type TEXT NOT NULL,
+        service_required TEXT NOT NULL
+      )
+    ''');
+    await database.insert('customers', {
+      'uuid': 'customer-uuid-1',
+      'name': 'Alice',
+      'created_at': now,
+      'updated_at': now,
+      'customer_type': 'personal',
+      'service_required': 'embroidery',
+    });
+
+    await DatabaseSchema.upgradeToVersion6(database);
+
+    final columns = await database.rawQuery('PRAGMA table_info(customers)');
+    expect(
+      columns.any((column) => column['name'] == 'sync_status'),
+      isTrue,
+    );
+
+    final customers = await database.query('customers');
+    expect(customers.single['sync_status'], 'synced');
+
+    // Idempotent: a second run must not throw (duplicate column).
+    await DatabaseSchema.upgradeToVersion6(database);
+  });
 }

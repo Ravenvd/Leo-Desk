@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 5;
+  static const int version = 6;
 
   static const List<String> createStatements = [
     '''
@@ -192,5 +192,22 @@ class DatabaseSchema {
         ON bill_items(uuid)
       ''');
     });
+  }
+
+  /// Repairs databases created by intermediate sync-branch builds that
+  /// stamped version 4/5 on a customers table without sync_status.
+  /// Idempotent: does nothing when the column already exists.
+  static Future<void> upgradeToVersion6(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(customers)');
+    final hasSyncStatus = columns.any(
+      (column) => column['name'] == 'sync_status',
+    );
+
+    if (!hasSyncStatus) {
+      await db.execute('''
+        ALTER TABLE customers
+        ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'
+      ''');
+    }
   }
 }
