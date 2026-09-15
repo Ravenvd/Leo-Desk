@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 6;
+  static const int version = 7;
 
   static const List<String> createStatements = [
     '''
@@ -55,6 +55,20 @@ class DatabaseSchema {
     )
     ''',
     '''
+    CREATE TABLE expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      expense_date TEXT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT NOT NULL,
+      amount_paise INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
     CREATE INDEX idx_bills_customer_id
     ON bills(customer_id)
     ''',
@@ -65,6 +79,10 @@ class DatabaseSchema {
     '''
     CREATE INDEX idx_bill_items_bill_id
     ON bill_items(bill_id)
+    ''',
+    '''
+    CREATE INDEX idx_expenses_expense_date
+    ON expenses(expense_date)
     ''',
   ];
 
@@ -209,5 +227,29 @@ class DatabaseSchema {
         ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'
       ''');
     }
+  }
+
+  static Future<void> upgradeToVersion7(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          expense_date TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount_paise INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE INDEX idx_expenses_expense_date
+        ON expenses(expense_date)
+      ''');
+    });
   }
 }
