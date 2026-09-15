@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/core/sync/sync_client.dart';
-import 'package:leo_desk/core/sync/sync_config.dart';
+import 'package/leo_desk/core/sync/sync_config.dart';
 import 'package:leo_desk/core/sync/sync_manager.dart';
 import 'package:leo_desk/core/sync/sync_server.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
@@ -88,6 +88,7 @@ void main() {
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
       billRepository: BillRepository(database: clientDatabase),
+      saveLastSyncTime: (_) async {},
     );
   }
 
