@@ -532,7 +532,7 @@ void main() {
       uuid: 'bill-conflict',
       customerId: localCustomer.id!,
       customerUuid: customer.uuid,
-      billNumber: 'INV-4001',
+      billNumber: 'INV-4002',
       notes: 'Android version',
     );
     await clientBills.insert(
