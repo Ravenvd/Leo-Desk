@@ -26,8 +26,6 @@ void main() {
     billRepository = BillRepository(database: database);
     expenseRepository = ExpenseRepository(database: database);
 
-    // Seed: two customers (one last month, one this month) and bills
-    // across both months so every chart has data.
     final now = DateTime.now();
     final lastMonth = DateTime(now.year, now.month - 1, 5);
 
@@ -40,8 +38,6 @@ void main() {
         serviceRequired: 'embroidery',
       ),
     );
-    // Backdate Alice to last month (insert sets created_at to now via
-    // the model, so fix it directly).
     await database.update(
       'customers',
       {'created_at': lastMonth.toIso8601String()},
@@ -88,8 +84,8 @@ void main() {
       );
     }
 
-    await addBill(aliceId, 'INV-OLD', lastMonth, 500000); // ₹5,000
-    await addBill(aliceId, 'INV-NEW', now, 300000); // ₹3,000
+    await addBill(aliceId, 'INV-OLD', lastMonth, 500000);
+    await addBill(aliceId, 'INV-NEW', now, 300000);
   });
 
   tearDown(() async {
@@ -111,8 +107,6 @@ void main() {
       ),
     );
 
-    // Repository futures never complete in the widget test's fake-async
-    // zone, so drive the load and animations on the real event loop.
     await tester.runAsync(() async {
       for (var i = 0; i < 10; i++) {
         await tester.pump();
@@ -120,16 +114,13 @@ void main() {
       }
     });
 
-    // Stats
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Customers'), findsOneWidget);
     expect(find.text('Pending sync'), findsOneWidget);
 
-    // Breakeven projection (₹8,000 earned of ₹10,00,000 invested)
-    expect(find.textContaining('days to breakeven'), findsOneWidget);
-    expect(find.textContaining('to go'), findsOneWidget);
+    expect(find.text('Amount to breakeven'), findsOneWidget);
+    expect(find.text('₹992000.00 remaining'), findsOneWidget);
 
-    // Charts (scroll them into view inside the dashboard ListView)
     await tester.scrollUntilVisible(
       find.text('Earnings — this month vs last month'),
       200,
@@ -148,8 +139,8 @@ void main() {
     await tester.scrollUntilVisible(find.text('Net worth'), 200);
     expect(find.text('Net worth'), findsOneWidget);
 
-    // Recent bills still present
-    await tester.scrollUntilVisible(find.text('Recent bills'), 200);
+    await tester.scrollUntilVisible(find.text('Recent transactions'), 200);
+    expect(find.text('Recent transactions'), findsOneWidget);
     expect(find.text('INV-NEW'), findsOneWidget);
   });
 }
