@@ -5,6 +5,7 @@ import '../../billing/repositories/bill_repository.dart';
 import '../../billing/screens/bill_details_screen.dart';
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
+import '../widgets/dashboard_charts.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -21,6 +22,9 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  /// Initial business investment: ₹10,00,000 (in paise).
+  static const int _investmentPaise = 100000000;
+
   List<Customer> _customers = [];
   List<Bill> _bills = [];
   int _pendingSyncCount = 0;
@@ -136,8 +140,204 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           _buildStats(),
           const SizedBox(height: 28),
+          _buildBreakevenCard(),
+          const SizedBox(height: 16),
+          _buildEarningsChart(),
+          const SizedBox(height: 16),
+          _buildCustomersChart(),
+          const SizedBox(height: 16),
+          NetworthChart(points: _networthPoints()),
+          const SizedBox(height: 28),
           _buildRecentBills(),
         ],
+      ),
+    );
+  }
+
+  int _daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
+
+  List<double> _cumulative(List<double> daily) {
+    var sum = 0.0;
+    return [for (final value in daily) sum += value];
+  }
+
+  /// Cumulative earnings (in rupees) per day of the given month,
+  /// up to and including [maxDay].
+  List<double> _cumulativeEarnings(int year, int month, int maxDay) {
+    final daily = List<double>.filled(maxDay, 0);
+
+    for (final bill in _bills) {
+      final date = bill.billDate;
+      if (date.year == year && date.month == month && date.day <= maxDay) {
+        daily[date.day - 1] += bill.totalPaise / 100;
+      }
+    }
+
+    return _cumulative(daily);
+  }
+
+  /// Cumulative new-customer count per day of the given month.
+  List<double> _cumulativeCustomers(int year, int month, int maxDay) {
+    final daily = List<double>.filled(maxDay, 0);
+
+    for (final customer in _customers) {
+      final date = customer.createdAt;
+      if (date.year == year && date.month == month && date.day <= maxDay) {
+        daily[date.day - 1] += 1;
+      }
+    }
+
+    return _cumulative(daily);
+  }
+
+  Widget _buildEarningsChart() {
+    final now = DateTime.now();
+    final lastMonth = DateTime(now.year, now.month - 1);
+    final lastMonthMaxDay =
+        now.day > _daysInMonth(lastMonth.year, lastMonth.month)
+        ? _daysInMonth(lastMonth.year, lastMonth.month)
+        : now.day;
+
+    return MonthComparisonChart(
+      title: 'Earnings — this month vs last month',
+      lastMonth: _cumulativeEarnings(
+        lastMonth.year,
+        lastMonth.month,
+        lastMonthMaxDay,
+      ),
+      thisMonth: _cumulativeEarnings(now.year, now.month, now.day),
+    );
+  }
+
+  Widget _buildCustomersChart() {
+    final now = DateTime.now();
+    final lastMonth = DateTime(now.year, now.month - 1);
+    final lastMonthMaxDay =
+        now.day > _daysInMonth(lastMonth.year, lastMonth.month)
+        ? _daysInMonth(lastMonth.year, lastMonth.month)
+        : now.day;
+
+    return MonthComparisonChart(
+      title: 'New customers — this month vs last month',
+      lastMonth: _cumulativeCustomers(
+        lastMonth.year,
+        lastMonth.month,
+        lastMonthMaxDay,
+      ),
+      thisMonth: _cumulativeCustomers(now.year, now.month, now.day),
+      formatValue: (value) => value.toInt().toString(),
+    );
+  }
+
+  /// Net worth per day: cumulative revenue minus the initial investment,
+  /// from the first bill's date until today.
+  List<NetworthPoint> _networthPoints() {
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+
+    if (_bills.isEmpty) {
+      return [
+        NetworthPoint(date: todayDate, networthRupees: -_investmentPaise / 100),
+      ];
+    }
+
+    final revenueByDay = <DateTime, int>{};
+    for (final bill in _bills) {
+      final day = DateTime(
+        bill.billDate.year,
+        bill.billDate.month,
+        bill.billDate.day,
+      );
+      revenueByDay[day] = (revenueByDay[day] ?? 0) + bill.totalPaise;
+    }
+
+    final firstDay = revenueByDay.keys.reduce((a, b) => a.isBefore(b) ? a : b);
+
+    final points = <NetworthPoint>[];
+    var cumulativePaise = 0;
+
+    for (
+      var day = firstDay;
+      !day.isAfter(todayDate);
+      day = day.add(const Duration(days: 1))
+    ) {
+      cumulativePaise += revenueByDay[day] ?? 0;
+      points.add(
+        NetworthPoint(
+          date: day,
+          networthRupees: (cumulativePaise - _investmentPaise) / 100,
+        ),
+      );
+    }
+
+    return points;
+  }
+
+  Widget _buildBreakevenCard() {
+    final totalRevenue = _bills.fold<int>(
+      0,
+      (sum, bill) => sum + bill.totalPaise,
+    );
+    final remaining = _investmentPaise - totalRevenue;
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    String title;
+    String subtitle;
+    Color accent;
+
+    if (remaining <= 0) {
+      title = 'Breakeven achieved 🎉';
+      subtitle =
+          'Earnings of ${_money(totalRevenue)} have covered the '
+          '${_money(_investmentPaise)} investment.';
+      accent = Colors.green;
+    } else if (totalRevenue <= 0) {
+      title = 'Breakeven countdown';
+      subtitle =
+          'No earnings yet — add bills to start the projection. '
+          '${_money(remaining)} to go.';
+      accent = colorScheme.primary;
+    } else {
+      final firstBillDate = _bills
+          .map((bill) => bill.billDate)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final daysTracked = DateTime.now().difference(firstBillDate).inDays + 1;
+      final averageDailyPaise = totalRevenue / daysTracked;
+      final estimatedDays = (remaining / averageDailyPaise).ceil();
+      final projectedDate = DateTime.now().add(Duration(days: estimatedDays));
+
+      title = '≈ $estimatedDays days to breakeven';
+      subtitle =
+          'At the current average of ${_money(averageDailyPaise.round())}'
+          '/day, projected around ${_date(projectedDate)}. '
+          '${_money(remaining)} to go.';
+      accent = colorScheme.primary;
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            Icon(Icons.flag_rounded, size: 40, color: accent),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(color: accent),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(subtitle),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
