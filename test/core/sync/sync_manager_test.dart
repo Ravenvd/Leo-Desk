@@ -11,6 +11,16 @@ import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+class RealHttpOverrides extends HttpOverrides {
+  // The override is intentional: flutter_test intercepts HTTP requests, and
+  // this test needs the real dart:io HttpClient for the local sync server.
+  // ignore: unnecessary_overrides
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -88,7 +98,8 @@ void main() {
   Future<SyncResult> syncWithRealHttpClient() {
     return HttpOverrides.runZoned(
       () => makeManager().sync(),
-      createHttpClient: (_) => HttpClient(),
+      createHttpClient: (context) =>
+          RealHttpOverrides().createHttpClient(context),
     );
   }
 
