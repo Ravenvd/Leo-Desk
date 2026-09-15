@@ -87,7 +87,15 @@ class SyncServer {
 
         final customer = Customer.fromMap(Map<String, Object?>.from(decoded));
 
-        await _customerRepository.upsertFromSync(customer);
+        final applied = await _customerRepository.upsertFromSync(customer);
+
+        if (!applied) {
+          await _sendJson(request.response, 409, {
+            'error': 'Customer could not be applied.',
+            'uuid': customer.uuid,
+          });
+          return;
+        }
 
         await _sendJson(request.response, 200, {
           'status': 'ok',
