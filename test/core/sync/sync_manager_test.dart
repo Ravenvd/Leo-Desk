@@ -486,7 +486,6 @@ void main() {
   });
 
   test('rejected bill push stays pending after full sync', () async {
-    final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientBills = BillRepository(database: clientDatabase);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
