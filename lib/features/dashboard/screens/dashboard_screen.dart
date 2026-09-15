@@ -5,6 +5,8 @@ import '../../billing/repositories/bill_repository.dart';
 import '../../billing/screens/bill_details_screen.dart';
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
+import '../../expenses/models/expense.dart';
+import '../../expenses/repositories/expense_repository.dart';
 import '../../../core/sync/sync_events.dart';
 import '../widgets/dashboard_charts.dart';
 
@@ -13,10 +15,12 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.customerRepository,
     required this.billRepository,
+    required this.expenseRepository,
   });
 
   final CustomerRepository customerRepository;
   final BillRepository billRepository;
+  final ExpenseRepository expenseRepository;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -28,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Customer> _customers = [];
   List<Bill> _bills = [];
+  List<Expense> _expenses = [];
   int _pendingSyncCount = 0;
   bool _isLoading = true;
   String? _error;
@@ -62,15 +67,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final customers = await widget.customerRepository.getAll();
       final bills = await widget.billRepository.getAll();
+      final expenses = await widget.expenseRepository.getAll();
       final pendingCustomers = await widget.customerRepository.getPending();
       final pendingBills = await widget.billRepository.getPending();
+      final pendingExpenses = await widget.expenseRepository.getPending();
 
       if (!mounted) return;
 
       setState(() {
         _customers = customers;
         _bills = bills;
-        _pendingSyncCount = pendingCustomers.length + pendingBills.length;
+        _expenses = expenses;
+        _pendingSyncCount =
+            pendingCustomers.length + pendingBills.length + pendingExpenses.length;
         _isLoading = false;
       });
     } catch (error, stackTrace) {
@@ -93,6 +102,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '${two(date.day)}/${two(date.month)}/${date.year}';
   }
 
+  int get _totalRevenuePaise =>
+      _bills.fold<int>(0, (sum, bill) => sum + bill.totalPaise);
+
+  int get _totalExpensesPaise =>
+      _expenses.fold<int>(0, (sum, expense) => sum + expense.amountPaise);
+
+  int get _netProfitPaise => _totalRevenuePaise - _totalExpensesPaise;
+
+  int get _netWorthPaise => _investmentPaise + _netProfitPaise;
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -102,7 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             Expanded(child: _buildContent()),
           ],
         ),
@@ -152,6 +171,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onRefresh: _load,
       child: ListView(
         children: [
+          _buildNetWorthCard(),
+          const SizedBox(height: 20),
           _buildStats(),
           const SizedBox(height: 28),
           _buildBreakevenCard(),
@@ -162,8 +183,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           NetworthChart(points: _networthPoints()),
           const SizedBox(height: 28),
-          _buildRecentBills(),
+          _buildRecentTransactions(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNetWorthCard() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isNegative = _netWorthPaise < 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            Icon(
+              Icons.account_balance_rounded,
+              size: 42,
+              color: isNegative ? colorScheme.error : colorScheme.primary,
+            ),
+            const SizedBox(width: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Net worth',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _money(_netWorthPaise),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: isNegative ? colorScheme.error : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Initial investment + net profit',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -243,15 +307,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Net worth per day: cumulative revenue minus the initial investment,
-  /// from the first bill's date until today.
+  /// Net worth per day: initial investment plus cumulative revenue minus
+  /// cumulative expenses, from the first transaction date until today.
   List<NetworthPoint> _networthPoints() {
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
 
-    if (_bills.isEmpty) {
+    final transactionDates = [
+      ..._bills.map((bill) => DateTime(
+            bill.billDate.year,
+            bill.billDate.month,
+            bill.billDate.day,
+          )),
+      ..._expenses.map((expense) => DateTime(
+            expense.expenseDate.year,
+            expense.expenseDate.month,
+            expense.expenseDate.day,
+          )),
+    ];
+
+    if (transactionDates.isEmpty) {
       return [
-        NetworthPoint(date: todayDate, networthRupees: -_investmentPaise / 100),
+        NetworthPoint(
+          date: todayDate,
+          networthRupees: _investmentPaise / 100,
+        ),
       ];
     }
 
@@ -265,10 +345,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       revenueByDay[day] = (revenueByDay[day] ?? 0) + bill.totalPaise;
     }
 
-    final firstDay = revenueByDay.keys.reduce((a, b) => a.isBefore(b) ? a : b);
+    final expensesByDay = <DateTime, int>{};
+    for (final expense in _expenses) {
+      final day = DateTime(
+        expense.expenseDate.year,
+        expense.expenseDate.month,
+        expense.expenseDate.day,
+      );
+      expensesByDay[day] =
+          (expensesByDay[day] ?? 0) + expense.amountPaise;
+    }
 
+    final firstDay = transactionDates.reduce((a, b) => a.isBefore(b) ? a : b);
     final points = <NetworthPoint>[];
-    var cumulativePaise = 0;
+    var cumulativePaise = _investmentPaise;
 
     for (
       var day = firstDay;
@@ -276,10 +366,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       day = day.add(const Duration(days: 1))
     ) {
       cumulativePaise += revenueByDay[day] ?? 0;
+      cumulativePaise -= expensesByDay[day] ?? 0;
       points.add(
         NetworthPoint(
           date: day,
-          networthRupees: (cumulativePaise - _investmentPaise) / 100,
+          networthRupees: cumulativePaise / 100,
         ),
       );
     }
@@ -288,10 +379,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBreakevenCard() {
-    final totalRevenue = _bills.fold<int>(
-      0,
-      (sum, bill) => sum + bill.totalPaise,
-    );
+    final totalRevenue = _totalRevenuePaise;
     final remaining = _investmentPaise - totalRevenue;
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -357,10 +445,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildStats() {
-    final totalRevenue = _bills.fold<int>(
-      0,
-      (sum, bill) => sum + bill.totalPaise,
-    );
     final outstanding = _bills.fold<int>(
       0,
       (sum, bill) =>
@@ -377,20 +461,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           value: '${_customers.length}',
         ),
         _StatCard(
-          icon: Icons.receipt_long_rounded,
-          label: 'Bills',
-          value: '${_bills.length}',
-        ),
-        _StatCard(
           icon: Icons.payments_rounded,
           label: 'Revenue',
-          value: _money(totalRevenue),
+          value: _money(_totalRevenuePaise),
         ),
         _StatCard(
           icon: Icons.account_balance_wallet_rounded,
           label: 'Outstanding',
           value: _money(outstanding),
           highlight: outstanding > 0,
+        ),
+        _StatCard(
+          icon: Icons.trending_up_rounded,
+          label: 'Net profit',
+          value: _money(_netProfitPaise),
+          highlight: _netProfitPaise < 0,
         ),
         _StatCard(
           icon: Icons.sync_rounded,
@@ -402,45 +487,116 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildRecentBills() {
+  Widget _buildRecentTransactions() {
     final customerNames = {
       for (final customer in _customers)
         if (customer.id != null) customer.id!: customer,
     };
 
-    final recentBills = _bills.take(5).toList();
+    final transactions = <_RecentTransaction>[
+      for (final bill in _bills)
+        _RecentTransaction.bill(bill),
+      for (final expense in _expenses)
+        _RecentTransaction.expense(expense),
+    ]..sort((a, b) => b.date.compareTo(a.date));
+
+    final recentTransactions = transactions.take(10).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recent bills', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Recent transactions',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         const SizedBox(height: 12),
-        if (recentBills.isEmpty)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('No bills yet.'),
-            ),
-          )
-        else
-          for (final bill in recentBills)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _RecentBillCard(
-                bill: bill,
-                customer: customerNames[bill.customerId],
-                money: _money,
-                date: _date,
-                onTap: () => _openBill(bill, customerNames[bill.customerId]),
-              ),
-            ),
+        Card(
+          child: recentTransactions.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('No transactions yet.'),
+                )
+              : ExpansionTile(
+                  title: Text(
+                    '${recentTransactions.length} most recent transaction'
+                    '${recentTransactions.length == 1 ? '' : 's'}',
+                  ),
+                  children: [
+                    for (final transaction in recentTransactions)
+                      _buildTransactionTile(transaction, customerNames),
+                  ],
+                ),
+        ),
       ],
     );
   }
 
-  Future<void> _openBill(Bill bill, Customer? customer) async {
-    if (customer == null) return;
+  Widget _buildTransactionTile(
+    _RecentTransaction transaction,
+    Map<int, Customer> customerNames,
+  ) {
+    if (transaction.bill != null) {
+      final bill = transaction.bill!;
+      final customer = customerNames[bill.customerId];
+      final statusLabel = switch (bill.paymentStatus) {
+        'paid' => 'Paid',
+        'partial' => 'Partial',
+        _ => 'Unpaid',
+      };
+      final statusColor = switch (bill.paymentStatus) {
+        'paid' => Colors.green,
+        'partial' => Colors.orange,
+        _ => Colors.red,
+      };
 
+      return ListTile(
+        leading: const Icon(Icons.receipt_long_rounded),
+        title: Text(
+          bill.billNumber,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          '${customer?.name ?? 'Unknown customer'} · ${_date(bill.billDate)}',
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _money(bill.totalPaise),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 12),
+            Chip(
+              label: Text(statusLabel),
+              labelStyle: TextStyle(color: statusColor),
+              side: BorderSide(color: statusColor),
+              backgroundColor: statusColor.withValues(alpha: 0.08),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        onTap: customer == null
+            ? null
+            : () => _openBill(bill, customer),
+      );
+    }
+
+    final expense = transaction.expense!;
+    return ListTile(
+      leading: const Icon(Icons.money_off_rounded),
+      title: Text(
+        expense.description,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text('${expense.category} · ${_date(expense.expenseDate)}'),
+      trailing: Text(
+        '-${_money(expense.amountPaise)}',
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Future<void> _openBill(Bill bill, Customer customer) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BillDetailsScreen(
@@ -456,6 +612,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
+class _RecentTransaction {
+  final DateTime date;
+  final Bill? bill;
+  final Expense? expense;
+
+  const _RecentTransaction._({
+    required this.date,
+    this.bill,
+    this.expense,
+  });
+
+  factory _RecentTransaction.bill(Bill bill) {
+    return _RecentTransaction._(date: bill.billDate, bill: bill);
+  }
+
+  factory _RecentTransaction.expense(Expense expense) {
+    return _RecentTransaction._(
+      date: expense.expenseDate,
+      expense: expense,
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.icon,
@@ -468,7 +647,7 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
 
-  /// Draws attention to the value (e.g. outstanding dues, pending sync).
+  /// Draws attention to a negative/problem value.
   final bool highlight;
 
   @override
@@ -500,68 +679,6 @@ class _StatCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RecentBillCard extends StatelessWidget {
-  const _RecentBillCard({
-    required this.bill,
-    required this.customer,
-    required this.money,
-    required this.date,
-    required this.onTap,
-  });
-
-  final Bill bill;
-  final Customer? customer;
-  final String Function(int paise) money;
-  final String Function(DateTime date) date;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final statusLabel = switch (bill.paymentStatus) {
-      'paid' => 'Paid',
-      'partial' => 'Partial',
-      _ => 'Unpaid',
-    };
-
-    final statusColor = switch (bill.paymentStatus) {
-      'paid' => Colors.green,
-      'partial' => Colors.orange,
-      _ => Colors.red,
-    };
-
-    return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-        title: Text(
-          bill.billNumber,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          '${customer?.name ?? 'Unknown customer'} · ${date(bill.billDate)}',
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              money(bill.totalPaise),
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            const SizedBox(width: 12),
-            Chip(
-              label: Text(statusLabel),
-              labelStyle: TextStyle(color: statusColor),
-              side: BorderSide(color: statusColor),
-              backgroundColor: statusColor.withValues(alpha: 0.08),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
-        onTap: customer == null ? null : onTap,
       ),
     );
   }
