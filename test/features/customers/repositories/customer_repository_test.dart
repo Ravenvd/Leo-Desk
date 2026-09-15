@@ -3,8 +3,12 @@ import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+
   late Database database;
   late CustomerRepository repository;
 
