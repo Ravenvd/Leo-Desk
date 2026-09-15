@@ -13,6 +13,7 @@ import 'package:leo_desk/features/billing/models/bill_item.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
+import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class RealHttpOverrides extends HttpOverrides {
@@ -117,6 +118,7 @@ void main() {
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
       billRepository: BillRepository(database: serverDatabase),
+      expenseRepository: ExpenseRepository(database: serverDatabase),
     );
 
     await server.start(port: 0);
@@ -138,6 +140,7 @@ void main() {
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
       billRepository: BillRepository(database: clientDatabase),
+      expenseRepository: ExpenseRepository(database: clientDatabase),
       saveLastSyncTime: (_) async {},
     );
   }
@@ -347,7 +350,8 @@ void main() {
     await serverCustomers.markSynced(customer.uuid);
     await syncWithRealHttpClient();
 
-    final localCustomer = (await CustomerRepository(database: clientDatabase).getAll()).single;
+    final localCustomer =
+        (await CustomerRepository(database: clientDatabase).getAll()).single;
 
     final serverCustomer = (await serverCustomers.getAll()).single;
     final bill = makeBill(
@@ -409,6 +413,7 @@ void main() {
 
     await serverCustomers.insert(customer);
     await serverCustomers.markSynced(customer.uuid);
+
     await syncWithRealHttpClient();
 
     final serverCustomer = (await serverCustomers.getAll()).single;
