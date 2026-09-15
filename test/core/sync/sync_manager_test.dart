@@ -398,7 +398,6 @@ void main() {
 
   test('replaces a synced bill and its items when Windows sends changes',
       () async {
-    final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientBills = BillRepository(database: clientDatabase);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
@@ -444,18 +443,6 @@ void main() {
     final localItemsBeforeUpdate =
         await clientBills.getItems(localBillBeforeUpdate.id!);
     expect(localItemsBeforeUpdate, hasLength(1));
-
-    await serverDatabase.update(
-      'bills',
-      {
-        'notes': 'Updated by Windows',
-        'amount_paid_paise': 154000,
-        'updated_at': DateTime.utc(2026, 1, 2).toIso8601String(),
-        'sync_status': 'synced',
-      },
-      where: 'uuid = ?',
-      whereArgs: [originalBill.uuid],
-    );
 
     await serverBills.deleteAll();
     final updatedBill = originalBill.copyWith(
