@@ -23,11 +23,29 @@ class BillRepository {
 
     final db = await _db;
 
-    return db.transaction((txn) async {
-      final billId = await txn.insert(
-        'bills',
-        bill.toMap()..remove('id'),
+    // Resolve the customer's uuid so the bill stays linked to the
+    // customer across devices (local integer ids differ per device).
+    var customerUuid = bill.customerUuid;
+    if (customerUuid == null) {
+      final customers = await db.query(
+        'customers',
+        columns: ['uuid'],
+        where: 'id = ?',
+        whereArgs: [bill.customerId],
+        limit: 1,
       );
+      if (customers.isNotEmpty) {
+        customerUuid = customers.first['uuid'] as String;
+      }
+    }
+
+    final localBill = bill.copyWith(
+      syncStatus: 'pending',
+      customerUuid: customerUuid,
+    );
+
+    return db.transaction((txn) async {
+      final billId = await txn.insert('bills', localBill.toMap()..remove('id'));
 
       for (final item in items) {
         await txn.insert(
@@ -40,6 +58,100 @@ class BillRepository {
 
       return billId;
     });
+  }
+
+  /// Inserts or updates a bill (with its items) received from sync.
+  ///
+  /// Returns false when the bill cannot be applied — either because the
+  /// owning customer is not present locally yet, or because a locally
+  /// modified (pending) bill with the same uuid exists (local wins until
+  /// it is pushed).
+  Future<bool> upsertFromSync(Bill bill, List<BillItem> items) async {
+    final db = await _db;
+
+    final existing = await db.query(
+      'bills',
+      columns: ['id', 'sync_status'],
+      where: 'uuid = ?',
+      whereArgs: [bill.uuid],
+      limit: 1,
+    );
+
+    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
+      return false;
+    }
+
+    // Resolve the local customer id from the customer uuid.
+    int customerId;
+    if (bill.customerUuid != null) {
+      final customers = await db.query(
+        'customers',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [bill.customerUuid],
+        limit: 1,
+      );
+      if (customers.isEmpty) {
+        return false;
+      }
+      customerId = customers.first['id'] as int;
+    } else {
+      return false;
+    }
+
+    final map =
+        bill.copyWith(syncStatus: 'synced', customerId: customerId).toMap()
+          ..remove('id');
+
+    await db.transaction((txn) async {
+      int billId;
+
+      if (existing.isEmpty) {
+        billId = await txn.insert('bills', map);
+      } else {
+        billId = existing.first['id'] as int;
+        await txn.update('bills', map, where: 'id = ?', whereArgs: [billId]);
+        await txn.delete(
+          'bill_items',
+          where: 'bill_id = ?',
+          whereArgs: [billId],
+        );
+      }
+
+      for (final item in items) {
+        await txn.insert(
+          'bill_items',
+          item.toMap()
+            ..remove('id')
+            ..['bill_id'] = billId,
+        );
+      }
+    });
+
+    return true;
+  }
+
+  Future<List<Bill>> getPending() async {
+    final db = await _db;
+
+    final maps = await db.query(
+      'bills',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
+    );
+
+    return maps.map(Bill.fromMap).toList();
+  }
+
+  Future<int> markSynced(String uuid) async {
+    final db = await _db;
+
+    return db.update(
+      'bills',
+      {'sync_status': 'synced'},
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+    );
   }
 
   Future<Bill?> getById(int id) async {
@@ -86,10 +198,7 @@ class BillRepository {
   Future<List<Bill>> getAll() async {
     final db = await _db;
 
-    final maps = await db.query(
-      'bills',
-      orderBy: 'bill_date DESC, id DESC',
-    );
+    final maps = await db.query('bills', orderBy: 'bill_date DESC, id DESC');
 
     return maps.map(Bill.fromMap).toList();
   }

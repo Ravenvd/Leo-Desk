@@ -1,6 +1,11 @@
+import 'package:uuid/uuid.dart';
+
 class Bill {
   final int? id;
+  final String uuid;
+  final String syncStatus;
   final int customerId;
+  final String? customerUuid;
   final String billNumber;
   final DateTime billDate;
   final int subtotalPaise;
@@ -12,9 +17,12 @@ class Bill {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  const Bill({
+  Bill({
     this.id,
+    String? uuid,
+    this.syncStatus = 'pending',
     required this.customerId,
+    this.customerUuid,
     required this.billNumber,
     required this.billDate,
     required this.subtotalPaise,
@@ -25,7 +33,7 @@ class Bill {
     this.notes,
     required this.createdAt,
     required this.updatedAt,
-  });
+  }) : uuid = uuid ?? const Uuid().v4();
 
   int get balanceDuePaise => totalPaise - amountPaidPaise;
 
@@ -37,7 +45,10 @@ class Bill {
 
   Bill copyWith({
     int? id,
+    String? uuid,
+    String? syncStatus,
     int? customerId,
+    String? customerUuid,
     String? billNumber,
     DateTime? billDate,
     int? subtotalPaise,
@@ -51,7 +62,10 @@ class Bill {
   }) {
     return Bill(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
+      syncStatus: syncStatus ?? this.syncStatus,
       customerId: customerId ?? this.customerId,
+      customerUuid: customerUuid ?? this.customerUuid,
       billNumber: billNumber ?? this.billNumber,
       billDate: billDate ?? this.billDate,
       subtotalPaise: subtotalPaise ?? this.subtotalPaise,
@@ -68,7 +82,10 @@ class Bill {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'uuid': uuid,
+      'sync_status': syncStatus,
       'customer_id': customerId,
+      'customer_uuid': customerUuid,
       'bill_number': billNumber,
       'bill_date': billDate.toIso8601String(),
       'subtotal_paise': subtotalPaise,
@@ -85,7 +102,10 @@ class Bill {
   factory Bill.fromMap(Map<String, Object?> map) {
     return Bill(
       id: map['id'] as int?,
-      customerId: map['customer_id'] as int,
+      uuid: map['uuid'] as String,
+      syncStatus: map['sync_status'] as String? ?? 'synced',
+      customerId: map['customer_id'] as int? ?? 0,
+      customerUuid: map['customer_uuid'] as String?,
       billNumber: map['bill_number'] as String,
       billDate: DateTime.parse(map['bill_date'] as String),
       subtotalPaise: map['subtotal_paise'] as int,

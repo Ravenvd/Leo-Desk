@@ -64,8 +64,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
     return ((double.tryParse(value.trim()) ?? 0) * 100).round();
   }
 
-  int get _subtotal =>
-      _items.fold(0, (sum, item) => sum + item.amountPaise);
+  int get _subtotal => _items.fold(0, (sum, item) => sum + item.amountPaise);
 
   int get _discount => _paise(_discountController.text);
   int get _tax => _paise(_taxController.text);
@@ -129,10 +128,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
           )
           .toList();
 
-      final id = await widget.repository.insert(
-        bill: bill,
-        items: items,
-      );
+      final id = await widget.repository.insert(bill: bill, items: items);
 
       if (!mounted) return;
       setState(() => _isSaving = false);
@@ -146,9 +142,8 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
   }
 
   void _error(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _pickDate() async {
@@ -237,8 +232,9 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed:
-                          _isSaving || _received != _total ? null : _saveBill,
+                      onPressed: _isSaving || _received != _total
+                          ? null
+                          : _saveBill,
                       icon: const Icon(Icons.receipt_long_rounded),
                       label: Text(_isSaving ? 'Saving...' : 'Save Bill'),
                     ),
@@ -281,7 +277,8 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
   }
 
   Widget _billInfoCard() {
-    final formattedDate = '${_billDate.day.toString().padLeft(2, '0')}/'
+    final formattedDate =
+        '${_billDate.day.toString().padLeft(2, '0')}/'
         '${_billDate.month.toString().padLeft(2, '0')}/'
         '${_billDate.year}';
 
@@ -332,10 +329,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
                 const Expanded(
                   child: Text(
                     'Items',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
                 OutlinedButton.icon(
@@ -474,10 +468,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
             Row(
               children: [
                 const Expanded(child: Text('Tax')),
-                SizedBox(
-                  width: 180,
-                  child: _moneyField(_taxController, 'Tax'),
-                ),
+                SizedBox(width: 180, child: _moneyField(_taxController, 'Tax')),
               ],
             ),
             const Divider(height: 28),
@@ -515,8 +506,7 @@ class _BillLineController {
   final quantityController = TextEditingController(text: '1');
   final rateController = TextEditingController(text: '0');
 
-  double get quantity =>
-      double.tryParse(quantityController.text.trim()) ?? 0;
+  double get quantity => double.tryParse(quantityController.text.trim()) ?? 0;
 
   int get ratePaise =>
       ((double.tryParse(rateController.text.trim()) ?? 0) * 100).round();

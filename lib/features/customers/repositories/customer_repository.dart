@@ -15,44 +15,69 @@ class CustomerRepository {
   Future<int> insert(Customer customer) async {
     final db = await _db;
 
-    return db.insert(
-      'customers',
-      customer.toMap(),
-    );
+    final localCustomer = customer.copyWith(syncStatus: 'pending');
+
+    return db.insert('customers', localCustomer.toMap()..remove('id'));
   }
 
-Future<void> upsertFromSync(Customer customer) async {
-  final db = await _db;
+  /// Inserts or updates a customer received from sync.
+  ///
+  /// Conflict rule: a locally modified (pending) record always wins over
+  /// the server copy — it will be pushed on the next sync. Otherwise the
+  /// server (Windows) is the source of truth and overwrites the local row.
+  Future<void> upsertFromSync(Customer customer) async {
+    final db = await _db;
 
-  final existing = await db.query(
-    'customers',
-    columns: ['id'],
-    where: 'uuid = ?',
-    whereArgs: [customer.uuid],
-    limit: 1,
-  );
+    final existing = await db.query(
+      'customers',
+      columns: ['id', 'sync_status'],
+      where: 'uuid = ?',
+      whereArgs: [customer.uuid],
+      limit: 1,
+    );
 
-  if (existing.isEmpty) {
-    final map = customer.toMap();
-    map.remove('id');
+    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
+      return;
+    }
 
-    await db.insert(
+    final map = customer.copyWith(syncStatus: 'synced').toMap()..remove('id');
+
+    if (existing.isEmpty) {
+      await db.insert('customers', map);
+      return;
+    }
+
+    await db.update(
       'customers',
       map,
+      where: 'uuid = ?',
+      whereArgs: [customer.uuid],
     );
-    return;
   }
 
-  final map = customer.toMap();
-  map.remove('id');
+  Future<List<Customer>> getPending() async {
+    final db = await _db;
 
-  await db.update(
-    'customers',
-    map,
-    where: 'uuid = ?',
-    whereArgs: [customer.uuid],
-  );
-}
+    final maps = await db.query(
+      'customers',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
+    );
+
+    return maps.map(Customer.fromMap).toList();
+  }
+
+  Future<int> markSynced(String uuid) async {
+    final db = await _db;
+
+    return db.update(
+      'customers',
+      {'sync_status': 'synced'},
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+    );
+  }
+
   Future<List<Customer>> getAll() async {
     final db = await _db;
 
@@ -88,9 +113,11 @@ Future<void> upsertFromSync(Customer customer) async {
 
     final db = await _db;
 
+    final localCustomer = customer.copyWith(syncStatus: 'pending');
+
     return db.update(
       'customers',
-      customer.toMap(),
+      localCustomer.toMap()..remove('id'),
       where: 'id = ?',
       whereArgs: [customer.id],
     );
@@ -99,11 +126,7 @@ Future<void> upsertFromSync(Customer customer) async {
   Future<int> delete(int id) async {
     final db = await _db;
 
-    return db.delete(
-      'customers',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return db.delete('customers', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<Customer>> search(String query) async {

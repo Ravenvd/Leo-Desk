@@ -6,10 +6,7 @@ import 'customer_details_screen.dart';
 import 'customer_form_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
-  const CustomersScreen({
-    super.key,
-    required this.repository,
-  });
+  const CustomersScreen({super.key, required this.repository});
 
   final CustomerRepository repository;
 
@@ -91,9 +88,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Future<void> _openAddCustomer() async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => CustomerFormScreen(
-          repository: widget.repository,
-        ),
+        builder: (_) => CustomerFormScreen(repository: widget.repository),
       ),
     );
 
@@ -154,9 +149,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             const SizedBox(height: 28),
             _buildSearchBar(),
             const SizedBox(height: 24),
-            Expanded(
-              child: _buildContent(),
-            ),
+            Expanded(child: _buildContent()),
           ],
         ),
       ),
@@ -172,9 +165,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
             children: [
               Text(
                 'Customers',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(context).textTheme.headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
               Text(
@@ -198,9 +190,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final hasSearch = _searchController.text.isNotEmpty;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: 600,
-      ),
+      constraints: const BoxConstraints(maxWidth: 600),
       child: TextField(
         controller: _searchController,
         onChanged: _searchCustomers,
@@ -226,9 +216,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
@@ -236,10 +224,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-            ),
+            const Icon(Icons.error_outline_rounded, size: 48),
             const SizedBox(height: 16),
             Text(_error!),
             const SizedBox(height: 16),
@@ -279,16 +264,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            hasSearch
-                ? Icons.search_off_rounded
-                : Icons.people_outline_rounded,
+            hasSearch ? Icons.search_off_rounded : Icons.people_outline_rounded,
             size: 64,
           ),
           const SizedBox(height: 20),
           Text(
-            hasSearch
-                ? 'No customers found'
-                : 'No customers yet',
+            hasSearch ? 'No customers found' : 'No customers yet',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
@@ -311,6 +292,29 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 }
 
+class _SyncStatusDot extends StatelessWidget {
+  const _SyncStatusDot({required this.syncStatus});
+
+  final String syncStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final synced = syncStatus == 'synced';
+
+    return Tooltip(
+      message: synced ? 'Synced' : 'Pending sync',
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: synced ? Colors.green : Colors.red,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
 class _CustomerCard extends StatelessWidget {
   const _CustomerCard({
     required this.customer,
@@ -324,16 +328,19 @@ class _CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final contact = customer.phone ??
+    final contact =
+        customer.phone ??
         customer.whatsapp ??
         customer.email ??
         'No contact information';
 
-    final customerType =
-        customer.customerType == 'business' ? 'Business' : 'Personal';
+    final customerType = customer.customerType == 'business'
+        ? 'Business'
+        : 'Personal';
 
-    final service =
-        customer.serviceRequired == 'stitching' ? 'Stitching' : 'Embroidery';
+    final service = customer.serviceRequired == 'stitching'
+        ? 'Stitching'
+        : 'Embroidery';
 
     return Card(
       child: ListTile(
@@ -348,11 +355,18 @@ class _CustomerCard extends StatelessWidget {
                 : customer.name.substring(0, 1).toUpperCase(),
           ),
         ),
-        title: Text(
-          customer.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
+        title: Row(
+          children: [
+            _SyncStatusDot(syncStatus: customer.syncStatus),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                customer.name,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

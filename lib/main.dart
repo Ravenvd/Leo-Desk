@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/database/app_database.dart';
+import 'core/sync/sync_config.dart';
+import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
-
+import 'features/sync/screens/sync_settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,16 +23,65 @@ Future<void> main() async {
 
   await AppDatabase.database;
 
-  if (Platform.isWindows){
-    final syncServer = SyncServer();
-    await syncServer.start();
+  SyncServer? syncServer;
+  if (Platform.isWindows) {
+    syncServer = SyncServer();
+    try {
+      final config = await SyncConfig.load();
+      await syncServer.start(port: config.serverPort);
+    } catch (error) {
+      // A busy port must not prevent the app from starting.
+      debugPrint('Sync server failed to start: $error');
+      syncServer = null;
+    }
   }
 
-  runApp(const LeoDeskApp());
+  if (Platform.isAndroid) {
+    _startAutoSync();
+  }
+
+  runApp(LeoDeskApp(syncServer: syncServer));
+}
+
+/// On Android, sync with the Windows host automatically: once at
+/// startup, whenever the device joins a Wi-Fi network, and on a
+/// 10-minute timer while the app is running.
+void _startAutoSync() {
+  var syncInProgress = false;
+
+  Future<void> runSync() async {
+    if (syncInProgress) return;
+    syncInProgress = true;
+    try {
+      final config = await SyncConfig.load();
+      if (config.isConfigured) {
+        await SyncManager.fromConfig(config).sync();
+      }
+    } catch (error) {
+      debugPrint('Auto-sync failed: $error');
+    } finally {
+      syncInProgress = false;
+    }
+  }
+
+  unawaited(runSync());
+
+  Connectivity().onConnectivityChanged.listen((results) {
+    if (results.contains(ConnectivityResult.wifi)) {
+      unawaited(runSync());
+    }
+  });
+
+  // Safety net: sync periodically while the app is running.
+  Timer.periodic(const Duration(minutes: 10), (_) {
+    unawaited(runSync());
+  });
 }
 
 class LeoDeskApp extends StatelessWidget {
-  const LeoDeskApp({super.key});
+  const LeoDeskApp({super.key, this.syncServer});
+
+  final SyncServer? syncServer;
 
   @override
   Widget build(BuildContext context) {
@@ -39,18 +92,17 @@ class LeoDeskApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
         scaffoldBackgroundColor: const Color(0xFFF7F8FC),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-        ),
+        cardTheme: const CardThemeData(elevation: 0, margin: EdgeInsets.zero),
       ),
-      home: const LeoDeskShell(),
+      home: LeoDeskShell(syncServer: syncServer),
     );
   }
 }
 
 class LeoDeskShell extends StatefulWidget {
-  const LeoDeskShell({super.key});
+  const LeoDeskShell({super.key, this.syncServer});
+
+  final SyncServer? syncServer;
 
   @override
   State<LeoDeskShell> createState() => _LeoDeskShellState();
@@ -60,35 +112,34 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
   int _selectedIndex = 0;
 
   List<Widget> get _pages => [
-  const _PlaceholderPage(
-    icon: Icons.dashboard_rounded,
-    title: 'Dashboard',
-    subtitle: 'Your business at a glance.',
-  ),
-  CustomersScreen(
-    repository: CustomerRepository(),
-  ),
-  const _PlaceholderPage(
-    icon: Icons.request_quote_rounded,
-    title: 'Quotations',
-    subtitle: 'Create and track quotations.',
-  ),
-  const _PlaceholderPage(
-    icon: Icons.inventory_2_rounded,
-    title: 'Inventory',
-    subtitle: 'Track materials and stock.',
-  ),
-  const _PlaceholderPage(
-    icon: Icons.receipt_long_rounded,
-    title: 'Invoices',
-    subtitle: 'Manage invoices and billing.',
-  ),
-  const _PlaceholderPage(
-    icon: Icons.payments_rounded,
-    title: 'Payments',
-    subtitle: 'Track payments and labour expenses.',
-  ),
-];
+    const _PlaceholderPage(
+      icon: Icons.dashboard_rounded,
+      title: 'Dashboard',
+      subtitle: 'Your business at a glance.',
+    ),
+    CustomersScreen(repository: CustomerRepository()),
+    const _PlaceholderPage(
+      icon: Icons.request_quote_rounded,
+      title: 'Quotations',
+      subtitle: 'Create and track quotations.',
+    ),
+    const _PlaceholderPage(
+      icon: Icons.inventory_2_rounded,
+      title: 'Inventory',
+      subtitle: 'Track materials and stock.',
+    ),
+    const _PlaceholderPage(
+      icon: Icons.receipt_long_rounded,
+      title: 'Invoices',
+      subtitle: 'Manage invoices and billing.',
+    ),
+    const _PlaceholderPage(
+      icon: Icons.payments_rounded,
+      title: 'Payments',
+      subtitle: 'Track payments and labour expenses.',
+    ),
+    SyncSettingsScreen(syncServer: widget.syncServer),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -113,9 +164,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
             selectedIndex: _selectedIndex,
             onSelected: _selectPage,
           ),
-          Expanded(
-            child: _pages[_selectedIndex],
-          ),
+          Expanded(child: _pages[_selectedIndex]),
         ],
       ),
     );
@@ -123,9 +172,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
 
   Widget _buildMobileLayout() {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Leo Desk'),
-      ),
+      appBar: AppBar(title: const Text('Leo Desk')),
       drawer: _MobileNavigation(
         selectedIndex: _selectedIndex,
         onSelected: _selectPage,
@@ -166,10 +213,7 @@ class _DesktopNavigation extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(12, 12, 12, 32),
             child: Text(
               'Leo Desk',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
             ),
           ),
           Expanded(
@@ -218,8 +262,8 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: false,
-            onTap: () {},
+            selected: selectedIndex == 6,
+            onTap: () => onSelected(6),
           ),
         ],
       ),
@@ -246,10 +290,7 @@ class _MobileNavigation extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(28, 28, 28, 20),
           child: Text(
             'Leo Desk',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
           ),
         ),
         NavigationDrawerDestination(
@@ -282,6 +323,11 @@ class _MobileNavigation extends StatelessWidget {
           selectedIcon: Icon(Icons.payments_rounded),
           label: Text('Payments'),
         ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings_rounded),
+          label: Text('Settings'),
+        ),
       ],
     );
   }
@@ -305,9 +351,7 @@ class _NavigationItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: ListTile(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         selected: selected,
         leading: Icon(icon),
         title: Text(label),
@@ -337,10 +381,7 @@ class _PlaceholderPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 64,
-              ),
+              Icon(icon, size: 64),
               const SizedBox(height: 24),
               Text(
                 title,

@@ -38,10 +38,10 @@ void main() {
   late Database database;
   late CustomerRepository repository;
 
- setUp(() async {
-  database = await AppDatabase.openTestDatabase();
-  repository = CustomerRepository(database: database);
-});
+  setUp(() async {
+    database = await AppDatabase.openTestDatabase();
+    repository = CustomerRepository(database: database);
+  });
   tearDown(() async {
     await database.close();
   });
@@ -275,6 +275,28 @@ void main() {
       expect(results.length, 2);
     });
 
+    test('marks locally inserted customer as pending', () async {
+      final customer = makeCustomer(name: 'Local Customer');
+
+      final id = await repository.insert(customer);
+
+      final savedCustomer = await repository.getById(id);
+
+      expect(savedCustomer, isNotNull);
+      expect(savedCustomer!.syncStatus, 'pending');
+    });
+    test('marks customer from sync as synced', () async {
+      final customer = makeCustomer(name: 'Synced Customer');
+
+      await repository.upsertFromSync(customer);
+
+      final savedCustomer = await repository.getById(
+        (await repository.getAll()).first.id!,
+      );
+
+      expect(savedCustomer, isNotNull);
+      expect(savedCustomer!.syncStatus, 'synced');
+    });
     test('stores business and stitching customer correctly', () async {
       final id = await repository.insert(
         makeCustomer(

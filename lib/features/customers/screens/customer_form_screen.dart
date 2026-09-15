@@ -40,24 +40,12 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
     final customer = widget.customer;
 
-    _nameController = TextEditingController(
-      text: customer?.name ?? '',
-    );
-    _phoneController = TextEditingController(
-      text: customer?.phone ?? '',
-    );
-    _whatsappController = TextEditingController(
-      text: customer?.whatsapp ?? '',
-    );
-    _emailController = TextEditingController(
-      text: customer?.email ?? '',
-    );
-    _addressController = TextEditingController(
-      text: customer?.address ?? '',
-    );
-    _notesController = TextEditingController(
-      text: customer?.notes ?? '',
-    );
+    _nameController = TextEditingController(text: customer?.name ?? '');
+    _phoneController = TextEditingController(text: customer?.phone ?? '');
+    _whatsappController = TextEditingController(text: customer?.whatsapp ?? '');
+    _emailController = TextEditingController(text: customer?.email ?? '');
+    _addressController = TextEditingController(text: customer?.address ?? '');
+    _notesController = TextEditingController(text: customer?.notes ?? '');
 
     _customerType = customer?.customerType ?? 'personal';
     _serviceRequired = customer?.serviceRequired ?? 'embroidery';
@@ -154,9 +142,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       return null;
     }
 
-    final emailRegex = RegExp(
-      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-    );
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
     if (!emailRegex.hasMatch(email)) {
       return 'Please enter a valid email address.';
@@ -186,15 +172,11 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     final title = widget.isEditing ? 'Edit Customer' : 'Add Customer';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 800,
-            ),
+            constraints: const BoxConstraints(maxWidth: 800),
             child: Form(
               key: _formKey,
               child: ListView(
@@ -224,9 +206,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       children: [
         Text(
           widget.isEditing ? 'Edit customer' : 'New customer',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
         Text(
@@ -262,14 +243,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             value: _customerType,
             icon: Icons.badge_outlined,
             items: const [
-              DropdownMenuItem(
-                value: 'personal',
-                child: Text('Personal'),
-              ),
-              DropdownMenuItem(
-                value: 'business',
-                child: Text('Business'),
-              ),
+              DropdownMenuItem(value: 'personal', child: Text('Personal')),
+              DropdownMenuItem(value: 'business', child: Text('Business')),
             ],
             onChanged: _isSaving
                 ? null
@@ -287,14 +262,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             value: _serviceRequired,
             icon: Icons.design_services_outlined,
             items: const [
-              DropdownMenuItem(
-                value: 'embroidery',
-                child: Text('Embroidery'),
-              ),
-              DropdownMenuItem(
-                value: 'stitching',
-                child: Text('Stitching'),
-              ),
+              DropdownMenuItem(value: 'embroidery', child: Text('Embroidery')),
+              DropdownMenuItem(value: 'stitching', child: Text('Stitching')),
             ],
             onChanged: _isSaving
                 ? null
@@ -404,10 +373,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       initialValue: value,
       items: items,
       onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-      ),
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
     );
   }
 
@@ -430,9 +396,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Icon(
                   widget.isEditing
@@ -443,8 +407,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             _isSaving
                 ? 'Saving...'
                 : widget.isEditing
-                    ? 'Save Changes'
-                    : 'Add Customer',
+                ? 'Save Changes'
+                : 'Add Customer',
           ),
         ),
       ],
@@ -477,9 +441,8 @@ class _FormSection extends StatelessWidget {
                 const SizedBox(width: 12),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ],
             ),

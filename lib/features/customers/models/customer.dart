@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 class Customer {
   final int? id;
   final String uuid;
+  final String syncStatus;
   final String name;
   final String? phone;
   final String? whatsapp;
@@ -17,6 +18,7 @@ class Customer {
   Customer({
     this.id,
     String? uuid,
+    this.syncStatus = 'pending',
     required this.name,
     this.phone,
     this.whatsapp,
@@ -32,6 +34,7 @@ class Customer {
   Customer copyWith({
     int? id,
     String? uuid,
+    String? syncStatus,
     String? name,
     String? phone,
     String? whatsapp,
@@ -46,6 +49,7 @@ class Customer {
     return Customer(
       id: id ?? this.id,
       uuid: uuid ?? this.uuid,
+      syncStatus: syncStatus ?? this.syncStatus,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       whatsapp: whatsapp ?? this.whatsapp,
@@ -62,7 +66,8 @@ class Customer {
   Map<String, Object?> toMap() {
     return {
       'id': id,
-      'uuid' : uuid, 
+      'uuid': uuid,
+      'sync_status': syncStatus,
       'name': name,
       'phone': phone,
       'whatsapp': whatsapp,
@@ -79,7 +84,8 @@ class Customer {
   factory Customer.fromMap(Map<String, Object?> map) {
     return Customer(
       id: map['id'] as int?,
-      uuid: map['uuid'] as String, 
+      uuid: map['uuid'] as String,
+      syncStatus: map['sync_status'] as String? ?? 'synced',
       name: map['name'] as String,
       phone: map['phone'] as String?,
       whatsapp: map['whatsapp'] as String?,

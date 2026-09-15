@@ -70,9 +70,7 @@ class BillPdfService {
           pw.Container(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(width: .7),
-            ),
+            decoration: pw.BoxDecoration(border: pw.Border.all(width: .7)),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -141,11 +139,7 @@ class BillPdfService {
                   if (bill.taxPaise != 0) _row('Tax', bill.taxPaise),
                   pw.Divider(),
                   _row('Total', bill.totalPaise, bold: true),
-                  _row(
-                    'Amount Received',
-                    bill.amountPaidPaise,
-                    bold: true,
-                  ),
+                  _row('Amount Received', bill.amountPaidPaise, bold: true),
                 ],
               ),
             ),
@@ -154,25 +148,16 @@ class BillPdfService {
             pw.SizedBox(height: 24),
             pw.Text(
               'Notes',
-              style: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 10,
-              ),
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
             ),
             pw.SizedBox(height: 5),
-            pw.Text(
-              bill.notes!,
-              style: const pw.TextStyle(fontSize: 9),
-            ),
+            pw.Text(bill.notes!, style: const pw.TextStyle(fontSize: 9)),
           ],
           pw.SizedBox(height: 30),
           pw.Center(
             child: pw.Text(
               'Thank you for your business.',
-              style: pw.TextStyle(
-                fontStyle: pw.FontStyle.italic,
-                fontSize: 10,
-              ),
+              style: pw.TextStyle(fontStyle: pw.FontStyle.italic, fontSize: 10),
             ),
           ),
         ],
@@ -191,17 +176,13 @@ class BillPdfService {
           pw.Text(
             label,
             style: pw.TextStyle(
-              fontWeight: bold
-                  ? pw.FontWeight.bold
-                  : pw.FontWeight.normal,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
             ),
           ),
           pw.Text(
             _money(paise),
             style: pw.TextStyle(
-              fontWeight: bold
-                  ? pw.FontWeight.bold
-                  : pw.FontWeight.normal,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
             ),
           ),
         ],
@@ -209,8 +190,7 @@ class BillPdfService {
     );
   }
 
-  static String _money(int paise) =>
-      'Rs. ${(paise / 100).toStringAsFixed(2)}';
+  static String _money(int paise) => 'Rs. ${(paise / 100).toStringAsFixed(2)}';
 
   static String _qty(double quantity) => quantity == quantity.roundToDouble()
       ? quantity.toInt().toString()

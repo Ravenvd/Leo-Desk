@@ -81,10 +81,8 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => CreateBillScreen(
-          customer: _customer,
-          repository: _billRepository,
-        ),
+        builder: (_) =>
+            CreateBillScreen(customer: _customer, repository: _billRepository),
       ),
     );
 
@@ -162,8 +160,6 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     return '₹${(paise / 100).toStringAsFixed(2)}';
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -224,9 +220,8 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 children: [
                   Text(
                     _customer.name,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: Theme.of(context).textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -235,9 +230,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     children: [
                       Chip(
                         avatar: const Icon(Icons.badge_outlined, size: 18),
-                        label: Text(
-                          _customerTypeLabel(_customer.customerType),
-                        ),
+                        label: Text(_customerTypeLabel(_customer.customerType)),
                         visualDensity: VisualDensity.compact,
                       ),
                       Chip(
@@ -245,9 +238,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                           Icons.design_services_outlined,
                           size: 18,
                         ),
-                        label: Text(
-                          _serviceLabel(_customer.serviceRequired),
-                        ),
+                        label: Text(_serviceLabel(_customer.serviceRequired)),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
@@ -276,9 +267,8 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
           children: [
             Text(
               'Customer Information',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 20),
             _InfoRow(
@@ -337,9 +327,8 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 Expanded(
                   child: Text(
                     'Customer History',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
                 Text(
@@ -390,9 +379,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -402,10 +389,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 12),
-          Text(
-            'No bills yet',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('No bills yet', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           const Text(
             'Bills created for this customer will appear here.',
@@ -441,9 +425,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 bill.billNumber,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle: Text(
-                _formatDate(bill.billDate),
-              ),
+              subtitle: Text(_formatDate(bill.billDate)),
               trailing: SizedBox(
                 width: 145,
                 child: Row(
@@ -451,9 +433,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                   children: [
                     Text(
                       _formatMoney(bill.totalPaise),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(width: 8),
                     const Icon(Icons.chevron_right_rounded),
@@ -487,18 +467,14 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 32,
-            child: Icon(icon, size: 20),
-          ),
+          SizedBox(width: 32, child: Icon(icon, size: 20)),
           const SizedBox(width: 12),
           SizedBox(
             width: 130,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           Expanded(child: Text(value)),

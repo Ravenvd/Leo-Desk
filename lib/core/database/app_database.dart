@@ -46,14 +46,19 @@ class AppDatabase {
         if (oldVersion < 4) {
           await DatabaseSchema.upgradeToVersion4(db);
         }
+        if (oldVersion < 5) {
+          await DatabaseSchema.upgradeToVersion5(db);
+        }
       },
     );
   }
 
-  /// Creates an isolated in-memory database for tests.
-  static Future<Database> openTestDatabase() {
+  /// Creates an isolated database for tests. Uses an in-memory database
+  /// unless [path] is given — pass distinct file paths when a test needs
+  /// two independent databases (in-memory handles are shared per process).
+  static Future<Database> openTestDatabase({String? path}) {
     return openDatabase(
-      inMemoryDatabasePath,
+      path ?? inMemoryDatabasePath,
       version: _databaseVersion,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');

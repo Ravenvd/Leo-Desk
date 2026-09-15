@@ -94,9 +94,8 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
   }
 
   void _error(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -112,9 +111,7 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                'Unable to load bill items.\n${snapshot.error}',
-              ),
+              child: Text('Unable to load bill items.\n${snapshot.error}'),
             );
           }
 
@@ -203,10 +200,7 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Customer',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Customer', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
               widget.customer.name,
@@ -224,41 +218,38 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
 
   Widget _buildItemsCard(List<BillItem> items) {
     return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Items',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(item.description)),
-                        Text('${item.quantity} × ${_money(item.ratePaise)}'),
-                        const SizedBox(width: 16),
-                        Text(
-                          _money(item.amountPaise),
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Items',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
             ),
-          ),
-        );
+            const SizedBox(height: 12),
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(item.description)),
+                    Text('${item.quantity} × ${_money(item.ratePaise)}'),
+                    const SizedBox(width: 16),
+                    Text(
+                      _money(item.amountPaise),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTotalsCard() {
@@ -270,15 +261,10 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
             _row('Subtotal', widget.bill.subtotalPaise),
             if (widget.bill.discountPaise != 0)
               _row('Discount', widget.bill.discountPaise),
-            if (widget.bill.taxPaise != 0)
-              _row('Tax', widget.bill.taxPaise),
+            if (widget.bill.taxPaise != 0) _row('Tax', widget.bill.taxPaise),
             const Divider(),
             _row('Total', widget.bill.totalPaise, bold: true),
-            _row(
-              'Amount Received',
-              widget.bill.amountPaidPaise,
-              bold: true,
-            ),
+            _row('Amount Received', widget.bill.amountPaidPaise, bold: true),
           ],
         ),
       ),
