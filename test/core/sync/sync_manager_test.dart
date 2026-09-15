@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_overrides
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -12,9 +14,6 @@ import 'package:leo_desk/features/customers/repositories/customer_repository.dar
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class RealHttpOverrides extends HttpOverrides {
-  // The override is intentional: flutter_test intercepts HTTP requests, and
-  // this test needs the real dart:io HttpClient for the local sync server.
-  // ignore: unnecessary_overrides
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     return super.createHttpClient(context);
