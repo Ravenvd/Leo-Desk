@@ -266,6 +266,7 @@ class _DesktopNavigation extends StatelessWidget {
               ],
             ),
           ),
+          const Divider(),
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
@@ -289,77 +290,58 @@ class _MobileNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Leo Desk',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                children: [
-                  _NavigationItem(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Dashboard',
-                    selected: selectedIndex == 0,
-                    onTap: () => onSelected(0),
-                  ),
-                  _NavigationItem(
-                    icon: Icons.people_alt_rounded,
-                    label: 'Customers',
-                    selected: selectedIndex == 1,
-                    onTap: () => onSelected(1),
-                  ),
-                  _NavigationItem(
-                    icon: Icons.request_quote_rounded,
-                    label: 'Quotations',
-                    selected: selectedIndex == 2,
-                    onTap: () => onSelected(2),
-                  ),
-                  _NavigationItem(
-                    icon: Icons.inventory_2_rounded,
-                    label: 'Inventory',
-                    selected: selectedIndex == 3,
-                    onTap: () => onSelected(3),
-                  ),
-                  _NavigationItem(
-                    icon: Icons.receipt_long_rounded,
-                    label: 'Invoices',
-                    selected: selectedIndex == 4,
-                    onTap: () => onSelected(4),
-                  ),
-                  _NavigationItem(
-                    icon: Icons.payments_rounded,
-                    label: 'Payments',
-                    selected: selectedIndex == 5,
-                    onTap: () => onSelected(5),
-                  ),
-                  _NavigationItem(
-                    icon: Icons.money_off_rounded,
-                    label: 'Expenses',
-                    selected: selectedIndex == 6,
-                    onTap: () => onSelected(6),
-                  ),
-                ],
-              ),
-            ),
-            _NavigationItem(
-              icon: Icons.settings_rounded,
-              label: 'Settings',
-              selected: selectedIndex == 7,
-              onTap: () => onSelected(7),
-            ),
-          ],
+    return NavigationDrawer(
+      selectedIndex: selectedIndex,
+      onDestinationSelected: onSelected,
+      children: const [
+        Padding(
+          padding: EdgeInsets.fromLTRB(28, 28, 28, 20),
+          child: Text(
+            'Leo Desk',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+          ),
         ),
-      ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.dashboard_outlined),
+          selectedIcon: Icon(Icons.dashboard_rounded),
+          label: Text('Dashboard'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.people_alt_outlined),
+          selectedIcon: Icon(Icons.people_alt_rounded),
+          label: Text('Customers'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.request_quote_outlined),
+          selectedIcon: Icon(Icons.request_quote_rounded),
+          label: Text('Quotations'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.inventory_2_outlined),
+          selectedIcon: Icon(Icons.inventory_2_rounded),
+          label: Text('Inventory'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.receipt_long_outlined),
+          selectedIcon: Icon(Icons.receipt_long_rounded),
+          label: Text('Invoices'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.payments_outlined),
+          selectedIcon: Icon(Icons.payments_rounded),
+          label: Text('Payments'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.money_off_outlined),
+          selectedIcon: Icon(Icons.money_off_rounded),
+          label: Text('Expenses'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings_rounded),
+          label: Text('Settings'),
+        ),
+      ],
     );
   }
 }
@@ -379,12 +361,17 @@ class _NavigationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      selected: selected,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onTap: onTap,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: ListTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        selected: selected,
+        leading: Icon(icon),
+        title: Text(label),
+        onTap: onTap,
+      ),
     );
   }
 }
@@ -402,16 +389,29 @@ class _PlaceholderPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 56),
-          const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(subtitle),
-        ],
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 64),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.headlineMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
