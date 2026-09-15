@@ -7,7 +7,6 @@ import 'package:leo_desk/core/sync/sync_server.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
