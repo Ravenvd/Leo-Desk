@@ -134,8 +134,7 @@ void main() {
     expect(items.first['description'], 'Logo embroidery');
   });
 
-  test('v6 migration repairs customers table missing sync_status',
-      () async {
+  test('v6 migration repairs customers table missing sync_status', () async {
     final now = DateTime.now().toIso8601String();
 
     // Simulate a database created by an intermediate build: customers
@@ -169,10 +168,7 @@ void main() {
     await DatabaseSchema.upgradeToVersion6(database);
 
     final columns = await database.rawQuery('PRAGMA table_info(customers)');
-    expect(
-      columns.any((column) => column['name'] == 'sync_status'),
-      isTrue,
-    );
+    expect(columns.any((column) => column['name'] == 'sync_status'), isTrue);
 
     final customers = await database.query('customers');
     expect(customers.single['sync_status'], 'synced');

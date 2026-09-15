@@ -93,8 +93,9 @@ void main() {
     await database.close();
   });
 
-  testWidgets('dashboard renders stats, charts and breakeven card',
-      (tester) async {
+  testWidgets('dashboard renders stats, charts and breakeven card', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -129,10 +130,7 @@ void main() {
       find.text('Earnings — this month vs last month'),
       200,
     );
-    expect(
-      find.text('Earnings — this month vs last month'),
-      findsOneWidget,
-    );
+    expect(find.text('Earnings — this month vs last month'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('New customers — this month vs last month'),

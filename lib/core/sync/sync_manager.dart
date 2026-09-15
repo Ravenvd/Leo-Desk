@@ -121,4 +121,46 @@ class SyncManager {
 
     return result;
   }
+
+  /// Completely replaces the local database with the server's dataset.
+  ///
+  /// All local customers and bills (including unsynced pending changes)
+  /// are discarded, then the Windows host's data is applied. Everything
+  /// pulled is marked synced. Windows is the source of truth.
+  Future<SyncResult> pullAndReplace() async {
+    if (!await _client.checkConnection()) {
+      return SyncResult.notConnected();
+    }
+
+    final customers = await _client.fetchCustomers();
+    final bills = await _client.fetchBills();
+
+    await _billRepository.deleteAll();
+    await _customerRepository.deleteAll();
+
+    var billsApplied = 0;
+
+    for (final customer in customers) {
+      await _customerRepository.upsertFromSync(customer);
+    }
+
+    for (final syncBill in bills) {
+      final applied = await _billRepository.upsertFromSync(
+        syncBill.bill,
+        syncBill.items,
+      );
+      if (applied) billsApplied++;
+    }
+
+    final result = SyncResult(
+      connected: true,
+      customersPulled: customers.length,
+      billsPulled: billsApplied,
+      syncedAt: DateTime.now(),
+    );
+
+    await SyncConfig.saveLastSyncTime(result.syncedAt);
+
+    return result;
+  }
 }

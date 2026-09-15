@@ -151,6 +151,95 @@ void main() {
     expect(pulled.syncStatus, 'synced');
   });
 
+  test(
+    'pullAndReplace discards local data and applies the server dataset',
+    () async {
+      final now = DateTime.now();
+
+      // Server has two customers and a bill.
+      final serverCustomerId = await serverCustomers.insert(
+        makeCustomer('Server Alice'),
+      );
+      await serverCustomers.insert(makeCustomer('Server Bob'));
+      await serverBills.insert(
+        bill: Bill(
+          customerId: serverCustomerId,
+          billNumber: 'INV-SERVER',
+          billDate: now,
+          subtotalPaise: 9000,
+          totalPaise: 9000,
+          amountPaidPaise: 9000,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        items: [
+          BillItem(
+            billId: 0,
+            description: 'Server work',
+            quantity: 1,
+            ratePaise: 9000,
+            amountPaise: 9000,
+          ),
+        ],
+      );
+
+      // Client has unsynced junk that must be discarded.
+      final junkId = await clientCustomers.insert(makeCustomer('Local Junk'));
+      await clientBills.insert(
+        bill: Bill(
+          customerId: junkId,
+          billNumber: 'INV-JUNK',
+          billDate: now,
+          subtotalPaise: 100,
+          totalPaise: 100,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        items: [
+          BillItem(
+            billId: 0,
+            description: 'Junk',
+            quantity: 1,
+            ratePaise: 100,
+            amountPaise: 100,
+          ),
+        ],
+      );
+
+      final result = await manager.pullAndReplace();
+
+      expect(result.connected, isTrue);
+      expect(result.customersPulled, 2);
+      expect(result.billsPulled, 1);
+
+      final customers = await clientCustomers.getAll();
+      expect(customers.length, 2);
+      expect(
+        customers.map((c) => c.name),
+        containsAll(['Server Alice', 'Server Bob']),
+      );
+      expect(customers.every((c) => c.syncStatus == 'synced'), isTrue);
+
+      final bills = await clientBills.getAll();
+      expect(bills.single.billNumber, 'INV-SERVER');
+      expect(bills.single.syncStatus, 'synced');
+
+      final serverAlice = (await serverCustomers.getAll()).firstWhere(
+        (c) => c.name == 'Server Alice',
+      );
+      final clientAlice = customers.firstWhere((c) => c.name == 'Server Alice');
+      expect(bills.single.customerId, clientAlice.id);
+      expect(bills.single.customerUuid, serverAlice.uuid);
+
+      final items = await clientBills.getItems(bills.single.id!);
+      expect(items.single.description, 'Server work');
+
+      // Nothing left pending after a full replace.
+      expect(await clientCustomers.getPending(), isEmpty);
+      expect(await clientBills.getPending(), isEmpty);
+    },
+  );
+
   test('locally pending record wins over server copy', () async {
     // Same customer (by uuid) exists on both sides.
     final customer = makeCustomer('Original Name');

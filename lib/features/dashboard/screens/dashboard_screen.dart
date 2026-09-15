@@ -5,6 +5,7 @@ import '../../billing/repositories/bill_repository.dart';
 import '../../billing/screens/bill_details_screen.dart';
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
+import '../../../core/sync/sync_events.dart';
 import '../widgets/dashboard_charts.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -35,6 +36,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _load();
+    syncCompleted.addListener(_onSyncCompleted);
+  }
+
+  void _onSyncCompleted() {
+    if (mounted) {
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    syncCompleted.removeListener(_onSyncCompleted);
+    super.dispose();
   }
 
   Future<void> _load() async {

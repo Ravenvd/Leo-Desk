@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../core/sync/sync_config.dart';
+import '../../../core/sync/sync_events.dart';
+import '../../../core/sync/sync_manager.dart';
 import '../../../core/sync/sync_server.dart';
 
 class SyncSettingsScreen extends StatefulWidget {
@@ -22,6 +24,7 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
   String? _statusMessage;
   DateTime? _lastSyncAt;
   List<String> _localAddresses = [];
+  bool _isPulling = false;
 
   bool get _isHost => Platform.isWindows;
 
@@ -86,6 +89,74 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
     setState(() {
       _statusMessage = 'Settings saved.';
     });
+  }
+
+  Future<void> _pullDatabase() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pull database?'),
+        content: const Text(
+          'This replaces ALL data on this device with the data from the '
+          'Windows computer. Any changes on this device that have not '
+          'been synced yet will be lost.\n\n'
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Pull & Replace'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isPulling = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final config = await SyncConfig.load();
+      final result = await SyncManager.fromConfig(config).pullAndReplace();
+
+      if (!mounted) return;
+
+      if (result.connected) {
+        notifySyncCompleted();
+        setState(() {
+          _lastSyncAt = result.syncedAt;
+          _statusMessage =
+              'Database replaced. '
+              '${result.customersPulled} customers and '
+              '${result.billsPulled} bills pulled from the server.';
+        });
+      } else {
+        setState(() {
+          _statusMessage =
+              'Could not reach the Windows server. '
+              'Nothing was changed on this device.';
+        });
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = 'Pull failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isPulling = false);
+      }
+    }
   }
 
   @override
@@ -203,6 +274,34 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
             OutlinedButton(
               onPressed: _save,
               child: const Text('Save Settings'),
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+            Text(
+              'Troubleshooting',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'If data on this device looks wrong or incomplete, pull a '
+              'fresh copy of the database from the Windows computer. '
+              'Unsynced changes on this device will be lost.',
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              onPressed: _isPulling ? null : _pullDatabase,
+              icon: _isPulling
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cloud_download_rounded),
+              label: Text(_isPulling ? 'Pulling…' : 'Pull Database'),
             ),
             const SizedBox(height: 20),
             if (_lastSyncAt != null)

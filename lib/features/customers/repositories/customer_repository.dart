@@ -129,6 +129,13 @@ class CustomerRepository {
     return db.delete('customers', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Removes every customer. Used by pull-and-replace before applying
+  /// the server's dataset.
+  Future<void> deleteAll() async {
+    final db = await _db;
+    await db.delete('customers');
+  }
+
   Future<List<Customer>> search(String query) async {
     final db = await _db;
 

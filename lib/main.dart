@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'core/database/app_database.dart';
 import 'core/sync/sync_config.dart';
+import 'core/sync/sync_events.dart';
 import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
 import 'features/billing/repositories/bill_repository.dart';
@@ -57,7 +58,10 @@ void _startAutoSync() {
     try {
       final config = await SyncConfig.load();
       if (config.isConfigured) {
-        await SyncManager.fromConfig(config).sync();
+        final result = await SyncManager.fromConfig(config).sync();
+        if (result.connected) {
+          notifySyncCompleted();
+        }
       }
     } catch (error) {
       debugPrint('Auto-sync failed: $error');

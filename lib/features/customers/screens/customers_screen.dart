@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/sync/sync_events.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import 'customer_details_screen.dart';
@@ -25,10 +26,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
   void initState() {
     super.initState();
     _loadCustomers();
+    // Reload when a background sync or database pull completes while
+    // this screen is open.
+    syncCompleted.addListener(_onSyncCompleted);
+  }
+
+  void _onSyncCompleted() {
+    if (mounted) {
+      _loadCustomers();
+    }
   }
 
   @override
   void dispose() {
+    syncCompleted.removeListener(_onSyncCompleted);
     _searchController.dispose();
     super.dispose();
   }

@@ -143,6 +143,16 @@ class BillRepository {
     return maps.map(Bill.fromMap).toList();
   }
 
+  /// Removes every bill and bill item. Used by pull-and-replace before
+  /// applying the server's dataset.
+  Future<void> deleteAll() async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      await txn.delete('bill_items');
+      await txn.delete('bills');
+    });
+  }
+
   Future<int> markSynced(String uuid) async {
     final db = await _db;
 
