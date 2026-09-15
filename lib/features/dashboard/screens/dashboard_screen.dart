@@ -110,8 +110,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   int get _netProfitPaise => _totalRevenuePaise - _totalExpensesPaise;
 
-  int get _netWorthPaise => _investmentPaise + _netProfitPaise;
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -171,12 +169,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onRefresh: _load,
       child: ListView(
         children: [
-          _buildNetWorthCard(),
+          _buildBreakevenCard(),
           const SizedBox(height: 20),
           _buildStats(),
           const SizedBox(height: 28),
-          _buildBreakevenCard(),
-          const SizedBox(height: 16),
           _buildEarningsChart(),
           const SizedBox(height: 16),
           _buildCustomersChart(),
@@ -185,49 +181,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 28),
           _buildRecentTransactions(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildNetWorthCard() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isNegative = _netWorthPaise < 0;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            Icon(
-              Icons.account_balance_rounded,
-              size: 42,
-              color: isNegative ? colorScheme.error : colorScheme.primary,
-            ),
-            const SizedBox(width: 20),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Net worth',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _money(_netWorthPaise),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isNegative ? colorScheme.error : null,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Initial investment + net profit',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -307,8 +260,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Net worth per day: initial investment plus cumulative revenue minus
-  /// cumulative expenses, from the first transaction date until today.
+  /// Net worth at the end of each calendar month: initial investment plus
+  /// cumulative revenue minus cumulative expenses. The current month is
+  /// calculated up to today.
   List<NetworthPoint> _networthPoints() {
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
@@ -329,7 +283,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (transactionDates.isEmpty) {
       return [
         NetworthPoint(
-          date: todayDate,
+          date: DateTime(today.year, today.month, 1),
           networthRupees: _investmentPaise / 100,
         ),
       ];
@@ -356,20 +310,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (expensesByDay[day] ?? 0) + expense.amountPaise;
     }
 
-    final firstDay = transactionDates.reduce((a, b) => a.isBefore(b) ? a : b);
+    final firstTransactionDay =
+        transactionDates.reduce((a, b) => a.isBefore(b) ? a : b);
+    final firstMonth =
+        DateTime(firstTransactionDay.year, firstTransactionDay.month, 1);
     final points = <NetworthPoint>[];
     var cumulativePaise = _investmentPaise;
 
     for (
-      var day = firstDay;
-      !day.isAfter(todayDate);
-      day = day.add(const Duration(days: 1))
+      var month = firstMonth;
+      !month.isAfter(todayDate);
+      month = DateTime(month.year, month.month + 1, 1)
     ) {
-      cumulativePaise += revenueByDay[day] ?? 0;
-      cumulativePaise -= expensesByDay[day] ?? 0;
+      final monthEnd = DateTime(month.year, month.month + 1, 0);
+      final endDate = monthEnd.isAfter(todayDate) ? todayDate : monthEnd;
+
+      for (
+        var day = month;
+        !day.isAfter(endDate);
+        day = day.add(const Duration(days: 1))
+      ) {
+        cumulativePaise += revenueByDay[day] ?? 0;
+        cumulativePaise -= expensesByDay[day] ?? 0;
+      }
+
       points.add(
         NetworthPoint(
-          date: day,
+          date: endDate,
           networthRupees: cumulativePaise / 100,
         ),
       );
@@ -381,25 +348,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBreakevenCard() {
     final totalRevenue = _totalRevenuePaise;
     final remaining = _investmentPaise - totalRevenue;
-
+    final achieved = remaining <= 0;
     final colorScheme = Theme.of(context).colorScheme;
+    final accent = achieved ? Colors.green : colorScheme.primary;
 
-    String title;
     String subtitle;
-    Color accent;
-
-    if (remaining <= 0) {
-      title = 'Breakeven achieved 🎉';
+    if (achieved) {
       subtitle =
-          'Earnings of ${_money(totalRevenue)} have covered the '
-          '${_money(_investmentPaise)} investment.';
-      accent = Colors.green;
+          'Your recorded earnings have covered the '
+          '${_money(_investmentPaise)} initial investment.';
     } else if (totalRevenue <= 0) {
-      title = 'Breakeven countdown';
-      subtitle =
-          'No earnings yet — add bills to start the projection. '
-          '${_money(remaining)} to go.';
-      accent = colorScheme.primary;
+      subtitle = 'Start recording bills to track progress towards breakeven.';
     } else {
       final firstBillDate = _bills
           .map((bill) => bill.billDate)
@@ -408,13 +367,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final averageDailyPaise = totalRevenue / daysTracked;
       final estimatedDays = (remaining / averageDailyPaise).ceil();
       final projectedDate = DateTime.now().add(Duration(days: estimatedDays));
-
-      title = '≈ $estimatedDays days to breakeven';
       subtitle =
-          'At the current average of ${_money(averageDailyPaise.round())}'
-          '/day, projected around ${_date(projectedDate)}. '
-          '${_money(remaining)} to go.';
-      accent = colorScheme.primary;
+          'At the current average of ${_money(averageDailyPaise.round())}/day, '
+          'projected around ${_date(projectedDate)}.';
     }
 
     return Card(
@@ -429,9 +384,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(color: accent),
+                    achieved ? 'Breakeven achieved 🎉' : 'Amount to breakeven',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    achieved ? '₹0.00 remaining' : '${_money(remaining)} remaining',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(subtitle),
@@ -494,10 +458,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     };
 
     final transactions = <_RecentTransaction>[
-      for (final bill in _bills)
-        _RecentTransaction.bill(bill),
-      for (final expense in _expenses)
-        _RecentTransaction.expense(expense),
+      for (final bill in _bills) _RecentTransaction.bill(bill),
+      for (final expense in _expenses) _RecentTransaction.expense(expense),
     ]..sort((a, b) => b.date.compareTo(a.date));
 
     final recentTransactions = transactions.take(10).toList();
@@ -516,14 +478,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: EdgeInsets.all(24),
                   child: Text('No transactions yet.'),
                 )
-              : ExpansionTile(
-                  title: Text(
-                    '${recentTransactions.length} most recent transaction'
-                    '${recentTransactions.length == 1 ? '' : 's'}',
-                  ),
+              : Column(
                   children: [
-                    for (final transaction in recentTransactions)
-                      _buildTransactionTile(transaction, customerNames),
+                    for (var i = 0; i < recentTransactions.length; i++) ...[
+                      _buildTransactionTile(
+                        recentTransactions[i],
+                        customerNames,
+                      ),
+                      if (i < recentTransactions.length - 1)
+                        const Divider(height: 1),
+                    ],
                   ],
                 ),
         ),
@@ -575,9 +539,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-        onTap: customer == null
-            ? null
-            : () => _openBill(bill, customer),
+        onTap: customer == null ? null : () => _openBill(bill, customer),
       );
     }
 
@@ -646,8 +608,6 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-
-  /// Draws attention to a negative/problem value.
   final bool highlight;
 
   @override
