@@ -333,7 +333,6 @@ void main() {
   });
 
   test('pulls a Windows bill and its line items into Android', () async {
-    final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientBills = BillRepository(database: clientDatabase);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
@@ -348,7 +347,7 @@ void main() {
     await serverCustomers.markSynced(customer.uuid);
     await syncWithRealHttpClient();
 
-    final localCustomer = (await clientCustomers.getAll()).single;
+    final localCustomer = (await CustomerRepository(database: clientDatabase).getAll()).single;
 
     final serverCustomer = (await serverCustomers.getAll()).single;
     final bill = makeBill(
@@ -501,7 +500,6 @@ void main() {
     await serverCustomers.markSynced(customer.uuid);
     await syncWithRealHttpClient();
 
-    final localCustomer = (await clientCustomers.getAll()).single;
     final serverCustomer = (await serverCustomers.getAll()).single;
 
     final serverBill = makeBill(
@@ -524,6 +522,7 @@ void main() {
         ),
       ],
     );
+
     await syncWithRealHttpClient();
 
     final localBillsBeforeEdit = await clientBills.getAll();
