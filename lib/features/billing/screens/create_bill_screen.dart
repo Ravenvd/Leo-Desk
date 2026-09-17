@@ -57,6 +57,9 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
   }
 
   void _refresh() {
+    if (_amountPaidController.text != (_total / 100).toStringAsFixed(2)) {
+      _amountPaidController.text = (_total / 100).toStringAsFixed(2);
+    }
     if (mounted) setState(() {});
   }
 
@@ -166,7 +169,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
   void _removeItem(int index) {
     if (_items.length == 1) return;
     _items.removeAt(index).dispose();
-    setState(() {});
+    _refresh();
   }
 
   Widget _moneyField(TextEditingController controller, String label) {
@@ -371,7 +374,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
               labelText: 'Qty',
               border: OutlineInputBorder(),
             ),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => _refresh(),
             validator: (value) {
               final quantity = double.tryParse(value?.trim() ?? '');
               return quantity == null || quantity <= 0 ? 'Invalid' : null;
@@ -386,7 +389,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
               prefixText: 'Rs. ',
               border: OutlineInputBorder(),
             ),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => _refresh(),
             validator: (value) {
               final rate = double.tryParse(value?.trim() ?? '');
               return rate == null || rate < 0 ? 'Invalid' : null;
