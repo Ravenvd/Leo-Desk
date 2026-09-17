@@ -26,14 +26,6 @@ class _ExpenseDetailsScreenState extends State<ExpenseDetailsScreen> {
     _expense = widget.expense;
   }
 
-  Future<void> _reload() async {
-    if (_expense.id == null) return;
-    final updated = await widget.repository.getById(_expense.id!);
-    if (updated != null && mounted) {
-      setState(() => _expense = updated);
-    }
-  }
-
   Future<void> _deleteExpense() async {
     if (_expense.id == null) return;
 
