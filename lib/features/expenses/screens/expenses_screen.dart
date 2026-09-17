@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/expense.dart';
 import '../repositories/expense_repository.dart';
+import 'expense_details_screen.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key, required this.repository});
@@ -60,6 +61,21 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
+  Future<void> _viewExpense(Expense expense) async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ExpenseDetailsScreen(
+          repository: widget.repository,
+          expense: expense,
+        ),
+      ),
+    );
+
+    if (mounted && deleted == true) {
+      setState(_refresh);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,8 +129,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         onPressed: () => _deleteExpense(expense),
                         icon: const Icon(Icons.delete_outline),
                       ),
+                      const Icon(Icons.chevron_right_rounded),
                     ],
                   ),
+                  onTap: () => _viewExpense(expense),
                 ),
               );
             },
