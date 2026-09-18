@@ -7,6 +7,8 @@ import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../../expenses/models/expense.dart';
 import '../../expenses/repositories/expense_repository.dart';
+import '../../orders/models/order.dart';
+import '../../orders/repositories/order_repository.dart';
 import '../../../core/sync/sync_events.dart';
 import '../widgets/dashboard_charts.dart';
 
@@ -33,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Customer> _customers = [];
   List<Bill> _bills = [];
   List<Expense> _expenses = [];
+  List<Order> _orders = [];
   int _pendingSyncCount = 0;
   bool _isLoading = true;
   String? _error;
@@ -68,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final customers = await widget.customerRepository.getAll();
       final bills = await widget.billRepository.getAll();
       final expenses = await widget.expenseRepository.getAll();
+      final orders = await OrderRepository().getAll();
       final pendingCustomers = await widget.customerRepository.getPending();
       final pendingBills = await widget.billRepository.getPending();
       final pendingExpenses = await widget.expenseRepository.getPending();
@@ -78,6 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _customers = customers;
         _bills = bills;
         _expenses = expenses;
+        _orders = orders;
         _pendingSyncCount =
             pendingCustomers.length + pendingBills.length + pendingExpenses.length;
         _isLoading = false;
@@ -109,6 +114,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _expenses.fold<int>(0, (sum, expense) => sum + expense.amountPaise);
 
   int get _netProfitPaise => _totalRevenuePaise - _totalExpensesPaise;
+
+  int get _pendingOrdersCount => _orders.where((order) {
+    return order.status == 'New' || order.status == 'In Progress';
+  }).length;
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +340,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         day = day.add(const Duration(days: 1))
       ) {
         cumulativePaise += revenueByDay[day] ?? 0;
-        cumulativePaise -= expensesByDay[day] ?? 0;
       }
 
       points.add(
@@ -347,7 +355,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildBreakevenCard() {
     final totalRevenue = _totalRevenuePaise;
-    final remaining = _investmentPaise - totalRevenue;
+    final remaining = _investmentPaise - _netProfitPaise;
     final achieved = remaining <= 0;
     final colorScheme = Theme.of(context).colorScheme;
     final accent = achieved ? Colors.green : colorScheme.primary;
@@ -355,7 +363,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String subtitle;
     if (achieved) {
       subtitle =
-          'Your recorded earnings have covered the '
+          'Your recorded net profit has covered the '
           '${_money(_investmentPaise)} initial investment.';
     } else if (totalRevenue <= 0) {
       subtitle = 'Start recording bills to track progress towards breakeven.';
@@ -364,11 +372,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .map((bill) => bill.billDate)
           .reduce((a, b) => a.isBefore(b) ? a : b);
       final daysTracked = DateTime.now().difference(firstBillDate).inDays + 1;
-      final averageDailyPaise = totalRevenue / daysTracked;
-      final estimatedDays = (remaining / averageDailyPaise).ceil();
+      final netProfitPaise = totalRevenue - _totalExpensesPaise;
+      final averageDailyPaise = netProfitPaise / daysTracked;
+      final estimatedDays = netProfitPaise > 0
+          ? (remaining / averageDailyPaise).ceil()
+          : 0;
       final projectedDate = DateTime.now().add(Duration(days: estimatedDays));
       subtitle =
-          'At the current average of ${_money(averageDailyPaise.round())}/day, '
+          'At the current average net profit of ${_money(averageDailyPaise.round())}/day, '
           'projected around ${_date(projectedDate)}.';
     }
 
@@ -440,6 +451,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Net profit',
           value: _money(_netProfitPaise),
           highlight: _netProfitPaise < 0,
+        ),
+        _StatCard(
+          icon: Icons.pending_actions_rounded,
+          label: 'Pending orders',
+          value: '$_pendingOrdersCount',
         ),
         _StatCard(
           icon: Icons.sync_rounded,

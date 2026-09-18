@@ -16,6 +16,7 @@ import 'features/customers/screens/customers_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/expenses/repositories/expense_repository.dart';
 import 'features/expenses/screens/expenses_screen.dart';
+import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 
 Future<void> main() async {
@@ -126,6 +127,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           expenseRepository: ExpenseRepository(),
         ),
         CustomersScreen(repository: CustomerRepository()),
+        OrdersScreen(),
         const _PlaceholderPage(
           icon: Icons.request_quote_rounded,
           title: 'Quotations',
@@ -188,9 +190,6 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
 
   void _selectPage(int index) {
     setState(() => _selectedIndex = index);
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
   }
 }
 
@@ -234,34 +233,40 @@ class _DesktopNavigation extends StatelessWidget {
                   onTap: () => onSelected(1),
                 ),
                 _NavigationItem(
-                  icon: Icons.request_quote_rounded,
-                  label: 'Quotations',
+                  icon: Icons.shopping_bag_rounded,
+                  label: 'Orders',
                   selected: selectedIndex == 2,
                   onTap: () => onSelected(2),
                 ),
                 _NavigationItem(
-                  icon: Icons.inventory_2_rounded,
-                  label: 'Inventory',
+                  icon: Icons.request_quote_rounded,
+                  label: 'Quotations',
                   selected: selectedIndex == 3,
                   onTap: () => onSelected(3),
                 ),
                 _NavigationItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Invoices',
+                  icon: Icons.inventory_2_rounded,
+                  label: 'Inventory',
                   selected: selectedIndex == 4,
                   onTap: () => onSelected(4),
                 ),
                 _NavigationItem(
-                  icon: Icons.payments_rounded,
-                  label: 'Payments',
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Invoices',
                   selected: selectedIndex == 5,
                   onTap: () => onSelected(5),
                 ),
                 _NavigationItem(
-                  icon: Icons.money_off_rounded,
-                  label: 'Expenses',
+                  icon: Icons.payments_rounded,
+                  label: 'Payments',
                   selected: selectedIndex == 6,
                   onTap: () => onSelected(6),
+                ),
+                _NavigationItem(
+                  icon: Icons.money_off_rounded,
+                  label: 'Expenses',
+                  selected: selectedIndex == 7,
+                  onTap: () => onSelected(7),
                 ),
               ],
             ),
@@ -270,8 +275,8 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: selectedIndex == 7,
-            onTap: () => onSelected(7),
+            selected: selectedIndex == 8,
+            onTap: () => onSelected(8),
           ),
         ],
       ),
@@ -310,6 +315,11 @@ class _MobileNavigation extends StatelessWidget {
           icon: Icon(Icons.people_alt_outlined),
           selectedIcon: Icon(Icons.people_alt_rounded),
           label: Text('Customers'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.shopping_bag_outlined),
+          selectedIcon: Icon(Icons.shopping_bag_rounded),
+          label: Text('Orders'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.request_quote_outlined),

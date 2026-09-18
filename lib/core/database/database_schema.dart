@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 7;
+  static const int version = 9;
 
   static const List<String> createStatements = [
     '''
@@ -69,6 +69,39 @@ class DatabaseSchema {
     )
     ''',
     '''
+    CREATE TABLE orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      order_number TEXT NOT NULL UNIQUE,
+      customer_id INTEGER NOT NULL,
+      order_date TEXT NOT NULL,
+      expected_delivery_date TEXT NOT NULL,
+      stitching_required INTEGER NOT NULL DEFAULT 0,
+      stitching_price_paise INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'New',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+    )
+    ''',
+    '''
+    CREATE TABLE order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      order_id INTEGER NOT NULL,
+      work_type TEXT NOT NULL,
+      garment_type TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price_paise INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    )
+    ''',
+    '''
     CREATE INDEX idx_bills_customer_id
     ON bills(customer_id)
     ''',
@@ -83,6 +116,18 @@ class DatabaseSchema {
     '''
     CREATE INDEX idx_expenses_expense_date
     ON expenses(expense_date)
+    ''',
+    '''
+    CREATE INDEX idx_orders_customer_id
+    ON orders(customer_id)
+    ''',
+    '''
+    CREATE INDEX idx_orders_order_date
+    ON orders(order_date)
+    ''',
+    '''
+    CREATE INDEX idx_order_items_order_id
+    ON order_items(order_id)
     ''',
   ];
 
@@ -161,7 +206,6 @@ class DatabaseSchema {
     const uuidGenerator = Uuid();
 
     await db.transaction((txn) async {
-      // --- bills: uuid, sync_status, customer_uuid ---
       await txn.execute('ALTER TABLE bills ADD COLUMN uuid TEXT');
       await txn.execute('''
         ALTER TABLE bills
@@ -192,7 +236,6 @@ class DatabaseSchema {
         ON bills(uuid)
       ''');
 
-      // --- bill_items: uuid ---
       await txn.execute('ALTER TABLE bill_items ADD COLUMN uuid TEXT');
 
       final items = await txn.query('bill_items', columns: ['id']);
@@ -252,4 +295,63 @@ class DatabaseSchema {
       ''');
     });
   }
+
+  static Future<void> upgradeToVersion8(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE orders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          order_number TEXT NOT NULL UNIQUE,
+          customer_id INTEGER NOT NULL,
+          order_date TEXT NOT NULL,
+          expected_delivery_date TEXT NOT NULL,
+          stitching_required INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'New',
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE order_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          order_id INTEGER NOT NULL,
+          work_type TEXT NOT NULL,
+          garment_type TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          unit_price_paise INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE INDEX idx_orders_customer_id
+        ON orders(customer_id)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_orders_order_date
+        ON orders(order_date)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_order_items_order_id
+        ON order_items(order_id)
+      ''');
+    });
+  }
+
+  static Future<void> upgradeToVersion9(Database db) async {
+    await db.execute('''
+      ALTER TABLE orders
+      ADD COLUMN stitching_price_paise INTEGER NOT NULL DEFAULT 0
+    ''');
+  }
+
 }

@@ -1,0 +1,764 @@
+import 'package:flutter/material.dart';
+
+import '../../customers/models/customer.dart';
+import '../../customers/repositories/customer_repository.dart';
+import '../models/order.dart';
+import '../models/order_item.dart';
+import '../repositories/order_item_repository.dart';
+import '../repositories/order_repository.dart';
+import 'order_details_screen.dart';
+import '../services/order_creation_service.dart';
+
+class CreateOrderScreen extends StatefulWidget {
+  const CreateOrderScreen({
+    super.key,
+    this.customer,
+    this.customerRepository,
+    this.creationService,
+    this.order,
+  });
+
+  final Customer? customer;
+  final CustomerRepository? customerRepository;
+  final OrderCreationService? creationService;
+  final Order? order;
+
+  @override
+  State<CreateOrderScreen> createState() => _CreateOrderScreenState();
+}
+
+class _CreateOrderScreenState extends State<CreateOrderScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late final CustomerRepository _customerRepository;
+  late final OrderCreationService _creationService;
+  late final OrderRepository _orderRepository;
+  late final OrderItemRepository _itemRepository;
+
+  Customer? _customer;
+  bool _stitchingRequired = false;
+  bool _isSaving = false;
+  bool _loadingOrder = false;
+
+  final _stitchingPriceController = TextEditingController();
+  final _notesController = TextEditingController();
+  final List<_OrderItemForm> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _customerRepository = widget.customerRepository ?? CustomerRepository();
+    _creationService = widget.creationService ?? OrderCreationService();
+    _orderRepository = OrderRepository();
+    _itemRepository = OrderItemRepository();
+    _customer = widget.customer;
+    if (widget.order == null) {
+      _addItem();
+    } else {
+      _loadOrderForEditing();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stitchingPriceController.dispose();
+    _notesController.dispose();
+    for (final item in _items) {
+      item.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addItem() {
+    setState(() {
+      _items.add(_OrderItemForm());
+    });
+  }
+
+  void _removeItem(int index) {
+    if (_items.length == 1) return;
+    final item = _items.removeAt(index);
+    item.dispose();
+    setState(() {});
+  }
+
+  Future<void> _selectCustomer() async {
+    final customers = await _customerRepository.getAll();
+    if (!mounted) return;
+
+    final selected = await showDialog<Customer>(
+      context: context,
+      builder: (_) => _CustomerPickerDialog(customers: customers),
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _customer = selected;
+      });
+    }
+  }
+
+  Future<void> _loadOrderForEditing() async {
+    final order = widget.order!;
+    if (order.id == null) return;
+    setState(() => _loadingOrder = true);
+    try {
+      final customer = await _customerRepository.getById(order.customerId);
+      final existingItems = await _itemRepository.getByOrder(order.id!);
+      if (!mounted) return;
+      _customer = customer;
+      _stitchingRequired = order.stitchingRequired;
+      _stitchingPriceController.text = order.stitchingRequired
+          ? (order.stitchingPricePaise / 100).toStringAsFixed(2)
+          : '';
+      _notesController.text = order.notes ?? '';
+      for (final item in existingItems) {
+        _items.add(_OrderItemForm.fromItem(item));
+      }
+      if (_items.isEmpty) _addItem();
+      setState(() => _loadingOrder = false);
+    } catch (error, stackTrace) {
+      debugPrint('Load order for editing error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() => _loadingOrder = false);
+      _showError('Unable to load order for editing.');
+    }
+  }
+
+  Future<void> _createOrder() async {
+    if (widget.order != null) {
+      await _updateOrder();
+      return;
+    }
+    if (_customer?.id == null) {
+      _showError('Please select a customer.');
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) return;
+
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final drafts = _items
+          .map(
+            (item) => OrderItemDraft(
+              workType: item.workType,
+              garmentType: item.garmentType,
+              quantity: int.parse(item.quantityController.text.trim()),
+              unitPricePaise: _parseAmountToPaise(
+                item.unitPriceController.text,
+              ),
+              notes: _nullableValue(item.notesController.text),
+            ),
+          )
+          .toList();
+
+      final order = await _creationService.create(
+        customerId: _customer!.id!,
+        stitchingRequired: _stitchingRequired,
+        stitchingPricePaise: _stitchingRequired
+            ? _parseOptionalAmountToPaise(_stitchingPriceController.text)
+            : 0,
+        items: drafts,
+        notes: _nullableValue(_notesController.text),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Order ${order.orderNumber} created.')),
+      );
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => OrderDetailsScreen(order: order),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Order creation error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isSaving = false;
+      });
+      _showError('Unable to create order: $error');
+    }
+  }
+
+  Future<void> _updateOrder() async {
+    final order = widget.order!;
+    if (order.id == null) return;
+    if (_customer?.id == null) {
+      _showError('Please select a customer.');
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _isSaving = true);
+    try {
+      final now = DateTime.now();
+      final updatedOrder = order.copyWith(
+        customerId: _customer!.id!,
+        stitchingRequired: _stitchingRequired,
+        stitchingPricePaise: _stitchingRequired
+            ? _parseOptionalAmountToPaise(_stitchingPriceController.text)
+            : 0,
+        notes: _nullableValue(_notesController.text),
+        updatedAt: now,
+      );
+      await _orderRepository.update(updatedOrder);
+      await _itemRepository.deleteByOrder(order.id!);
+      for (final item in _items) {
+        await _itemRepository.insert(OrderItem(
+          orderId: order.id!,
+          workType: item.workType,
+          garmentType: item.garmentType,
+          quantity: int.parse(item.quantityController.text.trim()),
+          unitPricePaise: _parseAmountToPaise(item.unitPriceController.text),
+          notes: _nullableValue(item.notesController.text),
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Order ${order.orderNumber} updated.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error, stackTrace) {
+      debugPrint('Order update error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      _showError('Unable to update order: $error');
+    }
+  }
+
+  int _parseOptionalAmountToPaise(String value) {
+    if (value.trim().isEmpty) return 0;
+    return _parseAmountToPaise(value);
+  }
+
+  int _parseAmountToPaise(String value) {
+    final amount = double.tryParse(value.trim().replaceAll(',', ''));
+    if (amount == null) {
+      throw ArgumentError('Invalid price.');
+    }
+    return (amount * 100).round();
+  }
+
+  String? _nullableValue(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String _formatDeliveryEstimate() {
+    final duration = _stitchingRequired ? '5 days' : '72 hours';
+    return 'Expected delivery: $duration from order creation';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loadingOrder) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final editing = widget.order != null;
+    return Scaffold(
+      appBar: AppBar(title: Text(editing ? 'Edit Order' : 'Create Order')),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(32),
+                children: [
+                  Text(
+                    editing ? 'Edit order' : 'New order',
+                    style: Theme.of(context).textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    editing
+                        ? 'Correct the order details within the 24-hour editing window.'
+                        : 'Create an order for a customer and add the work to be completed.',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 28),
+                  _buildCustomerSection(),
+                  const SizedBox(height: 20),
+                  _buildStitchingSection(),
+                  const SizedBox(height: 20),
+                  _buildItemsSection(),
+                  const SizedBox(height: 20),
+                  _buildNotesSection(),
+                  const SizedBox(height: 28),
+                  _buildActions(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Customer',
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: _isSaving ? null : _selectCustomer,
+              borderRadius: BorderRadius.circular(12),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Select customer *',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                  border: OutlineInputBorder(),
+                ),
+                child: Text(
+                  _customer?.name ?? 'Choose a customer',
+                  style: _customer == null
+                      ? Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          )
+                      : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStitchingSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Stitching required'),
+              subtitle: Text(_formatDeliveryEstimate()),
+              value: _stitchingRequired,
+              onChanged: _isSaving
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _stitchingRequired = value;
+                        if (!value) {
+                          _stitchingPriceController.clear();
+                        }
+                      });
+                    },
+            ),
+            if (_stitchingRequired) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _stitchingPriceController,
+                enabled: !_isSaving,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Stitching charge',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter stitching charge',
+                ),
+                validator: (value) {
+                  if (!_stitchingRequired ||
+                      value == null ||
+                      value.trim().isEmpty) {
+                    return null;
+                  }
+                  final amount = double.tryParse(
+                    value.trim().replaceAll(',', ''),
+                  );
+                  if (amount == null || amount < 0) {
+                    return 'Enter a valid stitching charge';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Order Items',
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _isSaving ? null : _addItem,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add Item'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...List.generate(
+              _items.length,
+              (index) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildItemCard(index),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemCard(int index) {
+    final item = _items[index];
+
+    Widget workTypeField() => DropdownButtonFormField<String>(
+          initialValue: item.workType,
+          decoration: const InputDecoration(
+            labelText: 'Work type',
+            border: OutlineInputBorder(),
+          ),
+          items: OrderItem.workTypes
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(value),
+                ),
+              )
+              .toList(),
+          onChanged: _isSaving
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  setState(() {
+                    item.workType = value;
+                  });
+                },
+        );
+
+    Widget garmentTypeField() => DropdownButtonFormField<String>(
+          initialValue: item.garmentType,
+          decoration: const InputDecoration(
+            labelText: 'Item type',
+            border: OutlineInputBorder(),
+          ),
+          items: OrderItem.garmentTypes
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(value),
+                ),
+              )
+              .toList(),
+          onChanged: _isSaving
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  setState(() {
+                    item.garmentType = value;
+                  });
+                },
+        );
+
+    Widget quantityField() => TextFormField(
+          controller: item.quantityController,
+          enabled: !_isSaving,
+          keyboardType: TextInputType.number,
+          validator: (value) {
+            final quantity = int.tryParse(value?.trim() ?? '');
+            if (quantity == null || quantity <= 0) {
+              return 'Enter quantity';
+            }
+            return null;
+          },
+          decoration: const InputDecoration(
+            labelText: 'Quantity',
+            border: OutlineInputBorder(),
+          ),
+        );
+
+    Widget priceField() => TextFormField(
+          controller: item.unitPriceController,
+          enabled: !_isSaving,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (value) {
+            final amount = double.tryParse(
+              value?.trim().replaceAll(',', '') ?? '',
+            );
+            if (amount == null || amount < 0) {
+              return 'Enter price';
+            }
+            return null;
+          },
+          decoration: const InputDecoration(
+            labelText: 'Rate / piece',
+            prefixText: '₹ ',
+            border: OutlineInputBorder(),
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Item ${index + 1}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (_items.length > 1)
+                IconButton(
+                  onPressed: _isSaving ? null : () => _removeItem(index),
+                  tooltip: 'Remove item',
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 600;
+
+              if (compact) {
+                return Column(
+                  children: [
+                    workTypeField(),
+                    const SizedBox(height: 12),
+                    garmentTypeField(),
+                    const SizedBox(height: 12),
+                    quantityField(),
+                    const SizedBox(height: 12),
+                    priceField(),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: workTypeField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: garmentTypeField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: quantityField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: priceField()),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 4),
+          TextFormField(
+            controller: item.notesController,
+            enabled: !_isSaving,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Item notes',
+              hintText: 'Optional',
+              prefixIcon: Icon(Icons.notes_outlined),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotesSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: TextFormField(
+          controller: _notesController,
+          enabled: !_isSaving,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Order notes',
+            hintText: 'Optional notes for this order',
+            prefixIcon: Icon(Icons.notes_outlined),
+            alignLabelWithHint: true,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActions() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        OutlinedButton(
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          onPressed: _isSaving ? null : _createOrder,
+          icon: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.check_rounded),
+          label: Text(_isSaving
+              ? (widget.order != null ? 'Saving...' : 'Creating...')
+              : (widget.order != null ? 'Save Changes' : 'Create Order')),
+        ),
+      ],
+    );
+  }
+}
+
+class _OrderItemForm {
+  _OrderItemForm();
+
+  _OrderItemForm.fromItem(OrderItem item)
+      : workType = item.workType,
+        garmentType = item.garmentType,
+        quantityController = TextEditingController(text: item.quantity.toString()),
+        unitPriceController = TextEditingController(
+          text: (item.unitPricePaise / 100).toStringAsFixed(2),
+        ),
+        notesController = TextEditingController(text: item.notes ?? '');
+
+  String workType = OrderItem.workTypes.first;
+  String garmentType = OrderItem.garmentTypes.first;
+
+  late TextEditingController quantityController = TextEditingController(text: '1');
+  late TextEditingController unitPriceController = TextEditingController(text: '0.00');
+  late TextEditingController notesController = TextEditingController();
+
+  void dispose() {
+    quantityController.dispose();
+    unitPriceController.dispose();
+    notesController.dispose();
+  }
+}
+
+class _CustomerPickerDialog extends StatefulWidget {
+  const _CustomerPickerDialog({required this.customers});
+
+  final List<Customer> customers;
+
+  @override
+  State<_CustomerPickerDialog> createState() => _CustomerPickerDialogState();
+}
+
+class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _searchController.text.trim().toLowerCase();
+    final customers = widget.customers.where((customer) {
+      return customer.name.toLowerCase().contains(query) ||
+          (customer.phone?.toLowerCase().contains(query) ?? false) ||
+          (customer.whatsapp?.toLowerCase().contains(query) ?? false);
+    }).toList();
+
+    return AlertDialog(
+      title: const Text('Select Customer'),
+      content: SizedBox(
+        width: 500,
+        height: 500,
+        child: Column(
+          children: [
+            TextField(
+              controller: _searchController,
+              autofocus: true,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                hintText: 'Search customers',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: customers.isEmpty
+                  ? const Center(child: Text('No customers found.'))
+                  : ListView.separated(
+                      itemCount: customers.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (_, index) {
+                        final customer = customers[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            child: Text(
+                              customer.name.isEmpty
+                                  ? '?'
+                                  : customer.name[0].toUpperCase(),
+                            ),
+                          ),
+                          title: Text(customer.name),
+                          subtitle: Text(
+                            customer.phone ??
+                                customer.whatsapp ??
+                                'No contact information',
+                          ),
+                          onTap: () => Navigator.of(context).pop(customer),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
