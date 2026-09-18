@@ -6,6 +6,7 @@ import '../models/order.dart';
 import '../models/order_item.dart';
 import '../repositories/order_item_repository.dart';
 import '../repositories/order_repository.dart';
+import 'create_order_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   const OrderDetailsScreen({
@@ -297,6 +298,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       appBar: AppBar(
         title: Text(_order.orderNumber),
         actions: [
+          if (!_isTerminal && !_isFrozen)
+            IconButton(
+              onPressed: () async {
+                final changed = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => CreateOrderScreen(order: _order),
+                  ),
+                );
+                if (changed == true && mounted) {
+                  await _loadDetails();
+                }
+              },
+              tooltip: 'Edit order',
+              icon: const Icon(Icons.edit_outlined),
+            ),
           if (!_isTerminal)
             IconButton(
               onPressed: _cancelOrder,
@@ -417,7 +433,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       _isTerminal
                           ? 'This order is locked.'
                           : _isFrozen
-                              ? 'Order is frozen. Only rates can be adjusted.'
+                              ? 'Order is frozen. Details can no longer be edited.'
                               : _editingWindow(),
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
