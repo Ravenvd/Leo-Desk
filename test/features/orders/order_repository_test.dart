@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:leo_desk/core/database/app_database.dart';
+import 'package:leo_desk/features/customers/models/customer.dart';
+import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 
@@ -36,10 +38,32 @@ void main() {
 
   late Database database;
   late OrderRepository repository;
+  late CustomerRepository customerRepository;
 
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     repository = OrderRepository(database: database);
+    customerRepository = CustomerRepository(database: database);
+
+    final now = DateTime.now();
+    await customerRepository.insert(
+      Customer(
+        name: 'Test Customer 1',
+        createdAt: now,
+        updatedAt: now,
+        customerType: 'personal',
+        serviceRequired: 'embroidery',
+      ),
+    );
+    await customerRepository.insert(
+      Customer(
+        name: 'Test Customer 2',
+        createdAt: now,
+        updatedAt: now,
+        customerType: 'business',
+        serviceRequired: 'stitching',
+      ),
+    );
   });
 
   tearDown(() async {
