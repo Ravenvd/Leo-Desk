@@ -6,6 +6,9 @@ import '../../features/customers/models/customer.dart';
 import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
+import '../../features/orders/repositories/order_repository.dart';
+import '../../features/orders/models/order.dart';
+import '../../features/orders/models/order_item.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
 
@@ -17,16 +20,19 @@ class SyncServer {
   final CustomerRepository _customerRepository;
   final BillRepository _billRepository;
   final ExpenseRepository _expenseRepository;
+  final OrderRepository _orderRepository;
   final String token;
 
   SyncServer({
     CustomerRepository? customerRepository,
     BillRepository? billRepository,
     ExpenseRepository? expenseRepository,
+    OrderRepository? orderRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
-       _expenseRepository = expenseRepository ?? ExpenseRepository();
+       _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _orderRepository = orderRepository ?? OrderRepository();
 
   bool get isRunning => _server != null;
 
@@ -149,6 +155,80 @@ class SyncServer {
         await _sendJson(request.response, 200, {
           'status': 'ok',
           'uuid': syncBill.bill.uuid,
+        });
+        return;
+      }
+
+      if (request.method == 'GET' && request.uri.path == '/api/orders') {
+        final orders = await _orderRepository.getAll();
+        final payload = <Map<String, Object?>>[];
+
+        for (final order in orders) {
+          final customer = await _customerRepository.getById(order.customerId);
+          if (customer == null) continue;
+
+          final items = await _orderRepository.getItems(order.id!);
+          payload.add(
+            SyncOrder(
+              order: order,
+              items: items,
+              customerUuid: customer.uuid,
+            ).toMap(),
+          );
+        }
+
+        await _sendJson(request.response, 200, payload);
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/orders') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {
+            'error': 'Invalid order data.',
+          });
+          return;
+        }
+
+        final map = Map<String, Object?>.from(decoded);
+        final customerUuid = map['customer_uuid'] as String?;
+        if (customerUuid == null) {
+          await _sendJson(request.response, 400, {
+            'error': 'Order customer is required.',
+          });
+          return;
+        }
+
+        final customer = await _customerRepository.getByUuid(customerUuid);
+        if (customer == null) {
+          await _sendJson(request.response, 409, {
+            'error': 'Order customer does not exist.',
+            'uuid': map['uuid'],
+          });
+          return;
+        }
+
+        final syncOrder = SyncOrder.fromMap(
+          map,
+          customerId: customer.id!,
+        );
+
+        final applied = await _orderRepository.upsertFromSync(
+          syncOrder.order,
+          syncOrder.items,
+        );
+
+        if (!applied) {
+          await _sendJson(request.response, 409, {
+            'error': 'Order could not be applied.',
+            'uuid': syncOrder.order.uuid,
+          });
+          return;
+        }
+
+        await _sendJson(request.response, 200, {
+          'status': 'ok',
+          'uuid': syncOrder.order.uuid,
         });
         return;
       }
