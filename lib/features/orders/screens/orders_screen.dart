@@ -105,13 +105,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  bool _isFrozen(Order order) {
-    if (order.status == 'Completed' || order.status == 'Cancelled') {
-      return true;
-    }
-    return DateTime.now().difference(order.createdAt).inHours >= 24;
-  }
-
   bool _isStatusSelectable(Order order, String status) {
     if (status == 'Cancelled') return false;
     if (status == 'Sent for Stitching' && !order.stitchingRequired) {
@@ -149,7 +142,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(order.orderNumber + ' → ' + status)),
+        SnackBar(content: Text('${order.orderNumber} → $status')),
       );
     } catch (error, stackTrace) {
       debugPrint('Update order status error: $error');
