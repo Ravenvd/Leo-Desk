@@ -357,7 +357,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildStatusDropdown(Order order) {
-    final frozen = _isFrozen(order);
     final terminal = order.status == 'Completed' || order.status == 'Cancelled';
 
     if (terminal) {
