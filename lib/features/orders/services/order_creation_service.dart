@@ -32,10 +32,15 @@ class OrderCreationService {
   Future<Order> create({
     required int customerId,
     required bool stitchingRequired,
+    int stitchingPricePaise = 0,
     required List<OrderItemDraft> items,
     String? notes,
     DateTime? now,
   }) async {
+    if (stitchingPricePaise < 0) {
+      throw ArgumentError('Stitching price cannot be negative.');
+    }
+
     if (items.isEmpty) {
       throw ArgumentError('An order must contain at least one item.');
     }
@@ -76,6 +81,7 @@ class OrderCreationService {
         orderDate: createdAt,
         expectedDeliveryDate: expectedDeliveryDate,
         stitchingRequired: stitchingRequired,
+        stitchingPricePaise: stitchingPricePaise,
         status: 'New',
         notes: notes,
         createdAt: createdAt,
