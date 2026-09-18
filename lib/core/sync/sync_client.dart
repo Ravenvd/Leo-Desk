@@ -88,7 +88,8 @@ class SyncOrder {
         ? rawItems
               .map(
                 (item) => OrderItem.fromMap(
-                  Map<String, Object?>.from(item as Map),
+                  Map<String, Object?>.from(item as Map)
+                    ..['order_id'] = 0,
                 ),
               )
               .toList()
