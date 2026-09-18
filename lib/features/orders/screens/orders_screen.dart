@@ -105,6 +105,59 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  bool _isFrozen(Order order) {
+    if (order.status == 'Completed' || order.status == 'Cancelled') {
+      return true;
+    }
+    return DateTime.now().difference(order.createdAt).inHours >= 24;
+  }
+
+  bool _isStatusSelectable(Order order, String status) {
+    if (status == 'Cancelled') return false;
+    if (status == 'Sent for Stitching' && !order.stitchingRequired) {
+      return false;
+    }
+
+    final currentIndex = Order.statuses.indexOf(order.status);
+    final targetIndex = Order.statuses.indexOf(status);
+    if (currentIndex < 0 || targetIndex < 0) return false;
+
+    return targetIndex >= currentIndex;
+  }
+
+  Future<void> _changeStatus(Order order, String status) async {
+    if (_isFrozen(order) || !_isStatusSelectable(order, status)) return;
+
+    try {
+      final updated = order.copyWith(
+        status: status,
+        updatedAt: DateTime.now(),
+      );
+      await _orderRepository.update(updated);
+
+      if (!mounted) return;
+
+      setState(() {
+        final index = _orders.indexWhere((item) => item.id == order.id);
+        if (index >= 0) {
+          _orders[index] = updated;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(order.orderNumber + ' → ' + status)),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Update order status error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update order status.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -287,7 +340,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Chip(label: Text(order.status)),
+                  _buildStatusDropdown(order),
                   const SizedBox(width: 4),
                   const Icon(Icons.chevron_right_rounded),
                 ],
@@ -297,6 +350,68 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildStatusDropdown(Order order) {
+    final frozen = _isFrozen(order);
+    final terminal = order.status == 'Completed' || order.status == 'Cancelled';
+
+    if (frozen || terminal) {
+      return Chip(
+        avatar: Icon(
+          terminal && order.status == 'Cancelled'
+              ? Icons.cancel_outlined
+              : Icons.circle,
+          size: 12,
+          color: _statusColor(order.status),
+        ),
+        label: Text(order.status),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.only(left: 10),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: order.status,
+          icon: const Icon(Icons.arrow_drop_down_rounded),
+          items: Order.statuses.map(
+            (status) => DropdownMenuItem<String>(
+              value: status,
+              enabled: _isStatusSelectable(order, status),
+              child: Text(status),
+            ),
+          ).toList(),
+          onChanged: (value) {
+            if (value != null) {
+              _changeStatus(order, value);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    final scheme = Theme.of(context).colorScheme;
+    switch (status) {
+      case 'Completed':
+        return scheme.onSurfaceVariant;
+      case 'Cancelled':
+        return scheme.error;
+      case 'Ready':
+        return scheme.primary;
+      case 'Sent for Stitching':
+        return scheme.tertiary;
+      default:
+        return scheme.secondary;
+    }
   }
 
   String _date(DateTime value) {
