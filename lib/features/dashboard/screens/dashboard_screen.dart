@@ -7,6 +7,8 @@ import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../../expenses/models/expense.dart';
 import '../../expenses/repositories/expense_repository.dart';
+import '../../orders/models/order.dart';
+import '../../orders/repositories/order_repository.dart';
 import '../../../core/sync/sync_events.dart';
 import '../widgets/dashboard_charts.dart';
 
@@ -33,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Customer> _customers = [];
   List<Bill> _bills = [];
   List<Expense> _expenses = [];
+  List<Order> _orders = [];
   int _pendingSyncCount = 0;
   bool _isLoading = true;
   String? _error;
@@ -68,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final customers = await widget.customerRepository.getAll();
       final bills = await widget.billRepository.getAll();
       final expenses = await widget.expenseRepository.getAll();
+      final orders = await OrderRepository().getAll();
       final pendingCustomers = await widget.customerRepository.getPending();
       final pendingBills = await widget.billRepository.getPending();
       final pendingExpenses = await widget.expenseRepository.getPending();
@@ -78,6 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _customers = customers;
         _bills = bills;
         _expenses = expenses;
+        _orders = orders;
         _pendingSyncCount =
             pendingCustomers.length + pendingBills.length + pendingExpenses.length;
         _isLoading = false;
@@ -109,6 +114,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _expenses.fold<int>(0, (sum, expense) => sum + expense.amountPaise);
 
   int get _netProfitPaise => _totalRevenuePaise - _totalExpensesPaise;
+
+  int get _pendingOrdersCount => _orders.where((order) {
+    return order.status == 'New' || order.status == 'In Progress';
+  }).length;
 
   @override
   Widget build(BuildContext context) {
@@ -440,6 +449,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Net profit',
           value: _money(_netProfitPaise),
           highlight: _netProfitPaise < 0,
+        ),
+        _StatCard(
+          icon: Icons.pending_actions_rounded,
+          label: 'Pending orders',
+          value: '$_pendingOrdersCount',
         ),
         _StatCard(
           icon: Icons.sync_rounded,
