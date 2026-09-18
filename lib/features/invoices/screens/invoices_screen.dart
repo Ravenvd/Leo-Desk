@@ -96,12 +96,11 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _money(int paise) => 'Rs. ' + (paise / 100).toStringAsFixed(2);
+  String _money(int paise) => 'Rs. ${(paise / 100).toStringAsFixed(2)}';
 
   String _date(DateTime value) {
     final d = value.toLocal();
-    return d.day.toString().padLeft(2, '0') + '/' +
-        d.month.toString().padLeft(2, '0') + '/' + d.year.toString();
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
   @override
@@ -151,7 +150,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         child: ListView.separated(
           padding: const EdgeInsets.all(24),
           itemCount: _orders.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (_, index) => _buildOrderCard(_orders[index]),
         ),
       ),
@@ -179,7 +178,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                     const SizedBox(height: 4),
                     Text(customer?.name ?? 'Customer unavailable'),
                     const SizedBox(height: 4),
-                    Text('Order date: ' + _date(order.orderDate),
+                    Text('Order date: ${_date(order.orderDate)}',
                         style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
