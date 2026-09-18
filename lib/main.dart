@@ -16,6 +16,7 @@ import 'features/customers/screens/customers_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/expenses/repositories/expense_repository.dart';
 import 'features/expenses/screens/expenses_screen.dart';
+import 'features/invoices/screens/invoices_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 
@@ -138,11 +139,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           title: 'Inventory',
           subtitle: 'Track materials and stock.',
         ),
-        const _PlaceholderPage(
-          icon: Icons.receipt_long_rounded,
-          title: 'Invoices',
-          subtitle: 'Manage invoices and billing.',
-        ),
+        InvoicesScreen(),
         const _PlaceholderPage(
           icon: Icons.payments_rounded,
           title: 'Payments',
