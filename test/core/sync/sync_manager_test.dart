@@ -634,6 +634,7 @@ void main() {
     expect(serverItems.single.uuid, 'bill-conflict-server-item');
   });
   test('syncs an order and all line items from Android to Windows', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final clientOrderItems = OrderItemRepository(database: clientDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
