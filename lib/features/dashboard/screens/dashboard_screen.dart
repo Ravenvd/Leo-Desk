@@ -356,7 +356,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildBreakevenCard() {
     final totalRevenue = _totalRevenuePaise;
-    final remaining = _investmentPaise - totalRevenue;
+    final remaining = _investmentPaise - _netProfitPaise;
     final achieved = remaining <= 0;
     final colorScheme = Theme.of(context).colorScheme;
     final accent = achieved ? Colors.green : colorScheme.primary;
@@ -364,7 +364,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String subtitle;
     if (achieved) {
       subtitle =
-          'Your recorded earnings have covered the '
+          'Your recorded net profit has covered the '
           '${_money(_investmentPaise)} initial investment.';
     } else if (totalRevenue <= 0) {
       subtitle = 'Start recording bills to track progress towards breakeven.';
