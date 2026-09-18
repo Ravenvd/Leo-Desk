@@ -50,7 +50,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
         name: 'INV-${_number(widget.order.orderNumber)}.pdf',
       );
     } catch (error) {
-      _error('Unable to generate invoice PDF: ${error}');
+      _error('Unable to generate invoice PDF: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -65,7 +65,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
         filename: 'INV-${_number(widget.order.orderNumber)}.pdf',
       );
     } catch (error) {
-      _error('Unable to share invoice PDF: ${error}');
+      _error('Unable to share invoice PDF: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
