@@ -651,8 +651,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 )
               : const Icon(Icons.check_rounded),
           label: Text(_isSaving
-              ? (editing ? 'Saving...' : 'Creating...')
-              : (editing ? 'Save Changes' : 'Create Order')),
+              ? (widget.order != null ? 'Saving...' : 'Creating...')
+              : (widget.order != null ? 'Save Changes' : 'Create Order')),
         ),
       ],
     );
@@ -674,9 +674,9 @@ class _OrderItemForm {
   String workType = OrderItem.workTypes.first;
   String garmentType = OrderItem.garmentTypes.first;
 
-  final quantityController = TextEditingController(text: '1');
-  final unitPriceController = TextEditingController(text: '0.00');
-  final notesController = TextEditingController();
+  late TextEditingController quantityController = TextEditingController(text: '1');
+  late TextEditingController unitPriceController = TextEditingController(text: '0.00');
+  late TextEditingController notesController = TextEditingController();
 
   void dispose() {
     quantityController.dispose();
