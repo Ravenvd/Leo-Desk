@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../models/order_item.dart';
+import 'order_details_screen.dart';
 import '../services/order_creation_service.dart';
 
 class CreateOrderScreen extends StatefulWidget {
@@ -125,7 +126,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Order ${order.orderNumber} created.')),
       );
-      Navigator.of(context).pop(order);
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OrderDetailsScreen(order: order),
+        ),
+      );
     } catch (error, stackTrace) {
       debugPrint('Order creation error: $error');
       debugPrintStack(stackTrace: stackTrace);
