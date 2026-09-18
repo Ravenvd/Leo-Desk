@@ -123,9 +123,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _changeStatus(String status) async {
-    if (_isFrozen ||
-        _order.id == null ||
-        !_isStatusSelectable(status)) {
+    if (_isTerminal || _order.id == null || !_isStatusSelectable(status)) {
       return;
     }
 
