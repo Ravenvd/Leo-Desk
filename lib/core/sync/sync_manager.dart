@@ -1,6 +1,7 @@
 import '../../features/billing/repositories/bill_repository.dart';
 import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
+import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
 
@@ -12,6 +13,8 @@ class SyncResult {
   final int billsPulled;
   final int expensesPushed;
   final int expensesPulled;
+  final int ordersPushed;
+  final int ordersPulled;
   final DateTime syncedAt;
 
   const SyncResult({
@@ -22,6 +25,8 @@ class SyncResult {
     this.billsPulled = 0,
     this.expensesPushed = 0,
     this.expensesPulled = 0,
+    this.ordersPushed = 0,
+    this.ordersPulled = 0,
     required this.syncedAt,
   });
 
@@ -35,14 +40,17 @@ class SyncResult {
       billsPushed +
       billsPulled +
       expensesPushed +
-      expensesPulled;
+      expensesPulled +
+      ordersPushed +
+      ordersPulled;
 
   @override
   String toString() {
     if (!connected) return 'Server not reachable';
     return 'Customers: $customersPushed sent, $customersPulled received · '
         'Bills: $billsPushed sent, $billsPulled received · '
-        'Expenses: $expensesPushed sent, $expensesPulled received';
+        'Expenses: $expensesPushed sent, $expensesPulled received · '
+        'Orders: $ordersPushed sent, $ordersPulled received';
   }
 }
 
@@ -60,6 +68,7 @@ class SyncManager {
   final CustomerRepository _customerRepository;
   final BillRepository _billRepository;
   final ExpenseRepository _expenseRepository;
+  final OrderRepository _orderRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
   SyncManager({
@@ -67,10 +76,12 @@ class SyncManager {
     CustomerRepository? customerRepository,
     BillRepository? billRepository,
     ExpenseRepository? expenseRepository,
+    OrderRepository? orderRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _orderRepository = orderRepository ?? OrderRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
@@ -94,6 +105,8 @@ class SyncManager {
     var billsPulled = 0;
     var expensesPushed = 0;
     var expensesPulled = 0;
+    var ordersPushed = 0;
+    var ordersPulled = 0;
 
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
@@ -125,6 +138,45 @@ class SyncManager {
         syncBill.items,
       );
       if (applied) billsPulled++;
+    }
+
+    // --- Push pending orders ---
+    final localCustomers = await _customerRepository.getAll();
+    final customerUuidsById = {
+      for (final customer in localCustomers) customer.id!: customer.uuid,
+    };
+
+    for (final order in await _orderRepository.getPending()) {
+      final customerUuid = customerUuidsById[order.customerId];
+      if (customerUuid == null) continue;
+
+      final items = await _orderRepository.getItems(order.id!);
+      if (await _client.sendOrder(
+        SyncOrder(
+          order: order,
+          items: items,
+          customerUuid: customerUuid,
+        ),
+      )) {
+        await _orderRepository.markSynced(order.uuid);
+        ordersPushed++;
+      }
+    }
+
+    // --- Pull orders after customers so foreign keys resolve ---
+    final customerIdsByUuid = {
+      for (final customer in await _customerRepository.getAll())
+        customer.uuid: customer.id!,
+    };
+
+    for (final syncOrder in await _client.fetchOrders(
+      customerIdsByUuid: customerIdsByUuid,
+    )) {
+      final applied = await _orderRepository.upsertFromSync(
+        syncOrder.order,
+        syncOrder.items,
+      );
+      if (applied) ordersPulled++;
     }
 
     // --- Push pending expenses ---
@@ -170,13 +222,22 @@ class SyncManager {
     final customers = await _client.fetchCustomers();
     final bills = await _client.fetchBills();
     final expenses = await _client.fetchExpenses();
+    final customerIdsByUuid = {
+      for (final customer in await _customerRepository.getAll())
+        customer.uuid: customer.id!,
+    };
+    final orders = await _client.fetchOrders(
+      customerIdsByUuid: customerIdsByUuid,
+    );
 
     await _billRepository.deleteAll();
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
+    await _orderRepository.deleteAll();
 
     var billsApplied = 0;
     var expensesApplied = 0;
+    var ordersApplied = 0;
 
     for (final customer in customers) {
       await _customerRepository.upsertFromSync(customer);
@@ -190,6 +251,14 @@ class SyncManager {
       if (applied) billsApplied++;
     }
 
+    for (final syncOrder in orders) {
+      final applied = await _orderRepository.upsertFromSync(
+        syncOrder.order,
+        syncOrder.items,
+      );
+      if (applied) ordersApplied++;
+    }
+
     for (final expense in expenses) {
       final applied = await _expenseRepository.upsertFromSync(expense);
       if (applied) expensesApplied++;
@@ -200,6 +269,7 @@ class SyncManager {
       customersPulled: customers.length,
       billsPulled: billsApplied,
       expensesPulled: expensesApplied,
+      ordersPulled: ordersApplied,
       syncedAt: DateTime.now(),
     );
 
