@@ -82,6 +82,20 @@ class CustomerRepository {
     );
   }
 
+  Future<Customer?> getByUuid(String uuid) async {
+    final db = await _db;
+
+    final maps = await db.query(
+      'customers',
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return Customer.fromMap(maps.first);
+  }
+
   Future<List<Customer>> getAll() async {
     final db = await _db;
 
