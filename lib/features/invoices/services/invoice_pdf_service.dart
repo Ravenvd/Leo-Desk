@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../../../customers/models/customer.dart';
-import '../../../orders/models/order.dart';
-import '../../../orders/models/order_item.dart';
+import '../../customers/models/customer.dart';
+import '../../orders/models/order.dart';
+import '../../orders/models/order_item.dart';
 
 class InvoicePdfService {
   static const businessName = 'Leo Stitch and Design';
