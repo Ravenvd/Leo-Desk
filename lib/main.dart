@@ -190,9 +190,6 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
 
   void _selectPage(int index) {
     setState(() => _selectedIndex = index);
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
   }
 }
 
