@@ -688,7 +688,6 @@ void main() {
 
   test('pulls a Windows order and its line items into Android', () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final clientCustomers = CustomerRepository(database: clientDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
