@@ -301,6 +301,91 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   Widget _buildItemCard(int index) {
     final item = _items[index];
 
+    Widget workTypeField() => DropdownButtonFormField<String>(
+          initialValue: item.workType,
+          decoration: const InputDecoration(
+            labelText: 'Work type',
+            border: OutlineInputBorder(),
+          ),
+          items: OrderItem.workTypes
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(value),
+                ),
+              )
+              .toList(),
+          onChanged: _isSaving
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  setState(() {
+                    item.workType = value;
+                  });
+                },
+        );
+
+    Widget garmentTypeField() => DropdownButtonFormField<String>(
+          initialValue: item.garmentType,
+          decoration: const InputDecoration(
+            labelText: 'Garment',
+            border: OutlineInputBorder(),
+          ),
+          items: OrderItem.garmentTypes
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(value),
+                ),
+              )
+              .toList(),
+          onChanged: _isSaving
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  setState(() {
+                    item.garmentType = value;
+                  });
+                },
+        );
+
+    Widget quantityField() => TextFormField(
+          controller: item.quantityController,
+          enabled: !_isSaving,
+          keyboardType: TextInputType.number,
+          validator: (value) {
+            final quantity = int.tryParse(value?.trim() ?? '');
+            if (quantity == null || quantity <= 0) {
+              return 'Enter quantity';
+            }
+            return null;
+          },
+          decoration: const InputDecoration(
+            labelText: 'Quantity',
+            border: OutlineInputBorder(),
+          ),
+        );
+
+    Widget priceField() => TextFormField(
+          controller: item.unitPriceController,
+          enabled: !_isSaving,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (value) {
+            final amount = double.tryParse(
+              value?.trim().replaceAll(',', '') ?? '',
+            );
+            if (amount == null || amount < 0) {
+              return 'Enter price';
+            }
+            return null;
+          },
+          decoration: const InputDecoration(
+            labelText: 'Rate / piece',
+            prefixText: '₹ ',
+            border: OutlineInputBorder(),
+          ),
+        );
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -332,117 +417,31 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 600;
 
-              final fields = [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: item.workType,
-                    decoration: const InputDecoration(
-                      labelText: 'Work type',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: OrderItem.workTypes
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _isSaving
-                        ? null
-                        : (value) {
-                            if (value == null) return;
-                            setState(() {
-                              item.workType = value;
-                            });
-                          },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: item.garmentType,
-                    decoration: const InputDecoration(
-                      labelText: 'Garment',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: OrderItem.garmentTypes
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _isSaving
-                        ? null
-                        : (value) {
-                            if (value == null) return;
-                            setState(() {
-                              item.garmentType = value;
-                            });
-                          },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: item.quantityController,
-                    enabled: !_isSaving,
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      final quantity = int.tryParse(value?.trim() ?? '');
-                      if (quantity == null || quantity <= 0) {
-                        return 'Enter quantity';
-                      }
-                      return null;
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: item.unitPriceController,
-                    enabled: !_isSaving,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    validator: (value) {
-                      final amount = double.tryParse(
-                        value?.trim().replaceAll(',', '') ?? '',
-                      );
-                      if (amount == null || amount < 0) {
-                        return 'Enter price';
-                      }
-                      return null;
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Rate / piece',
-                      prefixText: '₹ ',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-              ];
-
               if (compact) {
                 return Column(
-                  children: fields
-                      .map(
-                        (field) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: field,
-                        ),
-                      )
-                      .toList(),
+                  children: [
+                    workTypeField(),
+                    const SizedBox(height: 12),
+                    garmentTypeField(),
+                    const SizedBox(height: 12),
+                    quantityField(),
+                    const SizedBox(height: 12),
+                    priceField(),
+                  ],
                 );
               }
 
-              return Row(children: fields);
+              return Row(
+                children: [
+                  Expanded(child: workTypeField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: garmentTypeField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: quantityField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: priceField()),
+                ],
+              );
             },
           ),
           const SizedBox(height: 4),
