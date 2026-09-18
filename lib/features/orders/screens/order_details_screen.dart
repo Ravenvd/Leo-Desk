@@ -186,8 +186,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      await _changeStatus('Cancelled');
+    if (confirmed != true || _order.id == null) return;
+
+    try {
+      final updated = _order.copyWith(
+        status: 'Cancelled',
+        updatedAt: DateTime.now(),
+      );
+      await _orderRepository.update(updated);
+
+      if (!mounted) return;
+      setState(() => _order = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order cancelled.')),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Cancel order error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to cancel order.')),
+      );
     }
   }
 
