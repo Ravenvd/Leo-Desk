@@ -126,7 +126,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _changeStatus(Order order, String status) async {
-    if (_isFrozen(order) || !_isStatusSelectable(order, status)) return;
+    if (order.status == 'Completed' ||
+        order.status == 'Cancelled' ||
+        !_isStatusSelectable(order, status)) {
+      return;
+    }
 
     try {
       final updated = order.copyWith(
@@ -356,7 +360,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final frozen = _isFrozen(order);
     final terminal = order.status == 'Completed' || order.status == 'Cancelled';
 
-    if (frozen || terminal) {
+    if (terminal) {
       return Chip(
         avatar: Icon(
           terminal && order.status == 'Cancelled'
