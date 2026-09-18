@@ -29,7 +29,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Map<int, Customer> _customers = {};
   bool _loading = true;
   String? _error;
-  String _filter = 'All';
+  String _filter = 'New';
 
   @override
   void initState() {
@@ -78,9 +78,41 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  List<Order> get _filteredOrders {
-    if (_filter == 'All') return _orders;
-    return _orders.where((order) => order.status == _filter).toList();
+  List<Order> get _filteredOrders =>
+      _orders.where((order) => order.status == _filter).toList();
+
+  String? _nextStatus(Order order) {
+    if (order.status == 'Completed' || order.status == 'Cancelled') return null;
+    final currentIndex = Order.statuses.indexOf(order.status);
+    if (currentIndex < 0) return null;
+    for (var index = currentIndex + 1; index < Order.statuses.length; index++) {
+      final status = Order.statuses[index];
+      if (status == 'Cancelled') continue;
+      if (status == 'Sent for Stitching' && !order.stitchingRequired) continue;
+      return status;
+    }
+    return null;
+  }
+
+  Future<void> _goToNextProcess(Order order) async {
+    final nextStatus = _nextStatus(order);
+    if (nextStatus != null) await _changeStatus(order, nextStatus);
+  }
+
+  Future<void> _cancelOrder(Order order) async {
+    if (order.status == 'Completed' || order.status == 'Cancelled') return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel order?'),
+        content: Text('This will lock ${order.orderNumber} and mark it as cancelled.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep Order')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel Order')),
+        ],
+      ),
+    );
+    if (confirmed == true) await _changeStatus(order, 'Cancelled');
   }
 
   Future<void> _createOrder() async {
@@ -242,7 +274,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
       scrollDirection: Axis.horizontal,
       child: SegmentedButton<String>(
         segments: [
-          const ButtonSegment(value: 'All', label: Text('All')),
           ...Order.statuses.map(
             (status) => ButtonSegment(
               value: status,
@@ -337,7 +368,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  _buildStatusDropdown(order),
+                  _buildProcessActions(order),
                   const SizedBox(width: 4),
                   const Icon(Icons.chevron_right_rounded),
                 ],
@@ -349,48 +380,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  Widget _buildStatusDropdown(Order order) {
+  Widget _buildProcessActions(Order order) {
     final terminal = order.status == 'Completed' || order.status == 'Cancelled';
-
+    final nextStatus = _nextStatus(order);
     if (terminal) {
       return Chip(
-        avatar: Icon(
-          terminal && order.status == 'Cancelled'
-              ? Icons.cancel_outlined
-              : Icons.circle,
-          size: 12,
-          color: _statusColor(order.status),
-        ),
+        avatar: Icon(order.status == 'Cancelled' ? Icons.cancel_outlined : Icons.check_circle_outline_rounded, size: 16, color: _statusColor(order.status)),
         label: Text(order.status),
       );
     }
-
-    return Container(
-      padding: const EdgeInsets.only(left: 10),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FilledButton.icon(
+          onPressed: nextStatus == null ? null : () => _goToNextProcess(order),
+          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+          label: Text(nextStatus == 'Completed' ? 'Complete' : 'Next: $nextStatus'),
         ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: order.status,
-          icon: const Icon(Icons.arrow_drop_down_rounded),
-          items: Order.statuses.map(
-            (status) => DropdownMenuItem<String>(
-              value: status,
-              enabled: _isStatusSelectable(order, status),
-              child: Text(status),
-            ),
-          ).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              _changeStatus(order, value);
-            }
-          },
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          onPressed: () => _cancelOrder(order),
+          icon: const Icon(Icons.cancel_outlined, size: 18),
+          label: const Text('Cancel'),
         ),
-      ),
+      ],
     );
   }
 
