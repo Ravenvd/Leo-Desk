@@ -201,6 +201,8 @@ class SyncManager {
       billsPulled: billsPulled,
       expensesPushed: expensesPushed,
       expensesPulled: expensesPulled,
+      ordersPushed: ordersPushed,
+      ordersPulled: ordersPulled,
       syncedAt: DateTime.now(),
     );
 
@@ -222,18 +224,11 @@ class SyncManager {
     final customers = await _client.fetchCustomers();
     final bills = await _client.fetchBills();
     final expenses = await _client.fetchExpenses();
-    final customerIdsByUuid = {
-      for (final customer in await _customerRepository.getAll())
-        customer.uuid: customer.id!,
-    };
-    final orders = await _client.fetchOrders(
-      customerIdsByUuid: customerIdsByUuid,
-    );
 
     await _billRepository.deleteAll();
+    await _orderRepository.deleteAll();
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
-    await _orderRepository.deleteAll();
 
     var billsApplied = 0;
     var expensesApplied = 0;
@@ -242,6 +237,14 @@ class SyncManager {
     for (final customer in customers) {
       await _customerRepository.upsertFromSync(customer);
     }
+
+    final customerIdsByUuid = {
+      for (final customer in await _customerRepository.getAll())
+        customer.uuid: customer.id!,
+    };
+    final orders = await _client.fetchOrders(
+      customerIdsByUuid: customerIdsByUuid,
+    );
 
     for (final syncBill in bills) {
       final applied = await _billRepository.upsertFromSync(
