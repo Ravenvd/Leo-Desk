@@ -254,48 +254,55 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Stitching required'),
-          subtitle: Text(_formatDeliveryEstimate()),
-          value: _stitchingRequired,
-          onChanged: _isSaving
-              ? null
-              : (value) {
-                  setState(() {
-                    _stitchingRequired = value;
-                    if (!value) {
-                      _stitchingPriceController.clear();
-                    }
-                  });
-                },
-        ),
-        if (_stitchingRequired) ...[
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _stitchingPriceController,
-            enabled: !_isSaving,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Stitching charge',
-              prefixText: '₹ ',
-              border: OutlineInputBorder(),
-              hintText: 'Enter stitching charge',
+        child: Column(
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Stitching required'),
+              subtitle: Text(_formatDeliveryEstimate()),
+              value: _stitchingRequired,
+              onChanged: _isSaving
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _stitchingRequired = value;
+                        if (!value) {
+                          _stitchingPriceController.clear();
+                        }
+                      });
+                    },
             ),
-            validator: (value) {
-              if (!_stitchingRequired || value == null || value.trim().isEmpty) {
-                return null;
-              }
-              final amount = double.tryParse(
-                value.trim().replaceAll(',', ''),
-              );
-              if (amount == null || amount < 0) {
-                return 'Enter a valid stitching charge';
-              }
-              return null;
-            },
-          ),
-        ],
+            if (_stitchingRequired) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _stitchingPriceController,
+                enabled: !_isSaving,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Stitching charge',
+                  prefixText: '₹ ',
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter stitching charge',
+                ),
+                validator: (value) {
+                  if (!_stitchingRequired ||
+                      value == null ||
+                      value.trim().isEmpty) {
+                    return null;
+                  }
+                  final amount = double.tryParse(
+                    value.trim().replaceAll(',', ''),
+                  );
+                  if (amount == null || amount < 0) {
+                    return 'Enter a valid stitching charge';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
