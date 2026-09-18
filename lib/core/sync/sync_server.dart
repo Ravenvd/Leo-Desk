@@ -7,8 +7,6 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
-import '../../features/orders/models/order.dart';
-import '../../features/orders/models/order_item.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
 
