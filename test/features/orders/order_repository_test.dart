@@ -281,7 +281,7 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      final applied = await repository.upsertFromSync(serverOrder);
+      final applied = await repository.upsertFromSync(serverOrder, const []);
 
       expect(applied, false);
 
