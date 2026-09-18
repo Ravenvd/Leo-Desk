@@ -676,7 +676,8 @@ void main() {
     final serverOrder = (await serverOrders.getAll()).single;
     expect(serverOrder.uuid, order.uuid);
     expect(serverOrder.orderNumber, 'ORD-000001');
-    expect(serverOrder.customerId, isNot(localCustomer.id));
+    final serverCustomer = (await CustomerRepository(database: serverDatabase).getAll()).single;
+    expect(serverOrder.customerId, serverCustomer.id);
     expect(serverOrder.stitchingPricePaise, 25000);
 
     final serverItems = await serverOrderItems.getByOrder(serverOrder.id!);
