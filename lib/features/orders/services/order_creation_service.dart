@@ -116,6 +116,7 @@ class OrderCreationService {
     );
 
     final lastNumber = result.first['last_number'] as int? ?? 0;
-    return 'ORD-\${(lastNumber + 1).toString().padLeft(6, '0')}';
+    final nextNumber = (lastNumber + 1).toString().padLeft(6, '0');
+    return 'ORD-' + nextNumber;
   }
 }
