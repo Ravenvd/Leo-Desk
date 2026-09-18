@@ -123,7 +123,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _changeStatus(String status) async {
-    if (_isTerminal || _order.id == null || status == _order.status) return;
+    if (_isFrozen ||
+        _order.id == null ||
+        !_isStatusSelectable(status)) {
+      return;
+    }
 
     try {
       final updated = _order.copyWith(
@@ -146,6 +150,19 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         const SnackBar(content: Text('Unable to update order status.')),
       );
     }
+  }
+
+  bool _isStatusSelectable(String status) {
+    if (status == 'Cancelled') return false;
+    if (status == 'Sent for Stitching' && !_order.stitchingRequired) {
+      return false;
+    }
+
+    final currentIndex = Order.statuses.indexOf(_order.status);
+    final targetIndex = Order.statuses.indexOf(status);
+    if (currentIndex < 0 || targetIndex < 0) return false;
+
+    return targetIndex >= currentIndex;
   }
 
   Future<void> _cancelOrder() async {
@@ -403,6 +420,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     .map(
                       (status) => DropdownMenuItem(
                         value: status,
+                        enabled: _isStatusSelectable(status),
                         child: Text(status),
                       ),
                     )
