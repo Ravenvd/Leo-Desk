@@ -126,7 +126,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Order ${order.orderNumber} created.')),
       );
-      await Navigator.of(context).push(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => OrderDetailsScreen(order: order),
         ),
