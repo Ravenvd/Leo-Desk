@@ -30,6 +30,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   bool _stitchingRequired = false;
   bool _isSaving = false;
 
+  final _stitchingPriceController = TextEditingController();
   final _notesController = TextEditingController();
   final List<_OrderItemForm> _items = [];
 
@@ -44,6 +45,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   @override
   void dispose() {
+    _stitchingPriceController.dispose();
     _notesController.dispose();
     for (final item in _items) {
       item.dispose();
@@ -111,6 +113,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       final order = await _creationService.create(
         customerId: _customer!.id!,
         stitchingRequired: _stitchingRequired,
+        stitchingPricePaise: _stitchingRequired
+            ? _parseOptionalAmountToPaise(_stitchingPriceController.text)
+            : 0,
         items: drafts,
         notes: _nullableValue(_notesController.text),
       );
@@ -132,6 +137,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       });
       _showError('Unable to create order: $error');
     }
+  }
+
+  int _parseOptionalAmountToPaise(String value) {
+    if (value.trim().isEmpty) return 0;
+    return _parseAmountToPaise(value);
   }
 
   int _parseAmountToPaise(String value) {
@@ -254,9 +264,38 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               : (value) {
                   setState(() {
                     _stitchingRequired = value;
+                    if (!value) {
+                      _stitchingPriceController.clear();
+                    }
                   });
                 },
         ),
+        if (_stitchingRequired) ...[
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _stitchingPriceController,
+            enabled: !_isSaving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Stitching charge',
+              prefixText: '₹ ',
+              border: OutlineInputBorder(),
+              hintText: 'Enter stitching charge',
+            ),
+            validator: (value) {
+              if (!_stitchingRequired || value == null || value.trim().isEmpty) {
+                return null;
+              }
+              final amount = double.tryParse(
+                value.trim().replaceAll(',', ''),
+              );
+              if (amount == null || amount < 0) {
+                return 'Enter a valid stitching charge';
+              }
+              return null;
+            },
+          ),
+        ],
       ),
     );
   }
@@ -328,7 +367,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     Widget garmentTypeField() => DropdownButtonFormField<String>(
           initialValue: item.garmentType,
           decoration: const InputDecoration(
-            labelText: 'Garment',
+            labelText: 'Item type',
             border: OutlineInputBorder(),
           ),
           items: OrderItem.garmentTypes
