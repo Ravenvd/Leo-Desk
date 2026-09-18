@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 8;
+  static const int version = 9;
 
   static const List<String> createStatements = [
     '''
@@ -78,6 +78,7 @@ class DatabaseSchema {
       order_date TEXT NOT NULL,
       expected_delivery_date TEXT NOT NULL,
       stitching_required INTEGER NOT NULL DEFAULT 0,
+      stitching_price_paise INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'New',
       notes TEXT,
       created_at TEXT NOT NULL,
@@ -345,4 +346,12 @@ class DatabaseSchema {
       ''');
     });
   }
+
+  static Future<void> upgradeToVersion9(Database db) async {
+    await db.execute('''
+      ALTER TABLE orders
+      ADD COLUMN stitching_price_paise INTEGER NOT NULL DEFAULT 0
+    ''');
+  }
+
 }
