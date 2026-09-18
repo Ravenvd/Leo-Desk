@@ -340,7 +340,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         day = day.add(const Duration(days: 1))
       ) {
         cumulativePaise += revenueByDay[day] ?? 0;
-        cumulativePaise -= expensesByDay[day] ?? 0;
       }
 
       points.add(
