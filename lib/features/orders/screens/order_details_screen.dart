@@ -101,24 +101,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   int get _orderTotalPaise => _itemsTotalPaise + _order.stitchingPricePaise;
 
-  String _money(int paise) => '₹' + (paise / 100).toStringAsFixed(2);
+  String _money(int paise) => '₹${(paise / 100).toStringAsFixed(2)}';
 
   String _date(DateTime value) {
     final d = value.toLocal();
-    return d.day.toString().padLeft(2, '0') +
-        '/' +
-        d.month.toString().padLeft(2, '0') +
-        '/' +
-        d.year.toString();
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
   String _dateTime(DateTime value) {
     final d = value.toLocal();
-    return _date(d) +
-        ' ' +
-        d.hour.toString().padLeft(2, '0') +
-        ':' +
-        d.minute.toString().padLeft(2, '0');
+    return '${_date(d)} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
   String _editingWindow() {
@@ -127,11 +119,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     if (remaining.isNegative) return 'Editing window closed';
 
-    return 'Editable for ' +
-        remaining.inHours.toString() +
-        'h ' +
-        remaining.inMinutes.remainder(60).toString() +
-        'm';
+    return 'Editable for ${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m';
   }
 
   Future<void> _changeStatus(String status) async {
@@ -147,7 +135,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (!mounted) return;
       setState(() => _order = updated);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status changed to ' + status + '.')),
+        SnackBar(content: Text('Status changed to $status.')),
       );
     } catch (error, stackTrace) {
       debugPrint('Update order status error: $error');
@@ -168,7 +156,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Cancel order?'),
         content: Text(
-          'This will lock ' + _order.orderNumber + ' and mark it as cancelled.',
+          'This will lock ${_order.orderNumber} and mark it as cancelled.',
         ),
         actions: [
           TextButton(
@@ -536,7 +524,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    item.workType + ' · ' + item.garmentType,
+                    '${item.workType} · ${item.garmentType}',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -551,9 +539,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    item.quantity.toString() +
-                        ' × ' +
-                        _money(item.unitPricePaise),
+                    '${item.quantity} × ${_money(item.unitPricePaise)}',
                   ),
                 ),
                 if (!_isTerminal)
