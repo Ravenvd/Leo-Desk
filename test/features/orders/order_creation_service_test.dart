@@ -92,6 +92,7 @@ void main() {
     final order = await service.create(
       customerId: 1,
       stitchingRequired: true,
+      stitchingPricePaise: 50000,
       now: now,
       items: const [
         OrderItemDraft(
@@ -105,6 +106,29 @@ void main() {
 
     expect(order.expectedDeliveryDate, now.add(const Duration(hours: 120)));
     expect(order.stitchingRequired, true);
+    expect(order.stitchingPricePaise, 50000);
+  });
+
+
+  test('rejects negative stitching price', () async {
+    expect(
+      () => service.create(
+        customerId: 1,
+        stitchingRequired: true,
+        stitchingPricePaise: -1,
+        items: const [
+          OrderItemDraft(
+            workType: 'Embroidery',
+            garmentType: 'Blouse',
+            quantity: 1,
+            unitPricePaise: 10000,
+          ),
+        ],
+      ),
+      throwsA(isA<ArgumentError>()),
+    );
+
+    expect(await orderRepository.getAll(), isEmpty);
   });
 
   test('generates the next order number from existing orders', () async {
