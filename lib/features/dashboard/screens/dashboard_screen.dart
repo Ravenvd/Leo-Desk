@@ -373,11 +373,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .map((bill) => bill.billDate)
           .reduce((a, b) => a.isBefore(b) ? a : b);
       final daysTracked = DateTime.now().difference(firstBillDate).inDays + 1;
-      final averageDailyPaise = totalRevenue / daysTracked;
-      final estimatedDays = (remaining / averageDailyPaise).ceil();
+      final netProfitPaise = totalRevenue - _totalExpensesPaise;
+      final averageDailyPaise = netProfitPaise / daysTracked;
+      final estimatedDays = netProfitPaise > 0
+          ? (remaining / averageDailyPaise).ceil()
+          : 0;
       final projectedDate = DateTime.now().add(Duration(days: estimatedDays));
       subtitle =
-          'At the current average of ${_money(averageDailyPaise.round())}/day, '
+          'At the current average net profit of ${_money(averageDailyPaise.round())}/day, '
           'projected around ${_date(projectedDate)}.';
     }
 
