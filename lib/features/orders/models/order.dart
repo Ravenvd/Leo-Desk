@@ -18,6 +18,7 @@ class Order {
   final DateTime orderDate;
   final DateTime expectedDeliveryDate;
   final bool stitchingRequired;
+  final int stitchingPricePaise;
   final String status;
   final String? notes;
   final DateTime createdAt;
@@ -32,6 +33,7 @@ class Order {
     required this.orderDate,
     required this.expectedDeliveryDate,
     required this.stitchingRequired,
+    this.stitchingPricePaise = 0,
     this.status = 'New',
     this.notes,
     required this.createdAt,
@@ -47,6 +49,7 @@ class Order {
     DateTime? orderDate,
     DateTime? expectedDeliveryDate,
     bool? stitchingRequired,
+    int? stitchingPricePaise,
     String? status,
     String? notes,
     DateTime? createdAt,
@@ -62,6 +65,7 @@ class Order {
       expectedDeliveryDate:
           expectedDeliveryDate ?? this.expectedDeliveryDate,
       stitchingRequired: stitchingRequired ?? this.stitchingRequired,
+      stitchingPricePaise: stitchingPricePaise ?? this.stitchingPricePaise,
       status: status ?? this.status,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
@@ -79,6 +83,7 @@ class Order {
       'order_date': orderDate.toIso8601String(),
       'expected_delivery_date': expectedDeliveryDate.toIso8601String(),
       'stitching_required': stitchingRequired ? 1 : 0,
+      'stitching_price_paise': stitchingPricePaise,
       'status': status,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
@@ -97,6 +102,7 @@ class Order {
       expectedDeliveryDate:
           DateTime.parse(map['expected_delivery_date'] as String),
       stitchingRequired: (map['stitching_required'] as int) == 1,
+      stitchingPricePaise: map['stitching_price_paise'] as int? ?? 0,
       status: map['status'] as String? ?? 'New',
       notes: map['notes'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
