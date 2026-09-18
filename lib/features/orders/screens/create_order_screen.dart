@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
+import '../models/order.dart';
 import '../models/order_item.dart';
+import '../repositories/order_item_repository.dart';
+import '../repositories/order_repository.dart';
 import 'order_details_screen.dart';
 import '../services/order_creation_service.dart';
 
@@ -12,11 +15,13 @@ class CreateOrderScreen extends StatefulWidget {
     this.customer,
     this.customerRepository,
     this.creationService,
+    this.order,
   });
 
   final Customer? customer;
   final CustomerRepository? customerRepository;
   final OrderCreationService? creationService;
+  final Order? order;
 
   @override
   State<CreateOrderScreen> createState() => _CreateOrderScreenState();
@@ -26,10 +31,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   late final CustomerRepository _customerRepository;
   late final OrderCreationService _creationService;
+  late final OrderRepository _orderRepository;
+  late final OrderItemRepository _itemRepository;
 
   Customer? _customer;
   bool _stitchingRequired = false;
   bool _isSaving = false;
+  bool _loadingOrder = false;
 
   final _stitchingPriceController = TextEditingController();
   final _notesController = TextEditingController();
@@ -40,8 +48,14 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     super.initState();
     _customerRepository = widget.customerRepository ?? CustomerRepository();
     _creationService = widget.creationService ?? OrderCreationService();
+    _orderRepository = OrderRepository();
+    _itemRepository = OrderItemRepository();
     _customer = widget.customer;
-    _addItem();
+    if (widget.order == null) {
+      _addItem();
+    } else {
+      _loadOrderForEditing();
+    }
   }
 
   @override
@@ -83,7 +97,39 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     }
   }
 
+  Future<void> _loadOrderForEditing() async {
+    final order = widget.order!;
+    if (order.id == null) return;
+    setState(() => _loadingOrder = true);
+    try {
+      final customer = await _customerRepository.getById(order.customerId);
+      final existingItems = await _itemRepository.getByOrder(order.id!);
+      if (!mounted) return;
+      _customer = customer;
+      _stitchingRequired = order.stitchingRequired;
+      _stitchingPriceController.text = order.stitchingRequired
+          ? (order.stitchingPricePaise / 100).toStringAsFixed(2)
+          : '';
+      _notesController.text = order.notes ?? '';
+      for (final item in existingItems) {
+        _items.add(_OrderItemForm.fromItem(item));
+      }
+      if (_items.isEmpty) _addItem();
+      setState(() => _loadingOrder = false);
+    } catch (error, stackTrace) {
+      debugPrint('Load order for editing error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() => _loadingOrder = false);
+      _showError('Unable to load order for editing.');
+    }
+  }
+
   Future<void> _createOrder() async {
+    if (widget.order != null) {
+      await _updateOrder();
+      return;
+    }
     if (_customer?.id == null) {
       _showError('Please select a customer.');
       return;
@@ -144,6 +190,55 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     }
   }
 
+  Future<void> _updateOrder() async {
+    final order = widget.order!;
+    if (order.id == null) return;
+    if (_customer?.id == null) {
+      _showError('Please select a customer.');
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _isSaving = true);
+    try {
+      final now = DateTime.now();
+      final updatedOrder = order.copyWith(
+        customerId: _customer!.id!,
+        stitchingRequired: _stitchingRequired,
+        stitchingPricePaise: _stitchingRequired
+            ? _parseOptionalAmountToPaise(_stitchingPriceController.text)
+            : 0,
+        notes: _nullableValue(_notesController.text),
+        updatedAt: now,
+      );
+      await _orderRepository.update(updatedOrder);
+      await _itemRepository.deleteByOrder(order.id!);
+      for (final item in _items) {
+        await _itemRepository.insert(OrderItem(
+          orderId: order.id!,
+          workType: item.workType,
+          garmentType: item.garmentType,
+          quantity: int.parse(item.quantityController.text.trim()),
+          unitPricePaise: _parseAmountToPaise(item.unitPriceController.text),
+          notes: _nullableValue(item.notesController.text),
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Order ${order.orderNumber} updated.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error, stackTrace) {
+      debugPrint('Order update error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      _showError('Unable to update order: $error');
+    }
+  }
+
   int _parseOptionalAmountToPaise(String value) {
     if (value.trim().isEmpty) return 0;
     return _parseAmountToPaise(value);
@@ -175,8 +270,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingOrder) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final editing = widget.order != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Order')),
+      appBar: AppBar(title: Text(editing ? 'Edit Order' : 'Create Order')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -187,13 +286,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 padding: const EdgeInsets.all(32),
                 children: [
                   Text(
-                    'New order',
+                    editing ? 'Edit order' : 'New order',
                     style: Theme.of(context).textTheme.headlineSmall
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Create an order for a customer and add the work to be completed.',
+                    editing
+                        ? 'Correct the order details within the 24-hour editing window.'
+                        : 'Create an order for a customer and add the work to be completed.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 28),
@@ -549,7 +650,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.check_rounded),
-          label: Text(_isSaving ? 'Creating...' : 'Create Order'),
+          label: Text(_isSaving
+              ? (editing ? 'Saving...' : 'Creating...')
+              : (editing ? 'Save Changes' : 'Create Order')),
         ),
       ],
     );
@@ -557,6 +660,17 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 }
 
 class _OrderItemForm {
+  _OrderItemForm();
+
+  _OrderItemForm.fromItem(OrderItem item)
+      : workType = item.workType,
+        garmentType = item.garmentType,
+        quantityController = TextEditingController(text: item.quantity.toString()),
+        unitPriceController = TextEditingController(
+          text: (item.unitPricePaise / 100).toStringAsFixed(2),
+        ),
+        notesController = TextEditingController(text: item.notes ?? '');
+
   String workType = OrderItem.workTypes.first;
   String garmentType = OrderItem.garmentTypes.first;
 
