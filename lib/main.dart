@@ -16,7 +16,7 @@ import 'features/customers/screens/customers_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/expenses/repositories/expense_repository.dart';
 import 'features/expenses/screens/expenses_screen.dart';
-import 'features/orders/screens/create_order_screen.dart';
+import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 
 Future<void> main() async {
@@ -127,7 +127,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           expenseRepository: ExpenseRepository(),
         ),
         CustomersScreen(repository: CustomerRepository()),
-        const CreateOrderScreen(),
+        OrdersScreen(),
         const _PlaceholderPage(
           icon: Icons.request_quote_rounded,
           title: 'Quotations',
