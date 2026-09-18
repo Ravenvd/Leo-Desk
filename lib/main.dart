@@ -236,6 +236,12 @@ class _DesktopNavigation extends StatelessWidget {
                   onTap: () => onSelected(1),
                 ),
                 _NavigationItem(
+                  icon: Icons.shopping_bag_rounded,
+                  label: 'Orders',
+                  selected: selectedIndex == 2,
+                  onTap: () => onSelected(2),
+                ),
+                _NavigationItem(
                   icon: Icons.request_quote_rounded,
                   label: 'Quotations',
                   selected: selectedIndex == 3,
