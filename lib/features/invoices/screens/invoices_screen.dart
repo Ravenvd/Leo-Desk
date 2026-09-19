@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
-import '../../orders/models/order.dart';
 import '../../orders/repositories/order_repository.dart';
 import '../models/invoice.dart';
 import '../models/invoice_item.dart';
