@@ -50,7 +50,16 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     });
 
     try {
-      final invoices = await _invoiceRepository.getAll();
+      final allInvoices = await _invoiceRepository.getAll();
+      final invoices = <Invoice>[];
+
+      for (final invoice in allInvoices) {
+        final order = await _orderRepository.getById(invoice.orderId);
+        if (order != null && order.status != 'Cancelled') {
+          invoices.add(invoice);
+        }
+      }
+
       final customers = <int, Customer>{};
 
       for (final invoice in invoices) {
