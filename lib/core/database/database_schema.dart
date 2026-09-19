@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 10;
+  static const int version = 11;
 
   static const List<String> createStatements = [
     '''
@@ -29,6 +29,8 @@ class DatabaseSchema {
       sync_status TEXT NOT NULL DEFAULT 'synced',
       customer_id INTEGER NOT NULL,
       customer_uuid TEXT,
+      order_id INTEGER,
+      order_uuid TEXT,
       bill_number TEXT NOT NULL UNIQUE,
       bill_date TEXT NOT NULL,
       subtotal_paise INTEGER NOT NULL DEFAULT 0,
@@ -394,6 +396,22 @@ class DatabaseSchema {
     ''');
   }
 
+
+  static Future<void> upgradeToVersion11(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('ALTER TABLE bills ADD COLUMN order_id INTEGER');
+      await txn.execute('ALTER TABLE bills ADD COLUMN order_uuid TEXT');
+
+      await txn.execute('''
+        CREATE UNIQUE INDEX idx_bills_order_id
+        ON bills(order_id)
+      ''');
+      await txn.execute('''
+        CREATE UNIQUE INDEX idx_bills_order_uuid
+        ON bills(order_uuid)
+      ''');
+    });
+  }
 
   static Future<void> upgradeToVersion10(Database db) async {
     await db.transaction((txn) async {
