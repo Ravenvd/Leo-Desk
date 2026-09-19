@@ -4,6 +4,7 @@ import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../models/order.dart';
 import '../repositories/order_repository.dart';
+import '../../invoices/services/invoice_creation_service.dart';
 import 'create_order_screen.dart';
 import 'order_details_screen.dart';
 
@@ -24,6 +25,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   late final OrderRepository _orderRepository;
   late final CustomerRepository _customerRepository;
+  late final InvoiceCreationService _invoiceCreationService;
 
   List<Order> _orders = [];
   Map<int, Customer> _customers = {};
@@ -37,6 +39,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _orderRepository = widget.orderRepository ?? OrderRepository();
     _customerRepository =
         widget.customerRepository ?? CustomerRepository();
+    _invoiceCreationService = InvoiceCreationService(orderRepository: _orderRepository, customerRepository: _customerRepository);
     _loadOrders();
   }
 
@@ -164,6 +167,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
       await _orderRepository.update(updated);
 
+      try {
+        if (status == 'In Progress') {
+          await _invoiceCreationService.createForOrder(updated);
+        }
+      } catch (error) {
+        await _orderRepository.update(
+          order.copyWith(updatedAt: DateTime.now()),
+        );
+        rethrow;
+      }
+
       if (!mounted) return;
 
       setState(() {
@@ -174,7 +188,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${order.orderNumber} → $status')),
+        SnackBar(
+          content: Text(
+            status == 'In Progress'
+                ? '${order.orderNumber} → In Progress · Invoice generated'
+                : '${order.orderNumber} → $status',
+          ),
+        ),
       );
     } catch (error, stackTrace) {
       debugPrint('Update order status error: $error');
