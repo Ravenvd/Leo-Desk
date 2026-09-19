@@ -1,6 +1,7 @@
 import '../../features/billing/repositories/bill_repository.dart';
 import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
+import '../../features/invoices/repositories/invoice_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -68,6 +69,7 @@ class SyncManager {
   final CustomerRepository _customerRepository;
   final BillRepository _billRepository;
   final ExpenseRepository _expenseRepository;
+  final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
@@ -76,11 +78,13 @@ class SyncManager {
     CustomerRepository? customerRepository,
     BillRepository? billRepository,
     ExpenseRepository? expenseRepository,
+    InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
        _orderRepository = orderRepository ?? OrderRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
@@ -226,6 +230,7 @@ class SyncManager {
     final expenses = await _client.fetchExpenses();
 
     await _billRepository.deleteAll();
+    await _invoiceRepository.deleteAll();
     await _orderRepository.deleteAll();
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
