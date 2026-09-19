@@ -6,6 +6,7 @@ import '../models/order.dart';
 import '../models/order_item.dart';
 import '../repositories/order_item_repository.dart';
 import '../repositories/order_repository.dart';
+import '../../invoices/services/invoice_creation_service.dart';
 import 'create_order_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late final OrderRepository _orderRepository;
   late final OrderItemRepository _itemRepository;
   late final CustomerRepository _customerRepository;
+  late final InvoiceCreationService _invoiceCreationService;
 
   Customer? _customer;
   List<OrderItem> _items = [];
@@ -44,6 +46,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     _orderRepository = widget.orderRepository ?? OrderRepository();
     _itemRepository = widget.orderItemRepository ?? OrderItemRepository();
     _customerRepository = widget.customerRepository ?? CustomerRepository();
+    _invoiceCreationService = InvoiceCreationService(
+      orderRepository: _orderRepository,
+      customerRepository: _customerRepository,
+    );
     _loadDetails();
   }
 
@@ -127,10 +133,25 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       );
       await _orderRepository.update(updated);
 
+      try {
+        if (status == 'In Progress') {
+          await _invoiceCreationService.createForOrder(updated);
+        }
+      } catch (error) {
+        await _orderRepository.update(_order);
+        rethrow;
+      }
+
       if (!mounted) return;
       setState(() => _order = updated);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status changed to $status.')),
+        SnackBar(
+          content: Text(
+            status == 'In Progress'
+                ? 'Status changed to In Progress. Invoice generated.'
+                : 'Status changed to $status.',
+          ),
+        ),
       );
     } catch (error, stackTrace) {
       debugPrint('Update order status error: $error');
