@@ -12,6 +12,8 @@ class SyncResult {
   final int customersPulled;
   final int billsPushed;
   final int billsPulled;
+  final int invoicesPushed;
+  final int invoicesPulled;
   final int expensesPushed;
   final int expensesPulled;
   final int ordersPushed;
@@ -24,6 +26,8 @@ class SyncResult {
     this.customersPulled = 0,
     this.billsPushed = 0,
     this.billsPulled = 0,
+    this.invoicesPushed = 0,
+    this.invoicesPulled = 0,
     this.expensesPushed = 0,
     this.expensesPulled = 0,
     this.ordersPushed = 0,
@@ -40,6 +44,8 @@ class SyncResult {
       customersPulled +
       billsPushed +
       billsPulled +
+      invoicesPushed +
+      invoicesPulled +
       expensesPushed +
       expensesPulled +
       ordersPushed +
@@ -50,6 +56,7 @@ class SyncResult {
     if (!connected) return 'Server not reachable';
     return 'Customers: $customersPushed sent, $customersPulled received · '
         'Bills: $billsPushed sent, $billsPulled received · '
+        'Invoices: $invoicesPushed sent, $invoicesPulled received · '
         'Expenses: $expensesPushed sent, $expensesPulled received · '
         'Orders: $ordersPushed sent, $ordersPulled received';
   }
@@ -107,6 +114,8 @@ class SyncManager {
     var customersPulled = 0;
     var billsPushed = 0;
     var billsPulled = 0;
+    var invoicesPushed = 0;
+    var invoicesPulled = 0;
     var expensesPushed = 0;
     var expensesPulled = 0;
     var ordersPushed = 0;
@@ -126,24 +135,7 @@ class SyncManager {
       customersPulled++;
     }
 
-    // --- Push pending bills ---
-    for (final bill in await _billRepository.getPending()) {
-      final items = await _billRepository.getItems(bill.id!);
-      if (await _client.sendBill(SyncBill(bill: bill, items: items))) {
-        await _billRepository.markSynced(bill.uuid);
-        billsPushed++;
-      }
-    }
-
-    // --- Pull bills ---
-    for (final syncBill in await _client.fetchBills()) {
-      final applied = await _billRepository.upsertFromSync(
-        syncBill.bill,
-        syncBill.items,
-      );
-      if (applied) billsPulled++;
-    }
-
+    // Orders must sync before invoices and bills because both reference them.
     // --- Push pending orders ---
     final localCustomers = await _customerRepository.getAll();
     final customerUuidsById = {
@@ -183,6 +175,50 @@ class SyncManager {
       if (applied) ordersPulled++;
     }
 
+    // --- Push pending invoices ---
+    for (final invoice in await _invoiceRepository.getPending()) {
+      final items = await _invoiceRepository.getItems(invoice.id!);
+      if (await _client.sendInvoice(
+        SyncInvoice(invoice: invoice, items: items),
+      )) {
+        await _invoiceRepository.markSynced(invoice.uuid);
+        invoicesPushed++;
+      }
+    }
+
+    // --- Pull invoices ---
+    final localOrderIdsByUuid = {
+      for (final order in await _orderRepository.getAll()) order.uuid: order.id!,
+    };
+    for (final syncInvoice in await _client.fetchInvoices(
+      customerIdsByUuid: customerIdsByUuid,
+      orderIdsByUuid: localOrderIdsByUuid,
+    )) {
+      final applied = await _invoiceRepository.upsertFromSync(
+        syncInvoice.invoice,
+        syncInvoice.items,
+      );
+      if (applied) invoicesPulled++;
+    }
+
+    // --- Push pending bills ---
+    for (final bill in await _billRepository.getPending()) {
+      final items = await _billRepository.getItems(bill.id!);
+      if (await _client.sendBill(SyncBill(bill: bill, items: items))) {
+        await _billRepository.markSynced(bill.uuid);
+        billsPushed++;
+      }
+    }
+
+    // --- Pull bills ---
+    for (final syncBill in await _client.fetchBills()) {
+      final applied = await _billRepository.upsertFromSync(
+        syncBill.bill,
+        syncBill.items,
+      );
+      if (applied) billsPulled++;
+    }
+
     // --- Push pending expenses ---
     for (final expense in await _expenseRepository.getPending()) {
       if (await _client.sendExpense(expense)) {
@@ -203,6 +239,8 @@ class SyncManager {
       customersPulled: customersPulled,
       billsPushed: billsPushed,
       billsPulled: billsPulled,
+      invoicesPushed: invoicesPushed,
+      invoicesPulled: invoicesPulled,
       expensesPushed: expensesPushed,
       expensesPulled: expensesPulled,
       ordersPushed: ordersPushed,
@@ -226,7 +264,6 @@ class SyncManager {
     }
 
     final customers = await _client.fetchCustomers();
-    final bills = await _client.fetchBills();
     final expenses = await _client.fetchExpenses();
 
     await _billRepository.deleteAll();
@@ -236,6 +273,7 @@ class SyncManager {
     await _expenseRepository.deleteAll();
 
     var billsApplied = 0;
+    var invoicesApplied = 0;
     var expensesApplied = 0;
     var ordersApplied = 0;
 
@@ -251,13 +289,13 @@ class SyncManager {
       customerIdsByUuid: customerIdsByUuid,
     );
 
-    for (final syncBill in bills) {
-      final applied = await _billRepository.upsertFromSync(
-        syncBill.bill,
-        syncBill.items,
-      );
-      if (applied) billsApplied++;
-    }
+    final invoices = await _client.fetchInvoices(
+      customerIdsByUuid: customerIdsByUuid,
+      orderIdsByUuid: {
+        for (final order in orders) order.order.uuid: order.order.id!,
+      },
+    );
+    final bills = await _client.fetchBills();
 
     for (final syncOrder in orders) {
       final applied = await _orderRepository.upsertFromSync(
@@ -265,6 +303,22 @@ class SyncManager {
         syncOrder.items,
       );
       if (applied) ordersApplied++;
+    }
+
+    for (final syncInvoice in invoices) {
+      final applied = await _invoiceRepository.upsertFromSync(
+        syncInvoice.invoice,
+        syncInvoice.items,
+      );
+      if (applied) invoicesApplied++;
+    }
+
+    for (final syncBill in bills) {
+      final applied = await _billRepository.upsertFromSync(
+        syncBill.bill,
+        syncBill.items,
+      );
+      if (applied) billsApplied++;
     }
 
     for (final expense in expenses) {
@@ -276,6 +330,7 @@ class SyncManager {
       connected: true,
       customersPulled: customers.length,
       billsPulled: billsApplied,
+      invoicesPulled: invoicesApplied,
       expensesPulled: expensesApplied,
       ordersPulled: ordersApplied,
       syncedAt: DateTime.now(),
