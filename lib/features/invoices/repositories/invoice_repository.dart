@@ -54,6 +54,11 @@ class InvoiceRepository {
     return rows.map(Invoice.fromMap).toList();
   }
 
+  Future<void> deleteAll() async {
+    final db = await _db;
+    await db.delete('invoices');
+  }
+
   Future<Invoice> create({
     required Invoice invoice,
     required List<InvoiceItem> items,
