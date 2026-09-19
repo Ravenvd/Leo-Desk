@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../billing/services/bill_creation_service.dart';
+
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../models/order.dart';
@@ -33,6 +35,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late final OrderItemRepository _itemRepository;
   late final CustomerRepository _customerRepository;
   late final InvoiceCreationService _invoiceCreationService;
+  late final BillCreationService _billCreationService;
 
   Customer? _customer;
   List<OrderItem> _items = [];
@@ -48,6 +51,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     _customerRepository = widget.customerRepository ?? CustomerRepository();
     _invoiceCreationService = InvoiceCreationService(
       orderRepository: _orderRepository,
+      customerRepository: _customerRepository,
+    );
+    _billCreationService = BillCreationService(
       customerRepository: _customerRepository,
     );
     _loadDetails();
@@ -136,6 +142,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       try {
         if (status == 'In Progress') {
           await _invoiceCreationService.createForOrder(updated);
+        } else if (status == 'Completed') {
+          await _billCreationService.createForOrder(updated);
         }
       } catch (error) {
         await _orderRepository.update(_order);
@@ -149,7 +157,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           content: Text(
             status == 'In Progress'
                 ? 'Status changed to In Progress. Invoice generated.'
-                : 'Status changed to $status.',
+                : status == 'Completed'
+                    ? 'Status changed to Completed. Bill generated.'
+                    : 'Status changed to $status.',
           ),
         ),
       );
