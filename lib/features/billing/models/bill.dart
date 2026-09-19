@@ -6,6 +6,8 @@ class Bill {
   final String syncStatus;
   final int customerId;
   final String? customerUuid;
+  final int? orderId;
+  final String? orderUuid;
   final String billNumber;
   final DateTime billDate;
   final int subtotalPaise;
@@ -23,6 +25,8 @@ class Bill {
     this.syncStatus = 'pending',
     required this.customerId,
     this.customerUuid,
+    this.orderId,
+    this.orderUuid,
     required this.billNumber,
     required this.billDate,
     required this.subtotalPaise,
@@ -49,6 +53,8 @@ class Bill {
     String? syncStatus,
     int? customerId,
     String? customerUuid,
+    int? orderId,
+    String? orderUuid,
     String? billNumber,
     DateTime? billDate,
     int? subtotalPaise,
@@ -66,6 +72,8 @@ class Bill {
       syncStatus: syncStatus ?? this.syncStatus,
       customerId: customerId ?? this.customerId,
       customerUuid: customerUuid ?? this.customerUuid,
+      orderId: orderId ?? this.orderId,
+      orderUuid: orderUuid ?? this.orderUuid,
       billNumber: billNumber ?? this.billNumber,
       billDate: billDate ?? this.billDate,
       subtotalPaise: subtotalPaise ?? this.subtotalPaise,
@@ -86,6 +94,8 @@ class Bill {
       'sync_status': syncStatus,
       'customer_id': customerId,
       'customer_uuid': customerUuid,
+      'order_id': orderId,
+      'order_uuid': orderUuid,
       'bill_number': billNumber,
       'bill_date': billDate.toIso8601String(),
       'subtotal_paise': subtotalPaise,
@@ -106,6 +116,8 @@ class Bill {
       syncStatus: map['sync_status'] as String? ?? 'synced',
       customerId: map['customer_id'] as int? ?? 0,
       customerUuid: map['customer_uuid'] as String?,
+      orderId: map['order_id'] as int?,
+      orderUuid: map['order_uuid'] as String?,
       billNumber: map['bill_number'] as String,
       billDate: DateTime.parse(map['bill_date'] as String),
       subtotalPaise: map['subtotal_paise'] as int,
