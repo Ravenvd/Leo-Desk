@@ -6,6 +6,7 @@ import '../../features/customers/models/customer.dart';
 import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
+import '../../features/invoices/repositories/invoice_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -18,6 +19,7 @@ class SyncServer {
   final CustomerRepository _customerRepository;
   final BillRepository _billRepository;
   final ExpenseRepository _expenseRepository;
+  final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
   final String token;
 
@@ -25,11 +27,13 @@ class SyncServer {
     CustomerRepository? customerRepository,
     BillRepository? billRepository,
     ExpenseRepository? expenseRepository,
+    InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
        _orderRepository = orderRepository ?? OrderRepository();
 
   bool get isRunning => _server != null;
@@ -109,6 +113,71 @@ class SyncServer {
         await _sendJson(request.response, 200, {
           'status': 'ok',
           'uuid': customer.uuid,
+        });
+        return;
+      }
+
+      if (request.method == 'GET' && request.uri.path == '/api/invoices') {
+        final invoices = await _invoiceRepository.getAll();
+        final payload = <Map<String, Object?>>[];
+
+        for (final invoice in invoices) {
+          final items = await _invoiceRepository.getItems(invoice.id!);
+          payload.add(SyncInvoice(invoice: invoice, items: items).toMap());
+        }
+
+        await _sendJson(request.response, 200, payload);
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/invoices') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {
+            'error': 'Invalid invoice data.',
+          });
+          return;
+        }
+
+        final syncInvoice =
+            SyncInvoice.fromMap(Map<String, Object?>.from(decoded),
+              customerId: 0,
+              orderId: 0,
+            );
+
+        final customerUuid = syncInvoice.invoice.customerUuid;
+        final customer = customerUuid == null
+            ? null
+            : await _customerRepository.getByUuid(customerUuid);
+        final order = await _orderRepository.getById(syncInvoice.invoice.orderId);
+
+        if (customer == null || order == null) {
+          await _sendJson(request.response, 409, {
+            'error': 'Invoice customer or order does not exist.',
+            'uuid': syncInvoice.invoice.uuid,
+          });
+          return;
+        }
+
+        final applied = await _invoiceRepository.upsertFromSync(
+          syncInvoice.invoice.copyWith(
+            customerId: customer.id!,
+            orderId: order.id!,
+          ),
+          syncInvoice.items,
+        );
+
+        if (!applied) {
+          await _sendJson(request.response, 409, {
+            'error': 'Invoice could not be applied.',
+            'uuid': syncInvoice.invoice.uuid,
+          });
+          return;
+        }
+
+        await _sendJson(request.response, 200, {
+          'status': 'ok',
+          'uuid': syncInvoice.invoice.uuid,
         });
         return;
       }
