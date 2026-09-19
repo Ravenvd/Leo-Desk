@@ -5,6 +5,57 @@ import '../../features/billing/models/bill.dart';
 import '../../features/billing/models/bill_item.dart';
 import '../../features/customers/models/customer.dart';
 import '../../features/expenses/models/expense.dart';
+import '../../features/invoices/models/invoice.dart';
+import '../../features/invoices/models/invoice_item.dart';
+import '../../features/orders/models/order.dart';
+import '../../features/orders/models/order_item.dart';
+
+/// An invoice bundled with its line items, as transferred over sync.
+class SyncInvoice {
+  final Invoice invoice;
+  final List<InvoiceItem> items;
+
+  const SyncInvoice({required this.invoice, required this.items});
+
+  Map<String, Object?> toMap() {
+    final invoiceMap = invoice.toMap()
+      ..remove('id')
+      ..remove('order_id')
+      ..remove('customer_id')
+      ..remove('sync_status');
+    return {
+      ...invoiceMap,
+      'items': items
+          .map(
+            (item) => item.toMap()
+              ..remove('id')
+              ..remove('invoice_id'),
+          )
+          .toList(),
+    };
+  }
+
+  factory SyncInvoice.fromMap(
+    Map<String, Object?> map, {
+    required int customerId,
+    required int orderId,
+  }) {
+    final rawItems = map['items'];
+    final items = rawItems is List
+        ? rawItems
+              .map(
+                (item) =>
+                    InvoiceItem.fromMap(Map<String, Object?>.from(item as Map)),
+              )
+              .toList()
+        : <InvoiceItem>[];
+
+    final invoiceMap = Map<String, Object?>.from(map)..remove('items');
+    invoiceMap['customer_id'] = customerId;
+    invoiceMap['order_id'] = orderId;
+    return SyncInvoice(invoice: Invoice.fromMap(invoiceMap), items: items);
+  }
+}
 
 /// A bill bundled with its line items, as transferred over sync.
 class SyncBill {
@@ -45,6 +96,64 @@ class SyncBill {
     final billMap = Map<String, Object?>.from(map)..remove('items');
 
     return SyncBill(bill: Bill.fromMap(billMap), items: items);
+  }
+}
+
+class SyncOrder {
+  final Order order;
+  final List<OrderItem> items;
+  final String customerUuid;
+
+  const SyncOrder({
+    required this.order,
+    required this.items,
+    required this.customerUuid,
+  });
+
+  Map<String, Object?> toMap() {
+    final orderMap = order.toMap()
+      ..remove('id')
+      ..remove('customer_id')
+      ..remove('sync_status');
+    return {
+      ...orderMap,
+      'customer_uuid': customerUuid,
+      'items': items
+          .map(
+            (item) => item.toMap()
+              ..remove('id')
+              ..remove('order_id'),
+          )
+          .toList(),
+    };
+  }
+
+  factory SyncOrder.fromMap(
+    Map<String, Object?> map, {
+    required int customerId,
+  }) {
+    final rawItems = map['items'];
+    final items = rawItems is List
+        ? rawItems
+              .map(
+                (item) => OrderItem.fromMap(
+                  Map<String, Object?>.from(item as Map)
+                    ..['order_id'] = 0,
+                ),
+              )
+              .toList()
+        : <OrderItem>[];
+
+    final orderMap = Map<String, Object?>.from(map)
+      ..remove('items')
+      ..remove('customer_uuid');
+    orderMap['customer_id'] = customerId;
+
+    return SyncOrder(
+      order: Order.fromMap(orderMap),
+      items: items,
+      customerUuid: map['customer_uuid'] as String,
+    );
   }
 }
 
@@ -121,6 +230,42 @@ class SyncClient {
     return _postJson('/api/customers', map, customer.uuid);
   }
 
+  Future<List<SyncInvoice>> fetchInvoices({
+    required Map<String, int> customerIdsByUuid,
+    required Map<String, int> orderIdsByUuid,
+  }) async {
+    final decoded = await _getJson('/api/invoices');
+
+    if (decoded is! List) {
+      throw const FormatException('Invalid invoices response.');
+    }
+
+    final invoices = <SyncInvoice>[];
+    for (final item in decoded) {
+      final map = Map<String, Object?>.from(item as Map);
+      final customerUuid = map['customer_uuid'] as String?;
+      final orderUuid = map['order_uuid'] as String?;
+      if (customerUuid == null || orderUuid == null) continue;
+
+      final customerId = customerIdsByUuid[customerUuid];
+      final orderId = orderIdsByUuid[orderUuid];
+      if (customerId == null || orderId == null) continue;
+
+      invoices.add(
+        SyncInvoice.fromMap(
+          map,
+          customerId: customerId,
+          orderId: orderId,
+        ),
+      );
+    }
+    return invoices;
+  }
+
+  Future<bool> sendInvoice(SyncInvoice invoice) async {
+    return _postJson('/api/invoices', invoice.toMap(), invoice.invoice.uuid);
+  }
+
   Future<List<SyncBill>> fetchBills() async {
     final decoded = await _getJson('/api/bills');
 
@@ -135,6 +280,33 @@ class SyncClient {
 
   Future<bool> sendBill(SyncBill bill) async {
     return _postJson('/api/bills', bill.toMap(), bill.bill.uuid);
+  }
+
+  Future<List<SyncOrder>> fetchOrders({
+    required Map<String, int> customerIdsByUuid,
+  }) async {
+    final decoded = await _getJson('/api/orders');
+
+    if (decoded is! List) {
+      throw const FormatException('Invalid orders response.');
+    }
+
+    final orders = <SyncOrder>[];
+    for (final item in decoded) {
+      final map = Map<String, Object?>.from(item as Map);
+      final customerUuid = map['customer_uuid'] as String?;
+      if (customerUuid == null) continue;
+
+      final customerId = customerIdsByUuid[customerUuid];
+      if (customerId == null) continue;
+
+      orders.add(SyncOrder.fromMap(map, customerId: customerId));
+    }
+    return orders;
+  }
+
+  Future<bool> sendOrder(SyncOrder order) async {
+    return _postJson('/api/orders', order.toMap(), order.order.uuid);
   }
 
   Future<List<Expense>> fetchExpenses() async {

@@ -10,6 +10,7 @@ import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/dashboard/screens/dashboard_screen.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
+import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -19,12 +20,14 @@ void main() {
   late CustomerRepository customerRepository;
   late BillRepository billRepository;
   late ExpenseRepository expenseRepository;
+  late InvoiceRepository invoiceRepository;
 
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     customerRepository = CustomerRepository(database: database);
     billRepository = BillRepository(database: database);
     expenseRepository = ExpenseRepository(database: database);
+    invoiceRepository = InvoiceRepository(database: database);
 
     final now = DateTime.now();
     final lastMonth = DateTime(now.year, now.month - 1, 5);
@@ -102,6 +105,7 @@ void main() {
             customerRepository: customerRepository,
             billRepository: billRepository,
             expenseRepository: expenseRepository,
+            invoiceRepository: invoiceRepository,
           ),
         ),
       ),

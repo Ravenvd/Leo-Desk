@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../billing/services/bill_creation_service.dart';
+
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
 import '../repositories/order_item_repository.dart';
 import '../repositories/order_repository.dart';
+import '../../invoices/services/invoice_creation_service.dart';
 import 'create_order_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -31,6 +34,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   late final OrderRepository _orderRepository;
   late final OrderItemRepository _itemRepository;
   late final CustomerRepository _customerRepository;
+  late final InvoiceCreationService _invoiceCreationService;
+  late final BillCreationService _billCreationService;
 
   Customer? _customer;
   List<OrderItem> _items = [];
@@ -44,6 +49,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     _orderRepository = widget.orderRepository ?? OrderRepository();
     _itemRepository = widget.orderItemRepository ?? OrderItemRepository();
     _customerRepository = widget.customerRepository ?? CustomerRepository();
+    _invoiceCreationService = InvoiceCreationService(
+      orderRepository: _orderRepository,
+      customerRepository: _customerRepository,
+    );
+    _billCreationService = BillCreationService(
+      customerRepository: _customerRepository,
+    );
     _loadDetails();
   }
 
@@ -86,10 +98,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   bool get _isFrozen {
-    if (_order.status == 'Completed' || _order.status == 'Cancelled') {
-      return true;
-    }
-    return DateTime.now().difference(_order.createdAt).inHours >= 24;
+    return _order.status != 'New';
   }
 
   bool get _isTerminal =>
@@ -115,12 +124,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   String _editingWindow() {
-    final remaining =
-        const Duration(hours: 24) - DateTime.now().difference(_order.createdAt);
-
-    if (remaining.isNegative) return 'Editing window closed';
-
-    return 'Editable for ${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m';
+    return 'Order can be edited until it is moved to In Progress.';
   }
 
   Future<void> _changeStatus(String status) async {
@@ -135,10 +139,29 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       );
       await _orderRepository.update(updated);
 
+      try {
+        if (status == 'In Progress') {
+          await _invoiceCreationService.createForOrder(updated);
+        } else if (status == 'Completed') {
+          await _billCreationService.createForOrder(updated);
+        }
+      } catch (error) {
+        await _orderRepository.update(_order);
+        rethrow;
+      }
+
       if (!mounted) return;
       setState(() => _order = updated);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status changed to $status.')),
+        SnackBar(
+          content: Text(
+            status == 'In Progress'
+                ? 'Status changed to In Progress. Invoice generated.'
+                : status == 'Completed'
+                    ? 'Status changed to Completed. Bill generated.'
+                    : 'Status changed to $status.',
+          ),
+        ),
       );
     } catch (error, stackTrace) {
       debugPrint('Update order status error: $error');
@@ -213,7 +236,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _editRate(OrderItem item) async {
-    if (_isTerminal || item.id == null) return;
+    if (_isFrozen || item.id == null) return;
 
     final controller = TextEditingController(
       text: (item.unitPricePaise / 100).toStringAsFixed(2),
@@ -594,7 +617,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     '${item.quantity} × ${_money(item.unitPricePaise)}',
                   ),
                 ),
-                if (!_isTerminal)
+                if (!_isFrozen)
                   IconButton(
                     onPressed: () => _editRate(item),
                     tooltip: 'Edit rate',

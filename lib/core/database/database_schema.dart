@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 9;
+  static const int version = 11;
 
   static const List<String> createStatements = [
     '''
@@ -29,6 +29,8 @@ class DatabaseSchema {
       sync_status TEXT NOT NULL DEFAULT 'synced',
       customer_id INTEGER NOT NULL,
       customer_uuid TEXT,
+      order_id INTEGER,
+      order_uuid TEXT,
       bill_number TEXT NOT NULL UNIQUE,
       bill_date TEXT NOT NULL,
       subtotal_paise INTEGER NOT NULL DEFAULT 0,
@@ -102,12 +104,60 @@ class DatabaseSchema {
     )
     ''',
     '''
+    CREATE TABLE invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      order_id INTEGER NOT NULL UNIQUE,
+      order_uuid TEXT NOT NULL UNIQUE,
+      customer_id INTEGER NOT NULL,
+      customer_uuid TEXT,
+      invoice_number TEXT NOT NULL UNIQUE,
+      invoice_date TEXT NOT NULL,
+      subtotal_paise INTEGER NOT NULL DEFAULT 0,
+      total_paise INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+    )
+    ''',
+    '''
+    CREATE TABLE invoice_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      invoice_id INTEGER NOT NULL,
+      description TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      rate_paise INTEGER NOT NULL,
+      amount_paise INTEGER NOT NULL,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+    )
+    ''',
+    '''
+    CREATE INDEX idx_invoices_invoice_date
+    ON invoices(invoice_date)
+    ''',
+    '''
+    CREATE INDEX idx_invoice_items_invoice_id
+    ON invoice_items(invoice_id)
+    ''',
+    '''
     CREATE INDEX idx_bills_customer_id
     ON bills(customer_id)
     ''',
     '''
     CREATE INDEX idx_bills_bill_date
     ON bills(bill_date)
+    ''',
+    '''
+    CREATE UNIQUE INDEX idx_bills_order_id
+    ON bills(order_id)
+    ''',
+    '''
+    CREATE UNIQUE INDEX idx_bills_order_uuid
+    ON bills(order_uuid)
     ''',
     '''
     CREATE INDEX idx_bill_items_bill_id
@@ -354,4 +404,65 @@ class DatabaseSchema {
     ''');
   }
 
+
+  static Future<void> upgradeToVersion11(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('ALTER TABLE bills ADD COLUMN order_id INTEGER');
+      await txn.execute('ALTER TABLE bills ADD COLUMN order_uuid TEXT');
+
+      await txn.execute('''
+        CREATE UNIQUE INDEX idx_bills_order_id
+        ON bills(order_id)
+      ''');
+      await txn.execute('''
+        CREATE UNIQUE INDEX idx_bills_order_uuid
+        ON bills(order_uuid)
+      ''');
+    });
+  }
+
+  static Future<void> upgradeToVersion10(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          order_id INTEGER NOT NULL UNIQUE,
+          order_uuid TEXT NOT NULL UNIQUE,
+          customer_id INTEGER NOT NULL,
+          customer_uuid TEXT,
+          invoice_number TEXT NOT NULL UNIQUE,
+          invoice_date TEXT NOT NULL,
+          subtotal_paise INTEGER NOT NULL DEFAULT 0,
+          total_paise INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+        )
+      ''');
+      await txn.execute('''
+        CREATE TABLE invoice_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          invoice_id INTEGER NOT NULL,
+          description TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          rate_paise INTEGER NOT NULL,
+          amount_paise INTEGER NOT NULL,
+          FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+        )
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_invoices_invoice_date
+        ON invoices(invoice_date)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_invoice_items_invoice_id
+        ON invoice_items(invoice_id)
+      ''');
+    });
+  }
 }

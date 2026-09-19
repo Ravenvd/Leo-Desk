@@ -14,6 +14,10 @@ import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
+import 'package:leo_desk/features/orders/models/order.dart';
+import 'package:leo_desk/features/orders/models/order_item.dart';
+import 'package:leo_desk/features/orders/repositories/order_item_repository.dart';
+import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class RealHttpOverrides extends HttpOverrides {
@@ -103,6 +107,50 @@ void main() {
     );
   }
 
+  Order makeOrder({
+    required String uuid,
+    required int customerId,
+    required String orderNumber,
+    String syncStatus = 'pending',
+    String status = 'New',
+  }) {
+    final now = DateTime.utc(2026, 1, 1);
+    return Order(
+      uuid: uuid,
+      syncStatus: syncStatus,
+      orderNumber: orderNumber,
+      customerId: customerId,
+      orderDate: now,
+      expectedDeliveryDate: now.add(const Duration(days: 5)),
+      stitchingRequired: true,
+      stitchingPricePaise: 25000,
+      status: status,
+      notes: 'Order notes',
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  OrderItem makeOrderItem({
+    required String uuid,
+    required int orderId,
+    required String workType,
+    required String garmentType,
+  }) {
+    final now = DateTime.utc(2026, 1, 1);
+    return OrderItem(
+      uuid: uuid,
+      orderId: orderId,
+      workType: workType,
+      garmentType: garmentType,
+      quantity: 2,
+      unitPricePaise: 50000,
+      notes: 'Item notes',
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
   setUp(() async {
     testDirectory =
         await Directory.systemTemp.createTemp('leo_desk_sync_test_');
@@ -119,6 +167,7 @@ void main() {
       customerRepository: CustomerRepository(database: serverDatabase),
       billRepository: BillRepository(database: serverDatabase),
       expenseRepository: ExpenseRepository(database: serverDatabase),
+      orderRepository: OrderRepository(database: serverDatabase),
     );
 
     await server.start(port: 0);
@@ -141,6 +190,7 @@ void main() {
       customerRepository: CustomerRepository(database: clientDatabase),
       billRepository: BillRepository(database: clientDatabase),
       expenseRepository: ExpenseRepository(database: clientDatabase),
+      orderRepository: OrderRepository(database: clientDatabase),
       saveLastSyncTime: (_) async {},
     );
   }
@@ -583,4 +633,116 @@ void main() {
     expect(serverItems, hasLength(1));
     expect(serverItems.single.uuid, 'bill-conflict-server-item');
   });
+  test('syncs an order and all line items from Android to Windows', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+    final clientOrderItems = OrderItemRepository(database: clientDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final serverOrderItems = OrderItemRepository(database: serverDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'order-push-customer',
+      name: 'Order Push Customer',
+    );
+    await clientCustomers.insert(customer);
+    await syncWithRealHttpClient();
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final order = makeOrder(
+      uuid: 'order-push',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+    );
+    await clientOrders.insert(order);
+
+    final localOrder = (await clientOrders.getAll()).single;
+    await clientOrderItems.insert(
+      makeOrderItem(
+        uuid: 'order-push-item',
+        orderId: localOrder.id!,
+        workType: 'Embroidery',
+        garmentType: 'Blouse',
+      ),
+    );
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.ordersPushed, 1);
+
+    final clientOrder = (await clientOrders.getAll()).single;
+    expect(clientOrder.syncStatus, 'synced');
+
+    final serverOrder = (await serverOrders.getAll()).single;
+    expect(serverOrder.uuid, order.uuid);
+    expect(serverOrder.orderNumber, 'ORD-000001');
+    final serverCustomer = (await CustomerRepository(database: serverDatabase).getAll()).single;
+    expect(serverOrder.customerId, serverCustomer.id);
+    expect(serverOrder.stitchingPricePaise, 25000);
+
+    final serverItems = await serverOrderItems.getByOrder(serverOrder.id!);
+    expect(serverItems, hasLength(1));
+    expect(serverItems.single.uuid, 'order-push-item');
+    expect(serverItems.single.workType, 'Embroidery');
+    expect(serverItems.single.garmentType, 'Blouse');
+  });
+
+  test('pulls a Windows order and its line items into Android', () async {
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final serverOrderItems = OrderItemRepository(database: serverDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+    final clientOrderItems = OrderItemRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'order-pull-customer',
+      name: 'Order Pull Customer',
+      syncStatus: 'synced',
+    );
+    await serverCustomers.insert(customer);
+    await serverCustomers.markSynced(customer.uuid);
+
+    await syncWithRealHttpClient();
+
+    final serverCustomer = (await serverCustomers.getAll()).single;
+    final order = makeOrder(
+      uuid: 'order-pull',
+      customerId: serverCustomer.id!,
+      orderNumber: 'ORD-000101',
+      syncStatus: 'synced',
+      status: 'In Progress',
+    );
+    await serverOrders.insert(order);
+    await serverOrders.markSynced(order.uuid);
+
+    final serverOrder = (await serverOrders.getAll()).single;
+    await serverOrderItems.insert(
+      makeOrderItem(
+        uuid: 'order-pull-item',
+        orderId: serverOrder.id!,
+        workType: 'Aari',
+        garmentType: 'Garment piece',
+      ),
+    );
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.ordersPushed, 0);
+    expect(result.ordersPulled, 1);
+
+    final localOrders = await clientOrders.getAll();
+    expect(localOrders, hasLength(1));
+    expect(localOrders.single.uuid, order.uuid);
+    expect(localOrders.single.orderNumber, 'ORD-000101');
+    expect(localOrders.single.status, 'In Progress');
+    expect(localOrders.single.syncStatus, 'synced');
+
+    final localItems = await clientOrderItems.getByOrder(localOrders.single.id!);
+    expect(localItems, hasLength(1));
+    expect(localItems.single.uuid, 'order-pull-item');
+    expect(localItems.single.workType, 'Aari');
+    expect(localItems.single.garmentType, 'Garment piece');
+  });
+
 }

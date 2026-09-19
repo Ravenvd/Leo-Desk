@@ -11,11 +11,14 @@ import 'core/sync/sync_events.dart';
 import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
 import 'features/billing/repositories/bill_repository.dart';
+import 'features/billing/screens/bills_screen.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/expenses/repositories/expense_repository.dart';
 import 'features/expenses/screens/expenses_screen.dart';
+import 'features/invoices/repositories/invoice_repository.dart';
+import 'features/invoices/screens/invoices_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 
@@ -125,29 +128,12 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           customerRepository: CustomerRepository(),
           billRepository: BillRepository(),
           expenseRepository: ExpenseRepository(),
+          invoiceRepository: InvoiceRepository(),
         ),
         CustomersScreen(repository: CustomerRepository()),
         OrdersScreen(),
-        const _PlaceholderPage(
-          icon: Icons.request_quote_rounded,
-          title: 'Quotations',
-          subtitle: 'Create and track quotations.',
-        ),
-        const _PlaceholderPage(
-          icon: Icons.inventory_2_rounded,
-          title: 'Inventory',
-          subtitle: 'Track materials and stock.',
-        ),
-        const _PlaceholderPage(
-          icon: Icons.receipt_long_rounded,
-          title: 'Invoices',
-          subtitle: 'Manage invoices and billing.',
-        ),
-        const _PlaceholderPage(
-          icon: Icons.payments_rounded,
-          title: 'Payments',
-          subtitle: 'Track payments and labour expenses.',
-        ),
+        InvoicesScreen(),
+        BillsScreen(),
         ExpensesScreen(repository: ExpenseRepository()),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
@@ -239,34 +225,22 @@ class _DesktopNavigation extends StatelessWidget {
                   onTap: () => onSelected(2),
                 ),
                 _NavigationItem(
-                  icon: Icons.request_quote_rounded,
-                  label: 'Quotations',
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Invoices',
                   selected: selectedIndex == 3,
                   onTap: () => onSelected(3),
                 ),
                 _NavigationItem(
-                  icon: Icons.inventory_2_rounded,
-                  label: 'Inventory',
+                  icon: Icons.payments_rounded,
+                  label: 'Bills',
                   selected: selectedIndex == 4,
                   onTap: () => onSelected(4),
                 ),
                 _NavigationItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Invoices',
-                  selected: selectedIndex == 5,
-                  onTap: () => onSelected(5),
-                ),
-                _NavigationItem(
-                  icon: Icons.payments_rounded,
-                  label: 'Payments',
-                  selected: selectedIndex == 6,
-                  onTap: () => onSelected(6),
-                ),
-                _NavigationItem(
                   icon: Icons.money_off_rounded,
                   label: 'Expenses',
-                  selected: selectedIndex == 7,
-                  onTap: () => onSelected(7),
+                  selected: selectedIndex == 5,
+                  onTap: () => onSelected(5),
                 ),
               ],
             ),
@@ -275,8 +249,8 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: selectedIndex == 8,
-            onTap: () => onSelected(8),
+            selected: selectedIndex == 6,
+            onTap: () => onSelected(6),
           ),
         ],
       ),
@@ -322,16 +296,6 @@ class _MobileNavigation extends StatelessWidget {
           label: Text('Orders'),
         ),
         NavigationDrawerDestination(
-          icon: Icon(Icons.request_quote_outlined),
-          selectedIcon: Icon(Icons.request_quote_rounded),
-          label: Text('Quotations'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2_rounded),
-          label: Text('Inventory'),
-        ),
-        NavigationDrawerDestination(
           icon: Icon(Icons.receipt_long_outlined),
           selectedIcon: Icon(Icons.receipt_long_rounded),
           label: Text('Invoices'),
@@ -339,7 +303,7 @@ class _MobileNavigation extends StatelessWidget {
         NavigationDrawerDestination(
           icon: Icon(Icons.payments_outlined),
           selectedIcon: Icon(Icons.payments_rounded),
-          label: Text('Payments'),
+          label: Text('Bills'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.money_off_outlined),
@@ -381,47 +345,6 @@ class _NavigationItem extends StatelessWidget {
         leading: Icon(icon),
         title: Text(label),
         onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 64),
-              const SizedBox(height: 24),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

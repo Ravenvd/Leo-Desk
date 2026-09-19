@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../billing/models/bill.dart';
-import '../../billing/repositories/bill_repository.dart';
-import '../../billing/screens/bill_details_screen.dart';
-import '../../billing/screens/create_bill_screen.dart';
+import '../../orders/models/order.dart';
+import '../../orders/repositories/order_repository.dart';
+import '../../orders/screens/order_details_screen.dart';
 import '../models/customer.dart';
 import '../repositories/customer_repository.dart';
 import 'customer_form_screen.dart';
@@ -24,9 +23,9 @@ class CustomerDetailsScreen extends StatefulWidget {
 
 class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   late Customer _customer;
-  final BillRepository _billRepository = BillRepository();
+  final OrderRepository _orderRepository = OrderRepository();
 
-  List<Bill> _bills = [];
+  List<Order> _orders = [];
   bool _isLoadingHistory = true;
   String? _historyError;
 
@@ -34,15 +33,15 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   void initState() {
     super.initState();
     _customer = widget.customer;
-    _loadBillHistory();
+    _loadOrderHistory();
   }
 
-  Future<void> _loadBillHistory() async {
+  Future<void> _loadOrderHistory() async {
     final customerId = _customer.id;
 
     if (customerId == null) {
       setState(() {
-        _bills = [];
+        _orders = [];
         _isLoadingHistory = false;
         _historyError = null;
       });
@@ -55,12 +54,12 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     });
 
     try {
-      final bills = await _billRepository.getForCustomer(customerId);
+      final orders = await _orderRepository.getByCustomer(customerId);
 
       if (!mounted) return;
 
       setState(() {
-        _bills = bills;
+        _orders = orders;
         _isLoadingHistory = false;
       });
     } catch (error, stackTrace) {
@@ -71,36 +70,9 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
 
       setState(() {
         _isLoadingHistory = false;
-        _historyError = 'Unable to load billing history.';
+        _historyError = 'Unable to load order history.';
       });
     }
-  }
-
-  Future<void> _createBill() async {
-    if (_customer.id == null) return;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            CreateBillScreen(customer: _customer, repository: _billRepository),
-      ),
-    );
-
-    if (mounted) {
-      await _loadBillHistory();
-    }
-  }
-
-  Future<void> _viewBill(Bill bill) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BillDetailsScreen(
-          bill: bill,
-          repository: _billRepository,
-          customer: _customer,
-        ),
-      ),
-    );
   }
 
   Future<void> _editCustomer() async {
@@ -243,13 +215,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _customer.id == null ? null : _createBill,
-                    icon: const Icon(Icons.receipt_long_rounded),
-                    label: const Text('Create Bill'),
-                  ),
-                ],
+                 ],
               ),
             ),
           ],
@@ -322,17 +288,17 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.history_rounded),
+                const Icon(Icons.shopping_bag_rounded),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Customer History',
+                    'Customer Orders',
                     style: Theme.of(context).textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
                 Text(
-                  '${_bills.length} bill${_bills.length == 1 ? '' : 's'}',
+                  '${_orders.length} order${_orders.length == 1 ? '' : 's'}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
@@ -347,10 +313,10 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
               )
             else if (_historyError != null)
               _buildHistoryError()
-            else if (_bills.isEmpty)
+            else if (_orders.isEmpty)
               _buildEmptyHistory()
             else
-              _buildBillHistory(),
+              _buildOrderHistory(),
           ],
         ),
       ),
@@ -365,7 +331,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         Text(_historyError!),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: _loadBillHistory,
+          onPressed: _loadOrderHistory,
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Try Again'),
         ),
@@ -384,68 +350,69 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
       child: Column(
         children: [
           Icon(
-            Icons.receipt_long_outlined,
+            Icons.shopping_bag_outlined,
             size: 44,
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 12),
-          Text('No bills yet', style: Theme.of(context).textTheme.titleMedium),
+          Text('No orders yet', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           const Text(
-            'Bills created for this customer will appear here.',
+            'Orders placed by this customer will appear here.',
             textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _customer.id == null ? null : _createBill,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Create First Bill'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBillHistory() {
-    return Column(
-      children: _bills.map((bill) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Card(
-            margin: EdgeInsets.zero,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
+  Widget _buildOrderHistory() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: const [
+          DataColumn(label: Text('Order')),
+          DataColumn(label: Text('Date')),
+          DataColumn(label: Text('Status')),
+          DataColumn(label: Text('Total')),
+        ],
+        rows: _orders.map((order) {
+          return DataRow(
+            cells: [
+              DataCell(
+                Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => _viewOrder(order),
               ),
-              leading: const CircleAvatar(
-                child: Icon(Icons.receipt_long_rounded),
-              ),
-              title: Text(
-                bill.billNumber,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(_formatDate(bill.billDate)),
-              trailing: SizedBox(
-                width: 145,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      _formatMoney(bill.totalPaise),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right_rounded),
-                  ],
+              DataCell(Text(_formatDate(order.orderDate))),
+              DataCell(Chip(label: Text(order.status), visualDensity: VisualDensity.compact)),
+              DataCell(FutureBuilder<int>(
+                future: _orderTotal(order),
+                builder: (context, snapshot) => Text(
+                  snapshot.hasData ? _formatMoney(snapshot.data!) : '—',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-              ),
-              onTap: () => _viewBill(bill),
-            ),
-          ),
-        );
-      }).toList(),
+              )),
+            ],
+          );
+        }).toList(),
+      ),
     );
+  }
+
+  Future<int> _orderTotal(Order order) async {
+    if (order.id == null) return order.stitchingPricePaise;
+    final items = await _orderRepository.getItems(order.id!);
+    return items.fold<int>(
+      order.stitchingPricePaise,
+      (total, item) => total + item.quantity * item.unitPricePaise,
+    );
+  }
+
+  Future<void> _viewOrder(Order order) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
+    );
+    if (mounted) await _loadOrderHistory();
   }
 }
 

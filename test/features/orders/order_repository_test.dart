@@ -228,7 +228,7 @@ void main() {
         orderNumber: 'ORD-000001',
       );
 
-      final applied = await repository.upsertFromSync(order);
+      final applied = await repository.upsertFromSync(order, const []);
 
       expect(applied, true);
 
@@ -246,7 +246,7 @@ void main() {
         orderNumber: 'ORD-000001',
       );
 
-      await repository.upsertFromSync(order);
+      await repository.upsertFromSync(order, const []);
 
       final serverUpdate = order.copyWith(
         status: 'Ready',
@@ -254,7 +254,7 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      final applied = await repository.upsertFromSync(serverUpdate);
+      final applied = await repository.upsertFromSync(serverUpdate, const []);
 
       expect(applied, true);
 
@@ -281,7 +281,7 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      final applied = await repository.upsertFromSync(serverOrder);
+      final applied = await repository.upsertFromSync(serverOrder, const []);
 
       expect(applied, false);
 

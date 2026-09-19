@@ -8,6 +8,8 @@ import '../../customers/repositories/customer_repository.dart';
 import '../../expenses/models/expense.dart';
 import '../../expenses/repositories/expense_repository.dart';
 import '../../orders/models/order.dart';
+import '../../invoices/models/invoice.dart';
+import '../../invoices/repositories/invoice_repository.dart';
 import '../../orders/repositories/order_repository.dart';
 import '../../../core/sync/sync_events.dart';
 import '../widgets/dashboard_charts.dart';
@@ -18,11 +20,13 @@ class DashboardScreen extends StatefulWidget {
     required this.customerRepository,
     required this.billRepository,
     required this.expenseRepository,
+    required this.invoiceRepository,
   });
 
   final CustomerRepository customerRepository;
   final BillRepository billRepository;
   final ExpenseRepository expenseRepository;
+  final InvoiceRepository invoiceRepository;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -34,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Customer> _customers = [];
   List<Bill> _bills = [];
+  List<Invoice> _invoices = [];
   List<Expense> _expenses = [];
   List<Order> _orders = [];
   int _pendingSyncCount = 0;
@@ -70,6 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final customers = await widget.customerRepository.getAll();
       final bills = await widget.billRepository.getAll();
+      final invoices = await widget.invoiceRepository.getAll();
       final expenses = await widget.expenseRepository.getAll();
       final orders = await OrderRepository().getAll();
       final pendingCustomers = await widget.customerRepository.getPending();
@@ -81,6 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _customers = customers;
         _bills = bills;
+        _invoices = invoices;
         _expenses = expenses;
         _orders = orders;
         _pendingSyncCount =
@@ -114,6 +121,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _expenses.fold<int>(0, (sum, expense) => sum + expense.amountPaise);
 
   int get _netProfitPaise => _totalRevenuePaise - _totalExpensesPaise;
+
+  int get _amountPendingPaise {
+    final billedOrderUuids = _bills
+        .map((bill) => bill.orderUuid)
+        .whereType<String>()
+        .toSet();
+
+    return _invoices.fold<int>(0, (sum, invoice) {
+      // Cancelled orders are not collectible, so their invoices are excluded.
+      final order = _orders.cast<Order?>().firstWhere(
+        (candidate) => candidate?.uuid == invoice.orderUuid,
+        orElse: () => null,
+      );
+      if (order?.status == 'Cancelled') return sum;
+
+      // An invoice is pending until its order has a completed, paid bill.
+      if (billedOrderUuids.contains(invoice.orderUuid)) return sum;
+
+      return sum + invoice.totalPaise;
+    });
+  }
+
 
   int get _pendingOrdersCount => _orders.where((order) {
     return order.status == 'New' || order.status == 'In Progress';
@@ -420,12 +449,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildStats() {
-    final outstanding = _bills.fold<int>(
-      0,
-      (sum, bill) =>
-          sum + (bill.balanceDuePaise > 0 ? bill.balanceDuePaise : 0),
-    );
-
     return Wrap(
       spacing: 16,
       runSpacing: 16,
@@ -442,9 +465,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         _StatCard(
           icon: Icons.account_balance_wallet_rounded,
-          label: 'Outstanding',
-          value: _money(outstanding),
-          highlight: outstanding > 0,
+          label: 'Amount pending',
+          value: _money(_amountPendingPaise),
+          highlight: _amountPendingPaise > 0,
         ),
         _StatCard(
           icon: Icons.trending_up_rounded,

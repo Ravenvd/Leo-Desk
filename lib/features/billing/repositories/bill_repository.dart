@@ -13,6 +13,17 @@ class BillRepository {
     return database ?? await AppDatabase.database;
   }
 
+  Future<Bill?> getByOrderUuid(String orderUuid) async {
+    final db = await _db;
+    final maps = await db.query(
+      'bills',
+      where: 'order_uuid = ?',
+      whereArgs: [orderUuid],
+      limit: 1,
+    );
+    return maps.isEmpty ? null : Bill.fromMap(maps.first);
+  }
+
   Future<int> insert({
     required Bill bill,
     required List<BillItem> items,
@@ -99,9 +110,31 @@ class BillRepository {
       return false;
     }
 
-    final map =
-        bill.copyWith(syncStatus: 'synced', customerId: customerId).toMap()
-          ..remove('id');
+    // Integer order ids are local to each device. Resolve the order by uuid
+    // before storing the bill locally.
+    int? orderId;
+    if (bill.orderUuid != null) {
+      final orders = await db.query(
+        'orders',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [bill.orderUuid],
+        limit: 1,
+      );
+      if (orders.isEmpty) {
+        return false;
+      }
+      orderId = orders.first['id'] as int;
+    }
+
+    final map = bill
+        .copyWith(
+          syncStatus: 'synced',
+          customerId: customerId,
+          orderId: orderId,
+        )
+        .toMap()
+      ..remove('id');
 
     await db.transaction((txn) async {
       int billId;

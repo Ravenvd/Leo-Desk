@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
 import '../models/order.dart';
+import '../models/order_item.dart';
 
 class OrderRepository {
   final Database? database;
@@ -36,6 +37,19 @@ class OrderRepository {
       where: 'id = ?',
       whereArgs: [order.id],
     );
+  }
+
+  Future<List<OrderItem>> getItems(int orderId) async {
+    final db = await _db;
+
+    final maps = await db.query(
+      'order_items',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+      orderBy: 'id ASC',
+    );
+
+    return maps.map(OrderItem.fromMap).toList();
   }
 
   Future<int> delete(int id) async {
@@ -110,35 +124,55 @@ class OrderRepository {
     );
   }
 
-  Future<bool> upsertFromSync(Order order) async {
+  Future<bool> upsertFromSync(
+    Order order,
+    List<OrderItem> items,
+  ) async {
     final db = await _db;
 
-    final existing = await db.query(
-      'orders',
-      columns: ['id', 'sync_status'],
-      where: 'uuid = ?',
-      whereArgs: [order.uuid],
-      limit: 1,
-    );
-
-    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
-      return false;
-    }
-
-    final map = order.copyWith(syncStatus: 'synced').toMap()..remove('id');
-
-    if (existing.isEmpty) {
-      await db.insert('orders', map);
-    } else {
-      await db.update(
+    return db.transaction((txn) async {
+      final existing = await txn.query(
         'orders',
-        map,
+        columns: ['id', 'sync_status'],
         where: 'uuid = ?',
         whereArgs: [order.uuid],
+        limit: 1,
       );
-    }
 
-    return true;
+      if (existing.isNotEmpty &&
+          existing.first['sync_status'] == 'pending') {
+        return false;
+      }
+
+      final map = order.copyWith(syncStatus: 'synced').toMap()..remove('id');
+      late final int localOrderId;
+
+      if (existing.isEmpty) {
+        localOrderId = await txn.insert('orders', map);
+      } else {
+        localOrderId = existing.first['id'] as int;
+        await txn.update(
+          'orders',
+          map,
+          where: 'id = ?',
+          whereArgs: [localOrderId],
+        );
+      }
+
+      await txn.delete(
+        'order_items',
+        where: 'order_id = ?',
+        whereArgs: [localOrderId],
+      );
+
+      for (final item in items) {
+        final itemMap = item.copyWith(orderId: localOrderId).toMap()
+          ..remove('id');
+        await txn.insert('order_items', itemMap);
+      }
+
+      return true;
+    });
   }
 
   Future<void> deleteAll() async {
