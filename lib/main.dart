@@ -17,6 +17,7 @@ import 'features/customers/screens/customers_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/expenses/repositories/expense_repository.dart';
 import 'features/expenses/screens/expenses_screen.dart';
+import 'features/invoices/repositories/invoice_repository.dart';
 import 'features/invoices/screens/invoices_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
@@ -127,6 +128,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           customerRepository: CustomerRepository(),
           billRepository: BillRepository(),
           expenseRepository: ExpenseRepository(),
+          invoiceRepository: InvoiceRepository(),
         ),
         CustomersScreen(repository: CustomerRepository()),
         OrdersScreen(),
