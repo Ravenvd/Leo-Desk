@@ -394,8 +394,6 @@ class DatabaseSchema {
     ''');
   }
 
-}
-
 
   static Future<void> upgradeToVersion10(Database db) async {
     await db.transaction((txn) async {
@@ -441,3 +439,4 @@ class DatabaseSchema {
       ''');
     });
   }
+}
