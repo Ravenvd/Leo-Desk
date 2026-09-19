@@ -142,7 +142,7 @@ class DatabaseSchema {
     '''
     CREATE INDEX idx_invoice_items_invoice_id
     ON invoice_items(invoice_id)
-    '''
+    ''',
     '''
     CREATE INDEX idx_bills_customer_id
     ON bills(customer_id)
