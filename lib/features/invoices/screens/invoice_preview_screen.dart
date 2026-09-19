@@ -5,19 +5,22 @@ import 'package:printing/printing.dart';
 
 import '../../customers/models/customer.dart';
 import '../../orders/models/order.dart';
-import '../../orders/models/order_item.dart';
+import '../models/invoice.dart';
+import '../models/invoice_item.dart';
 import '../services/invoice_pdf_service.dart';
 
 class InvoicePreviewScreen extends StatefulWidget {
   const InvoicePreviewScreen({
     super.key,
+    required this.invoice,
+    required this.invoiceItems,
     required this.order,
-    required this.items,
     required this.customer,
   });
 
+  final Invoice invoice;
+  final List<InvoiceItem> invoiceItems;
   final Order order;
-  final List<OrderItem> items;
   final Customer customer;
 
   @override
@@ -25,20 +28,13 @@ class InvoicePreviewScreen extends StatefulWidget {
 }
 
 class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
-  late final DateTime _invoiceDate;
   bool _busy = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _invoiceDate = DateTime.now();
-  }
-
   Future<Uint8List> _pdf() => InvoicePdfService.generate(
+        invoice: widget.invoice,
+        invoiceItems: widget.invoiceItems,
         order: widget.order,
-        items: widget.items,
         customer: widget.customer,
-        invoiceDate: _invoiceDate,
       );
 
   Future<void> _preview() async {
@@ -47,7 +43,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
       final bytes = await _pdf();
       await Printing.layoutPdf(
         onLayout: (_) => bytes,
-        name: 'INV-${_number(widget.order.orderNumber)}.pdf',
+        name: '${widget.invoice.invoiceNumber}.pdf',
       );
     } catch (error) {
       _error('Unable to generate invoice PDF: $error');
@@ -62,7 +58,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
       final bytes = await _pdf();
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'INV-${_number(widget.order.orderNumber)}.pdf',
+        filename: '${widget.invoice.invoiceNumber}.pdf',
       );
     } catch (error) {
       _error('Unable to share invoice PDF: $error');
@@ -72,19 +68,14 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
   }
 
   void _error(String message) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
-  int get _itemsTotal => widget.items.fold(
-        0,
-        (total, item) => total + item.quantity * item.unitPricePaise,
-      );
-
-  int get _total => _itemsTotal + widget.order.stitchingPricePaise;
-
-  String _number(String value) => value.startsWith('ORD-') ? value.substring(4) : value;
-
-  String _money(int paise) => 'Rs. ${(paise / 100).toStringAsFixed(2)}';
+  String _money(int paise) => '₹${(paise / 100).toStringAsFixed(2)}';
 
   String _date(DateTime value) {
     final d = value.toLocal();
@@ -110,7 +101,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'INV-${_number(widget.order.orderNumber)}',
+                          widget.invoice.invoiceNumber,
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                       ),
@@ -119,7 +110,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                   const SizedBox(height: 12),
                   Text('Order: ${widget.order.orderNumber}'),
                   Text('Customer: ${widget.customer.name}'),
-                  Text('Invoice date: ${_date(_invoiceDate)}'),
+                  Text('Invoice date: ${_date(widget.invoice.invoiceDate)}'),
                   const SizedBox(height: 18),
                   Row(
                     children: [
@@ -150,37 +141,35 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  ...widget.items.map(
+                  ...widget.invoiceItems.map(
                     (item) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
                         children: [
-                          Expanded(child: Text('${item.workType} · ${item.garmentType}')),
-                          Text('${item.quantity} × ${_money(item.unitPricePaise)}'),
+                          Expanded(child: Text(item.description)),
+                          Text('${item.quantity} × ${_money(item.ratePaise)}'),
                           const SizedBox(width: 16),
                           Text(
-                            _money(item.quantity * item.unitPricePaise),
+                            _money(item.amountPaise),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (widget.order.stitchingRequired)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          const Expanded(child: Text('Stitching')),
-                          Text(_money(widget.order.stitchingPricePaise)),
-                        ],
-                      ),
-                    ),
                   const Divider(height: 28),
                   Row(
                     children: [
-                      const Expanded(child: Text('Total', style: TextStyle(fontWeight: FontWeight.w700))),
-                      Text(_money(_total), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const Expanded(
+                        child: Text(
+                          'Amount Payable on Delivery',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      Text(
+                        _money(widget.invoice.totalPaise),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ],
                   ),
                 ],
