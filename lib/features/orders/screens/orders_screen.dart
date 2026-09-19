@@ -149,7 +149,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   bool _isStatusSelectable(Order order, String status) {
-    if (status == 'Cancelled') return false;
+    if (status == 'Cancelled') {
+      return order.status != 'Completed' && order.status != 'Cancelled';
+    }
     if (status == 'Sent for Stitching' && !order.stitchingRequired) {
       return false;
     }
@@ -163,7 +165,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<void> _changeStatus(Order order, String status) async {
     if (order.status == 'Completed' ||
-        order.status == 'Cancelled' ||
+        (order.status == 'Cancelled' && status != 'Cancelled') ||
         !_isStatusSelectable(order, status)) {
       return;
     }
