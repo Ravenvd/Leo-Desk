@@ -289,14 +289,6 @@ class SyncManager {
       customerIdsByUuid: customerIdsByUuid,
     );
 
-    final invoices = await _client.fetchInvoices(
-      customerIdsByUuid: customerIdsByUuid,
-      orderIdsByUuid: {
-        for (final order in orders) order.order.uuid: order.order.id!,
-      },
-    );
-    final bills = await _client.fetchBills();
-
     for (final syncOrder in orders) {
       final applied = await _orderRepository.upsertFromSync(
         syncOrder.order,
@@ -304,6 +296,18 @@ class SyncManager {
       );
       if (applied) ordersApplied++;
     }
+
+    final localOrderIdsByUuid = {
+      for (final order in await _orderRepository.getAll()) order.uuid: order.id!,
+    };
+    final invoices = await _client.fetchInvoices(
+      customerIdsByUuid: {
+        for (final customer in await _customerRepository.getAll())
+          customer.uuid: customer.id!,
+      },
+      orderIdsByUuid: localOrderIdsByUuid,
+    );
+    final bills = await _client.fetchBills();
 
     for (final syncInvoice in invoices) {
       final applied = await _invoiceRepository.upsertFromSync(
