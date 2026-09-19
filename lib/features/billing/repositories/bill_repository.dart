@@ -13,6 +13,17 @@ class BillRepository {
     return database ?? await AppDatabase.database;
   }
 
+  Future<Bill?> getByOrderUuid(String orderUuid) async {
+    final db = await _db;
+    final maps = await db.query(
+      'bills',
+      where: 'order_uuid = ?',
+      whereArgs: [orderUuid],
+      limit: 1,
+    );
+    return maps.isEmpty ? null : Bill.fromMap(maps.first);
+  }
+
   Future<int> insert({
     required Bill bill,
     required List<BillItem> items,
