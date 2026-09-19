@@ -4,11 +4,20 @@ import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../../orders/models/order.dart';
 import '../../orders/repositories/order_repository.dart';
+import '../models/invoice.dart';
+import '../models/invoice_item.dart';
+import '../repositories/invoice_repository.dart';
 import 'invoice_preview_screen.dart';
 
 class InvoicesScreen extends StatefulWidget {
-  const InvoicesScreen({super.key, this.orderRepository, this.customerRepository});
+  const InvoicesScreen({
+    super.key,
+    this.invoiceRepository,
+    this.orderRepository,
+    this.customerRepository,
+  });
 
+  final InvoiceRepository? invoiceRepository;
   final OrderRepository? orderRepository;
   final CustomerRepository? customerRepository;
 
@@ -17,70 +26,80 @@ class InvoicesScreen extends StatefulWidget {
 }
 
 class _InvoicesScreenState extends State<InvoicesScreen> {
+  late final InvoiceRepository _invoiceRepository;
   late final OrderRepository _orderRepository;
   late final CustomerRepository _customerRepository;
-  List<Order> _orders = [];
+
+  List<Invoice> _invoices = [];
   Map<int, Customer> _customers = {};
-  Map<int, int> _totals = {};
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _invoiceRepository = widget.invoiceRepository ?? InvoiceRepository();
     _orderRepository = widget.orderRepository ?? OrderRepository();
     _customerRepository = widget.customerRepository ?? CustomerRepository();
-    _loadOrders();
+    _loadInvoices();
   }
 
-  Future<void> _loadOrders() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _loadInvoices() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
-      final orders = await _orderRepository.getAll();
+      final invoices = await _invoiceRepository.getAll();
       final customers = <int, Customer>{};
-      final totals = <int, int>{};
-      for (final order in orders) {
-        final customer = await _customerRepository.getById(order.customerId);
-        if (customer != null) customers[order.customerId] = customer;
-        if (order.id != null) {
-          final items = await _orderRepository.getItems(order.id!);
-          totals[order.id!] = items.fold(
-            order.stitchingPricePaise,
-            (total, item) => total + item.quantity * item.unitPricePaise,
-          );
+
+      for (final invoice in invoices) {
+        final customer = await _customerRepository.getById(invoice.customerId);
+        if (customer != null) {
+          customers[invoice.customerId] = customer;
         }
       }
+
       if (!mounted) return;
       setState(() {
-        _orders = orders;
+        _invoices = invoices;
         _customers = customers;
-        _totals = totals;
         _loading = false;
       });
     } catch (error, stackTrace) {
-      debugPrint('Load invoice orders error: $error');
+      debugPrint('Load invoices error: $error');
       debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      setState(() { _loading = false; _error = 'Unable to load orders for invoicing.'; });
+      setState(() {
+        _loading = false;
+        _error = 'Unable to load invoices.';
+      });
     }
   }
 
-  Future<void> _openInvoice(Order order) async {
-    if (order.id == null) return;
+  Future<void> _openInvoice(Invoice invoice) async {
     try {
-      final customer = _customers[order.customerId] ??
-          await _customerRepository.getById(order.customerId);
-      if (customer == null) {
-        _message('Customer could not be found.');
+      final customer = _customers[invoice.customerId] ??
+          await _customerRepository.getById(invoice.customerId);
+      final order = await _orderRepository.getById(invoice.orderId);
+      final items = invoice.id == null
+          ? <InvoiceItem>[]
+          : await _invoiceRepository.getItems(invoice.id!);
+
+      if (customer == null || order == null || items.isEmpty) {
+        _message('Unable to load the saved invoice.');
         return;
       }
-      final items = await _orderRepository.getItems(order.id!);
+
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => InvoicePreviewScreen(
+            invoice: invoice,
+            invoiceItems: items,
             order: order,
-            items: items,
             customer: customer,
           ),
         ),
@@ -88,15 +107,17 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     } catch (error, stackTrace) {
       debugPrint('Open invoice error: $error');
       debugPrintStack(stackTrace: stackTrace);
-      if (mounted) _message('Unable to prepare the invoice.');
+      if (mounted) _message('Unable to open the invoice.');
     }
   }
 
   void _message(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
-  String _money(int paise) => 'Rs. ${(paise / 100).toStringAsFixed(2)}';
+  String _money(int paise) => '₹${(paise / 100).toStringAsFixed(2)}';
 
   String _date(DateTime value) {
     final d = value.toLocal();
@@ -108,13 +129,19 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Invoices')),
       body: SafeArea(
-        child: RefreshIndicator(onRefresh: _loadOrders, child: _buildBody()),
+        child: RefreshIndicator(
+          onRefresh: _loadInvoices,
+          child: _buildBody(),
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (_error != null) {
       return Center(
         child: Column(
@@ -125,7 +152,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             Text(_error!),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: _loadOrders,
+              onPressed: _loadInvoices,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try Again'),
             ),
@@ -133,36 +160,38 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         ),
       );
     }
-    if (_orders.isEmpty) {
+
+    if (_invoices.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40),
           child: Text(
-            'No orders available for invoicing. Orders will appear here automatically as soon as they are created.',
+            'No invoices have been generated yet. An invoice is created automatically when an order enters In Progress.',
             textAlign: TextAlign.center,
           ),
         ),
       );
     }
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
         child: ListView.separated(
           padding: const EdgeInsets.all(24),
-          itemCount: _orders.length,
+          itemCount: _invoices.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (_, index) => _buildOrderCard(_orders[index]),
+          itemBuilder: (_, index) => _buildInvoiceCard(_invoices[index]),
         ),
       ),
     );
   }
 
-  Widget _buildOrderCard(Order order) {
-    final customer = _customers[order.customerId];
-    final total = order.id == null ? 0 : _totals[order.id!] ?? 0;
+  Widget _buildInvoiceCard(Invoice invoice) {
+    final customer = _customers[invoice.customerId];
+
     return Card(
       child: InkWell(
-        onTap: () => _openInvoice(order),
+        onTap: () => _openInvoice(invoice),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -174,16 +203,24 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text(
+                      invoice.invoiceNumber,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     const SizedBox(height: 4),
                     Text(customer?.name ?? 'Customer unavailable'),
                     const SizedBox(height: 4),
-                    Text('Order date: ${_date(order.orderDate)}',
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      'Invoice date: ${_date(invoice.invoiceDate)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
-              Text(_money(total), style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                _money(invoice.totalPaise),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(width: 8),
               const Icon(Icons.chevron_right_rounded),
             ],
