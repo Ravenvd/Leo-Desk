@@ -4,6 +4,7 @@ import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../models/order.dart';
 import '../repositories/order_repository.dart';
+import '../../billing/services/bill_creation_service.dart';
 import '../../invoices/services/invoice_creation_service.dart';
 import 'create_order_screen.dart';
 import 'order_details_screen.dart';
@@ -26,6 +27,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   late final OrderRepository _orderRepository;
   late final CustomerRepository _customerRepository;
   late final InvoiceCreationService _invoiceCreationService;
+  late final BillCreationService _billCreationService;
 
   List<Order> _orders = [];
   Map<int, Customer> _customers = {};
@@ -39,7 +41,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _orderRepository = widget.orderRepository ?? OrderRepository();
     _customerRepository =
         widget.customerRepository ?? CustomerRepository();
-    _invoiceCreationService = InvoiceCreationService(orderRepository: _orderRepository, customerRepository: _customerRepository);
+    _invoiceCreationService = InvoiceCreationService(
+      orderRepository: _orderRepository,
+      customerRepository: _customerRepository,
+    );
+    _billCreationService = BillCreationService(
+      customerRepository: _customerRepository,
+    );
     _loadOrders();
   }
 
@@ -170,6 +178,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       try {
         if (status == 'In Progress') {
           await _invoiceCreationService.createForOrder(updated);
+        } else if (status == 'Completed') {
+          await _billCreationService.createForOrder(updated);
         }
       } catch (error) {
         await _orderRepository.update(
@@ -192,7 +202,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
           content: Text(
             status == 'In Progress'
                 ? '${order.orderNumber} → In Progress · Invoice generated'
-                : '${order.orderNumber} → $status',
+                : status == 'Completed'
+                    ? '${order.orderNumber} → Completed · Bill generated'
+                    : '${order.orderNumber} → $status',
           ),
         ),
       );
