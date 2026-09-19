@@ -108,7 +108,7 @@ class InvoicePdfService {
                   _row('Items Total', itemsTotal),
                   if (order.stitchingRequired) _row('Stitching', order.stitchingPricePaise),
                   pw.Divider(),
-                  _row('Total', total, bold: true),
+                  _row('Amount Payable on Delivery', total, bold: true),
                 ],
               ),
             ),
