@@ -288,11 +288,11 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.history_rounded),
+                const Icon(Icons.shopping_bag_rounded),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Customer History',
+                    'Customer Orders',
                     style: Theme.of(context).textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -350,7 +350,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
       child: Column(
         children: [
           Icon(
-            Icons.receipt_long_outlined,
+            Icons.shopping_bag_outlined,
             size: 44,
             color: Theme.of(context).colorScheme.primary,
           ),
