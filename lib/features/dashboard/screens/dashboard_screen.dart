@@ -127,7 +127,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _invoices.fold<int>(0, (sum, invoice) => sum + invoice.totalPaise);
     final paidPaise =
         _bills.fold<int>(0, (sum, bill) => sum + bill.amountPaidPaise);
-    return (invoicedPaise - paidPaise).clamp(0, invoicedPaise);
+    final pending = invoicedPaise - paidPaise;
+    return pending > 0 ? pending : 0;
   }
 
 
@@ -436,12 +437,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildStats() {
-    final outstanding = _bills.fold<int>(
-      0,
-      (sum, bill) =>
-          sum + (bill.balanceDuePaise > 0 ? bill.balanceDuePaise : 0),
-    );
-
     return Wrap(
       spacing: 16,
       runSpacing: 16,
