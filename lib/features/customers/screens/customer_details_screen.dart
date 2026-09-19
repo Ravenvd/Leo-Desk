@@ -378,9 +378,11 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         ],
         rows: _orders.map((order) {
           return DataRow(
-            onSelectChanged: (_) => _viewOrder(order),
             cells: [
-              DataCell(Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.w600))),
+              DataCell(
+                Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => _viewOrder(order),
+              ),
               DataCell(Text(_formatDate(order.orderDate))),
               DataCell(Chip(label: Text(order.status), visualDensity: VisualDensity.compact)),
               DataCell(FutureBuilder<int>(
