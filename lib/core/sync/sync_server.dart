@@ -149,9 +149,12 @@ class SyncServer {
         final customer = customerUuid == null
             ? null
             : await _customerRepository.getByUuid(customerUuid);
-        final order = await _orderRepository.getById(syncInvoice.invoice.orderId);
+        final order = (await _orderRepository.getAll())
+            .where((candidate) => candidate.uuid == syncInvoice.invoice.orderUuid)
+            .cast()
+            .toList();
 
-        if (customer == null || order == null) {
+        if (customer == null || order.isEmpty) {
           await _sendJson(request.response, 409, {
             'error': 'Invoice customer or order does not exist.',
             'uuid': syncInvoice.invoice.uuid,
