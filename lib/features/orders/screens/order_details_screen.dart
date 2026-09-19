@@ -86,10 +86,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   bool get _isFrozen {
-    if (_order.status == 'Completed' || _order.status == 'Cancelled') {
-      return true;
-    }
-    return DateTime.now().difference(_order.createdAt).inHours >= 24;
+    return _order.status != 'New';
   }
 
   bool get _isTerminal =>
@@ -115,12 +112,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   String _editingWindow() {
-    final remaining =
-        const Duration(hours: 24) - DateTime.now().difference(_order.createdAt);
-
-    if (remaining.isNegative) return 'Editing window closed';
-
-    return 'Editable for ${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m';
+    return 'Order can be edited until it is moved to In Progress.';
   }
 
   Future<void> _changeStatus(String status) async {
@@ -213,7 +205,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _editRate(OrderItem item) async {
-    if (_isTerminal || item.id == null) return;
+    if (_isFrozen || item.id == null) return;
 
     final controller = TextEditingController(
       text: (item.unitPricePaise / 100).toStringAsFixed(2),
@@ -594,7 +586,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     '${item.quantity} × ${_money(item.unitPricePaise)}',
                   ),
                 ),
-                if (!_isTerminal)
+                if (!_isFrozen)
                   IconButton(
                     onPressed: () => _editRate(item),
                     tooltip: 'Edit rate',
