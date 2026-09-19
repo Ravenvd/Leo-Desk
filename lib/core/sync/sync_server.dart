@@ -165,7 +165,7 @@ class SyncServer {
         final applied = await _invoiceRepository.upsertFromSync(
           syncInvoice.invoice.copyWith(
             customerId: customer.id!,
-            orderId: order.id!,
+            orderId: order.first.id!,
           ),
           syncInvoice.items,
         );
