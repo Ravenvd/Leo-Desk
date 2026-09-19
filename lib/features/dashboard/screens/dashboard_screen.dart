@@ -123,12 +123,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int get _netProfitPaise => _totalRevenuePaise - _totalExpensesPaise;
 
   int get _amountPendingPaise {
-    final invoicedPaise =
-        _invoices.fold<int>(0, (sum, invoice) => sum + invoice.totalPaise);
-    final paidPaise =
-        _bills.fold<int>(0, (sum, bill) => sum + bill.amountPaidPaise);
-    final pending = invoicedPaise - paidPaise;
-    return pending > 0 ? pending : 0;
+    final billedOrderUuids = _bills
+        .map((bill) => bill.orderUuid)
+        .whereType<String>()
+        .toSet();
+
+    return _invoices.fold<int>(0, (sum, invoice) {
+      // Cancelled orders are not collectible, so their invoices are excluded.
+      final order = _orders.cast<Order?>().firstWhere(
+        (candidate) => candidate?.uuid == invoice.orderUuid,
+        orElse: () => null,
+      );
+      if (order?.status == 'Cancelled') return sum;
+
+      // An invoice is pending until its order has a completed, paid bill.
+      if (billedOrderUuids.contains(invoice.orderUuid)) return sum;
+
+      return sum + invoice.totalPaise;
+    });
   }
 
 
