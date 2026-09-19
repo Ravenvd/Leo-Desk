@@ -215,13 +215,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.receipt_long_rounded),
-                    label: const Text('Bills are generated on completion'),
-                  ),
-                ],
+                 ],
               ),
             ),
           ],
@@ -319,7 +313,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
               )
             else if (_historyError != null)
               _buildHistoryError()
-            else if (_bills.isEmpty)
+            else if (_orders.isEmpty)
               _buildEmptyHistory()
             else
               _buildOrderHistory(),
@@ -366,12 +360,6 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
           const Text(
             'Orders placed by this customer will appear here.',
             textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _customer.id == null ? null : _createBill,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Create First Bill'),
           ),
         ],
       ),
