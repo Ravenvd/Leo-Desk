@@ -152,6 +152,14 @@ class DatabaseSchema {
     ON bills(bill_date)
     ''',
     '''
+    CREATE UNIQUE INDEX idx_bills_order_id
+    ON bills(order_id)
+    ''',
+    '''
+    CREATE UNIQUE INDEX idx_bills_order_uuid
+    ON bills(order_uuid)
+    ''',
+    '''
     CREATE INDEX idx_bill_items_bill_id
     ON bill_items(bill_id)
     ''',
