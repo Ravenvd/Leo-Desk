@@ -143,13 +143,28 @@ class _BillsScreenState extends State<BillsScreen> {
             rows: _bills.map((bill) {
               final customer = _customers[bill.customerId];
               return DataRow(
-                onSelectChanged: (_) => _openBill(bill),
                 cells: [
-                  DataCell(Text(bill.billNumber, style: const TextStyle(fontWeight: FontWeight.w600))),
+                  DataCell(
+                    Text(
+                      bill.billNumber,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    onTap: () => _openBill(bill),
+                  ),
                   DataCell(Text(customer?.name ?? 'Unknown customer')),
                   DataCell(Text(_date(bill.billDate))),
-                  DataCell(Text(_money(bill.totalPaise), style: const TextStyle(fontWeight: FontWeight.w600))),
-                  const DataCell(Chip(label: Text('Paid'), visualDensity: VisualDensity.compact)),
+                  DataCell(
+                    Text(
+                      _money(bill.totalPaise),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const DataCell(
+                    Chip(
+                      label: Text('Paid'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                 ],
               );
             }).toList(),
