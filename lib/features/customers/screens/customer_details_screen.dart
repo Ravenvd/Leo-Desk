@@ -41,7 +41,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
 
     if (customerId == null) {
       setState(() {
-        _bills = [];
+        _orders = [];
         _isLoadingHistory = false;
         _historyError = null;
       });
