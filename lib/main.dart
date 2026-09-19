@@ -11,6 +11,7 @@ import 'core/sync/sync_events.dart';
 import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
 import 'features/billing/repositories/bill_repository.dart';
+import 'features/billing/screens/bills_screen.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
@@ -129,22 +130,8 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
         ),
         CustomersScreen(repository: CustomerRepository()),
         OrdersScreen(),
-        const _PlaceholderPage(
-          icon: Icons.request_quote_rounded,
-          title: 'Quotations',
-          subtitle: 'Create and track quotations.',
-        ),
-        const _PlaceholderPage(
-          icon: Icons.inventory_2_rounded,
-          title: 'Inventory',
-          subtitle: 'Track materials and stock.',
-        ),
         InvoicesScreen(),
-        const _PlaceholderPage(
-          icon: Icons.payments_rounded,
-          title: 'Payments',
-          subtitle: 'Track payments and labour expenses.',
-        ),
+        BillsScreen(),
         ExpensesScreen(repository: ExpenseRepository()),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
@@ -236,34 +223,22 @@ class _DesktopNavigation extends StatelessWidget {
                   onTap: () => onSelected(2),
                 ),
                 _NavigationItem(
-                  icon: Icons.request_quote_rounded,
-                  label: 'Quotations',
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Invoices',
                   selected: selectedIndex == 3,
                   onTap: () => onSelected(3),
                 ),
                 _NavigationItem(
-                  icon: Icons.inventory_2_rounded,
-                  label: 'Inventory',
+                  icon: Icons.payments_rounded,
+                  label: 'Bills',
                   selected: selectedIndex == 4,
                   onTap: () => onSelected(4),
                 ),
                 _NavigationItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Invoices',
-                  selected: selectedIndex == 5,
-                  onTap: () => onSelected(5),
-                ),
-                _NavigationItem(
-                  icon: Icons.payments_rounded,
-                  label: 'Payments',
-                  selected: selectedIndex == 6,
-                  onTap: () => onSelected(6),
-                ),
-                _NavigationItem(
                   icon: Icons.money_off_rounded,
                   label: 'Expenses',
-                  selected: selectedIndex == 7,
-                  onTap: () => onSelected(7),
+                  selected: selectedIndex == 5,
+                  onTap: () => onSelected(5),
                 ),
               ],
             ),
@@ -272,8 +247,8 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: selectedIndex == 8,
-            onTap: () => onSelected(8),
+            selected: selectedIndex == 6,
+            onTap: () => onSelected(6),
           ),
         ],
       ),
@@ -319,16 +294,6 @@ class _MobileNavigation extends StatelessWidget {
           label: Text('Orders'),
         ),
         NavigationDrawerDestination(
-          icon: Icon(Icons.request_quote_outlined),
-          selectedIcon: Icon(Icons.request_quote_rounded),
-          label: Text('Quotations'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2_rounded),
-          label: Text('Inventory'),
-        ),
-        NavigationDrawerDestination(
           icon: Icon(Icons.receipt_long_outlined),
           selectedIcon: Icon(Icons.receipt_long_rounded),
           label: Text('Invoices'),
@@ -336,7 +301,7 @@ class _MobileNavigation extends StatelessWidget {
         NavigationDrawerDestination(
           icon: Icon(Icons.payments_outlined),
           selectedIcon: Icon(Icons.payments_rounded),
-          label: Text('Payments'),
+          label: Text('Bills'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.money_off_outlined),
