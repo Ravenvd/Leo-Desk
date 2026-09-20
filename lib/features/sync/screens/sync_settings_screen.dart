@@ -226,7 +226,7 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
               'Connect to the Windows computer running Leo Desk. '
               'Both devices must be on the same Wi-Fi network. '
               'Sync runs automatically on startup, when Wi-Fi connects, '
-              'and every 10 minutes.',
+              'and every minute.',
             ),
             const SizedBox(height: 20),
             TextField(
