@@ -223,6 +223,26 @@ class SyncClient {
         .toList();
   }
 
+  Future<bool> acknowledgePulled({
+    required List<String> customerUuids,
+    required List<String> orderUuids,
+    required List<String> invoiceUuids,
+    required List<String> billUuids,
+    required List<String> expenseUuids,
+  }) async {
+    return _postJson(
+      '/api/sync/ack',
+      {
+        'customers': customerUuids,
+        'orders': orderUuids,
+        'invoices': invoiceUuids,
+        'bills': billUuids,
+        'expenses': expenseUuids,
+      },
+      'ack',
+    );
+  }
+
   Future<bool> sendCustomer(Customer customer) async {
     final map = customer.toMap()
       ..remove('id')
