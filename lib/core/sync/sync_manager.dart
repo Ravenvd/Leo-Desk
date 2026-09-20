@@ -121,6 +121,12 @@ class SyncManager {
     var ordersPushed = 0;
     var ordersPulled = 0;
 
+    final acknowledgedCustomers = <String>[];
+    final acknowledgedOrders = <String>[];
+    final acknowledgedInvoices = <String>[];
+    final acknowledgedBills = <String>[];
+    final acknowledgedExpenses = <String>[];
+
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
       if (await _client.sendCustomer(customer)) {
@@ -131,8 +137,11 @@ class SyncManager {
 
     // --- Pull customers (before bills, so bill customer links resolve) ---
     for (final customer in await _client.fetchCustomers()) {
-      await _customerRepository.upsertFromSync(customer);
-      customersPulled++;
+      final applied = await _customerRepository.upsertFromSync(customer);
+      if (applied) {
+        customersPulled++;
+        acknowledgedCustomers.add(customer.uuid);
+      }
     }
 
     // Orders must sync before invoices and bills because both reference them.
@@ -172,7 +181,10 @@ class SyncManager {
         syncOrder.order,
         syncOrder.items,
       );
-      if (applied) ordersPulled++;
+      if (applied) {
+        ordersPulled++;
+        acknowledgedOrders.add(syncOrder.order.uuid);
+      }
     }
 
     // --- Push pending invoices ---
@@ -198,7 +210,10 @@ class SyncManager {
         syncInvoice.invoice,
         syncInvoice.items,
       );
-      if (applied) invoicesPulled++;
+      if (applied) {
+        invoicesPulled++;
+        acknowledgedInvoices.add(syncInvoice.invoice.uuid);
+      }
     }
 
     // --- Push pending bills ---
@@ -216,7 +231,10 @@ class SyncManager {
         syncBill.bill,
         syncBill.items,
       );
-      if (applied) billsPulled++;
+      if (applied) {
+        billsPulled++;
+        acknowledgedBills.add(syncBill.bill.uuid);
+      }
     }
 
     // --- Push pending expenses ---
@@ -230,7 +248,24 @@ class SyncManager {
     // --- Pull expenses ---
     for (final expense in await _client.fetchExpenses()) {
       final applied = await _expenseRepository.upsertFromSync(expense);
-      if (applied) expensesPulled++;
+      if (applied) {
+        expensesPulled++;
+        acknowledgedExpenses.add(expense.uuid);
+      }
+    }
+
+    if (acknowledgedCustomers.isNotEmpty ||
+        acknowledgedOrders.isNotEmpty ||
+        acknowledgedInvoices.isNotEmpty ||
+        acknowledgedBills.isNotEmpty ||
+        acknowledgedExpenses.isNotEmpty) {
+      await _client.acknowledgePulled(
+        customerUuids: acknowledgedCustomers,
+        orderUuids: acknowledgedOrders,
+        invoiceUuids: acknowledgedInvoices,
+        billUuids: acknowledgedBills,
+        expenseUuids: acknowledgedExpenses,
+      );
     }
 
     final result = SyncResult(
