@@ -756,4 +756,61 @@ void main() {
     expect(localItems.single.garmentType, 'Garment piece');
   });
 
+  test('renumbers a new offline order when Windows already uses its order number', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'order-number-collision-customer',
+      name: 'Collision Customer',
+    );
+    await clientCustomers.insert(customer);
+    await syncWithRealHttpClient();
+
+    final serverCustomer = (await serverCustomers.getAll()).single;
+    final windowsOrder = makeOrder(
+      uuid: 'windows-existing-order',
+      customerId: serverCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    await serverOrders.insert(windowsOrder);
+    await serverOrders.markSynced(windowsOrder.uuid);
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final androidOrder = makeOrder(
+      uuid: 'android-collision-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'pending',
+    );
+    await clientOrders.insert(androidOrder);
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.ordersPushed, 1);
+
+    final localOrders = await clientOrders.getAll();
+    final pushedOrder = localOrders.singleWhere(
+      (order) => order.uuid == androidOrder.uuid,
+    );
+    expect(pushedOrder.orderNumber, 'ORD-000002');
+    expect(pushedOrder.syncStatus, 'synced');
+
+    final serverOrdersAfter = await serverOrders.getAll();
+    final serverOrder = serverOrdersAfter.singleWhere(
+      (order) => order.uuid == androidOrder.uuid,
+    );
+    expect(serverOrder.orderNumber, 'ORD-000002');
+    expect(serverOrder.syncStatus, 'synced');
+
+    expect(
+      serverOrdersAfter.where((order) => order.orderNumber == 'ORD-000001'),
+      hasLength(1),
+    );
+  });
+
 }
