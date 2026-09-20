@@ -303,7 +303,9 @@ void main() {
 
     final finalServerCustomers = await serverRepository.getAll();
     expect(finalServerCustomers.single.name, 'Windows Authoritative Customer');
-    expect(finalServerCustomers.single.syncStatus, 'pending');
+    // The pull acknowledgement marks the Windows copy as synced after the
+    // Android client successfully applies it.
+    expect(finalServerCustomers.single.syncStatus, 'synced');
   });
 
   test('syncs a bill and all line items from Android to Windows', () async {
@@ -561,7 +563,7 @@ void main() {
       customerId: serverCustomer.id!,
       customerUuid: serverCustomer.uuid,
       billNumber: 'INV-4001',
-      syncStatus: 'pending',
+      syncStatus: 'synced',
       notes: 'Windows version',
     );
     await serverBills.insert(
@@ -577,7 +579,16 @@ void main() {
       ],
     );
 
+    // First sync establishes the shared bill on both sides. Then Windows is
+    // deliberately put back into a pending state to simulate a conflicting
+    // Windows-side edit. The next Android push must therefore be rejected.
     await syncWithRealHttpClient();
+    await serverDatabase.update(
+      'bills',
+      {'sync_status': 'pending'},
+      where: 'uuid = ?',
+      whereArgs: [serverBill.uuid],
+    );
 
     final localBillsBeforeEdit = await clientBills.getAll();
     expect(localBillsBeforeEdit, hasLength(1));
