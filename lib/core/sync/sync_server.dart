@@ -7,6 +7,7 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/orders/models/order.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -316,10 +317,45 @@ class SyncServer {
           return;
         }
 
-        final syncOrder = SyncOrder.fromMap(
+        var syncOrder = SyncOrder.fromMap(
           map,
           customerId: customer.id!,
         );
+
+        final existingOrders = await _orderRepository.getAll();
+        final existingByUuid = existingOrders
+            .where((candidate) => candidate.uuid == syncOrder.order.uuid)
+            .firstOrNull;
+        final numberOwner = existingOrders
+            .where(
+              (candidate) =>
+                  candidate.orderNumber == syncOrder.order.orderNumber &&
+                  candidate.uuid != syncOrder.order.uuid,
+            )
+            .firstOrNull;
+
+        // UUID is the sync identity. If a genuinely new offline order happens
+        // to have the same locally generated order number as an existing
+        // Windows order, allocate the next Windows order number instead of
+        // failing on SQLite's UNIQUE constraint.
+        if (numberOwner != null) {
+          if (existingByUuid == null) {
+            final nextNumber = _nextAvailableOrderNumber(existingOrders);
+            syncOrder = SyncOrder(
+              order: syncOrder.order.copyWith(orderNumber: nextNumber),
+              items: syncOrder.items,
+              customerUuid: syncOrder.customerUuid,
+            );
+          } else {
+            await _sendJson(request.response, 409, {
+              'error':
+                  'Order number conflicts with another order on Windows.',
+              'uuid': syncOrder.order.uuid,
+              'order_number': syncOrder.order.orderNumber,
+            });
+            return;
+          }
+        }
 
         final applied = await _orderRepository.upsertFromSync(
           syncOrder.order,
@@ -337,6 +373,7 @@ class SyncServer {
         await _sendJson(request.response, 200, {
           'status': 'ok',
           'uuid': syncOrder.order.uuid,
+          'order_number': syncOrder.order.orderNumber,
         });
         return;
       }
@@ -395,6 +432,18 @@ class SyncServer {
         'error': 'Internal server error',
       });
     }
+  }
+
+  String _nextAvailableOrderNumber(List<Order> orders) {
+    var highest = 0;
+    for (final order in orders) {
+      if (!order.orderNumber.startsWith('ORD-')) continue;
+      final number = int.tryParse(order.orderNumber.substring(4));
+      if (number != null && number > highest) {
+        highest = number;
+      }
+    }
+    return 'ORD-' + (highest + 1).toString().padLeft(6, '0');
   }
 
   Future<Object?> _readJsonBody(HttpRequest request) async {
