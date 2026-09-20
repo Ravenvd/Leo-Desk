@@ -325,8 +325,15 @@ class SyncClient {
     return orders;
   }
 
-  Future<bool> sendOrder(SyncOrder order) async {
-    return _postJson('/api/orders', order.toMap(), order.order.uuid);
+  Future<String?> sendOrder(SyncOrder order) async {
+    final data = await _postJsonResponse(
+      '/api/orders',
+      order.toMap(),
+    );
+    if (data == null || data['status'] != 'ok' || data['uuid'] != order.order.uuid) {
+      return null;
+    }
+    return data['order_number'] as String?;
   }
 
   Future<List<Expense>> fetchExpenses() async {
@@ -379,6 +386,16 @@ class SyncClient {
     Map<String, Object?> payload,
     String expectedUuid,
   ) async {
+    final data = await _postJsonResponse(path, payload);
+    return data != null &&
+        data['status'] == 'ok' &&
+        data['uuid'] == expectedUuid;
+  }
+
+  Future<Map<String, Object?>?> _postJsonResponse(
+    String path,
+    Map<String, Object?> payload,
+  ) async {
     final client = HttpClient()..connectionTimeout = timeout;
 
     try {
@@ -389,20 +406,18 @@ class SyncClient {
 
       final response = await request.close().timeout(timeout);
 
-      if (response.statusCode != HttpStatus.ok) {
-        return false;
-      }
-
       final body = await response
           .transform(utf8.decoder)
           .join()
           .timeout(timeout);
 
-      final data = jsonDecode(body);
+      if (body.trim().isEmpty) return null;
 
-      return data['status'] == 'ok' && data['uuid'] == expectedUuid;
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return null;
+      return Map<String, Object?>.from(decoded);
     } catch (_) {
-      return false;
+      return null;
     } finally {
       client.close();
     }
