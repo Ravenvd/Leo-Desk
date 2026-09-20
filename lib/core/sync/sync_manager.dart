@@ -156,14 +156,22 @@ class SyncManager {
       if (customerUuid == null) continue;
 
       final items = await _orderRepository.getItems(order.id!);
-      if (await _client.sendOrder(
+      final pushedOrderNumber = await _client.sendOrder(
         SyncOrder(
           order: order,
           items: items,
           customerUuid: customerUuid,
         ),
-      )) {
-        await _orderRepository.markSynced(order.uuid);
+      );
+      if (pushedOrderNumber != null) {
+        if (pushedOrderNumber != order.orderNumber) {
+          await _orderRepository.updateOrderNumberAndMarkSynced(
+            order.uuid,
+            pushedOrderNumber,
+          );
+        } else {
+          await _orderRepository.markSynced(order.uuid);
+        }
         ordersPushed++;
       }
     }
