@@ -175,6 +175,22 @@ class OrderRepository {
     });
   }
 
+  Future<int> updateOrderNumberAndMarkSynced(
+    String uuid,
+    String orderNumber,
+  ) async {
+    final db = await _db;
+    return db.update(
+      'orders',
+      {
+        'order_number': orderNumber,
+        'sync_status': 'synced',
+      },
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+    );
+  }
+
   Future<void> deleteAll() async {
     final db = await _db;
     await db.delete('orders');
