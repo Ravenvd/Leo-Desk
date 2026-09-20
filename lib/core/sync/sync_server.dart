@@ -72,6 +72,44 @@ class SyncServer {
         return;
       }
 
+      if (request.method == 'POST' && request.uri.path == '/api/sync/ack') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {
+            'error': 'Invalid sync acknowledgement.',
+          });
+          return;
+        }
+
+        List<String> uuids(String key) {
+          final value = decoded[key];
+          if (value is! List) return <String>[];
+          return value.whereType<String>().toList();
+        }
+
+        for (final uuid in uuids('customers')) {
+          await _customerRepository.markSynced(uuid);
+        }
+        for (final uuid in uuids('orders')) {
+          await _orderRepository.markSynced(uuid);
+        }
+        for (final uuid in uuids('invoices')) {
+          await _invoiceRepository.markSynced(uuid);
+        }
+        for (final uuid in uuids('bills')) {
+          await _billRepository.markSynced(uuid);
+        }
+        for (final uuid in uuids('expenses')) {
+          await _expenseRepository.markSynced(uuid);
+        }
+
+        await _sendJson(request.response, 200, {
+          'status': 'ok',
+          'uuid': 'ack',
+        });
+        return;
+      }
+
       if (request.method == 'GET' && request.uri.path == '/api/customers') {
         final customers = await _customerRepository.getAll();
 
