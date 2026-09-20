@@ -259,13 +259,18 @@ class SyncManager {
         acknowledgedInvoices.isNotEmpty ||
         acknowledgedBills.isNotEmpty ||
         acknowledgedExpenses.isNotEmpty) {
-      await _client.acknowledgePulled(
+      final acknowledged = await _client.acknowledgePulled(
         customerUuids: acknowledgedCustomers,
         orderUuids: acknowledgedOrders,
         invoiceUuids: acknowledgedInvoices,
         billUuids: acknowledgedBills,
         expenseUuids: acknowledgedExpenses,
       );
+      if (!acknowledged) {
+        throw StateError(
+          'Pulled records were applied, but Windows could not confirm sync.',
+        );
+      }
     }
 
     final result = SyncResult(
