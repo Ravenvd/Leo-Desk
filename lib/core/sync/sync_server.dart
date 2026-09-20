@@ -443,7 +443,7 @@ class SyncServer {
         highest = number;
       }
     }
-    return 'ORD-' + (highest + 1).toString().padLeft(6, '0');
+    return 'ORD-${(highest + 1).toString().padLeft(6, '0')}';
   }
 
   Future<Object?> _readJsonBody(HttpRequest request) async {
