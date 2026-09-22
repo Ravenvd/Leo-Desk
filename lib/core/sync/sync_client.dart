@@ -45,7 +45,10 @@ class SyncInvoice {
         ? rawItems
               .map(
                 (item) =>
-                    InvoiceItem.fromMap(Map<String, Object?>.from(item as Map)),
+                    InvoiceItem.fromMap(
+                  Map<String, Object?>.from(item as Map)
+                    ..['invoice_id'] = 0,
+                ),
               )
               .toList()
         : <InvoiceItem>[];
