@@ -793,8 +793,11 @@ void main() {
     final serverBillItems = await serverBills.getItems(serverBill.id!);
 
     expect(syncedOrderItems.single.uuid, 'graph-order-item');
+    expect(syncedOrderItems.single.orderId, serverOrder.id);
     expect(serverInvoiceItems.single.uuid, 'graph-invoice-item');
+    expect(serverInvoiceItems.single.invoiceId, serverInvoice.id);
     expect(serverBillItems.single.uuid, 'graph-bill-item');
+    expect(serverBillItems.single.billId, serverBill.id);
   });
 
 
