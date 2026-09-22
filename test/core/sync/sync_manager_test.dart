@@ -94,7 +94,6 @@ void main() {
     required String uuid,
     required String description,
   }) {
-    final now = DateTime.utc(2026, 1, 1);
     return InvoiceItem(
       uuid: uuid,
       invoiceId: 0,
@@ -789,11 +788,11 @@ void main() {
     expect(serverBill.orderUuid, serverOrder.uuid);
     expect(serverBill.customerUuid, customer.uuid);
 
-    final serverOrderItems = await serverOrderItems.getByOrder(serverOrder.id!);
+    final syncedOrderItems = await serverOrderItems.getByOrder(serverOrder.id!);
     final serverInvoiceItems = await serverInvoices.getItems(serverInvoice.id!);
     final serverBillItems = await serverBills.getItems(serverBill.id!);
 
-    expect(serverOrderItems.single.uuid, 'graph-order-item');
+    expect(syncedOrderItems.single.uuid, 'graph-order-item');
     expect(serverInvoiceItems.single.uuid, 'graph-invoice-item');
     expect(serverBillItems.single.uuid, 'graph-bill-item');
   });
