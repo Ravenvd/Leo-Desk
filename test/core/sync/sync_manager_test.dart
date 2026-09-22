@@ -14,6 +14,9 @@ import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
+import 'package:leo_desk/features/invoices/models/invoice.dart';
+import 'package:leo_desk/features/invoices/models/invoice_item.dart';
+import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/models/order_item.dart';
 import 'package:leo_desk/features/orders/repositories/order_item_repository.dart';
@@ -58,6 +61,47 @@ void main() {
       updatedAt: now,
       customerType: 'Individual',
       serviceRequired: 'Embroidery',
+    );
+  }
+
+  Invoice makeInvoice({
+    required String uuid,
+    required int orderId,
+    required String orderUuid,
+    required int customerId,
+    required String customerUuid,
+    String syncStatus = 'pending',
+  }) {
+    final now = DateTime.utc(2026, 1, 1);
+    return Invoice(
+      uuid: uuid,
+      syncStatus: syncStatus,
+      orderId: orderId,
+      orderUuid: orderUuid,
+      customerId: customerId,
+      customerUuid: customerUuid,
+      invoiceNumber: 'INV-000001',
+      invoiceDate: now,
+      subtotalPaise: 100000,
+      totalPaise: 100000,
+      notes: 'Invoice notes',
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  InvoiceItem makeInvoiceItem({
+    required String uuid,
+    required String description,
+  }) {
+    final now = DateTime.utc(2026, 1, 1);
+    return InvoiceItem(
+      uuid: uuid,
+      invoiceId: 0,
+      description: description,
+      quantity: 1,
+      ratePaise: 100000,
+      amountPaise: 100000,
     );
   }
 
@@ -166,6 +210,7 @@ void main() {
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
       billRepository: BillRepository(database: serverDatabase),
+      invoiceRepository: InvoiceRepository(database: serverDatabase),
       expenseRepository: ExpenseRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
     );
@@ -189,6 +234,7 @@ void main() {
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
       billRepository: BillRepository(database: clientDatabase),
+      invoiceRepository: InvoiceRepository(database: clientDatabase),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
       saveLastSyncTime: (_) async {},
@@ -644,6 +690,115 @@ void main() {
     expect(serverItems, hasLength(1));
     expect(serverItems.single.uuid, 'bill-conflict-server-item');
   });
+
+  test('syncs an order, invoice, and bill as one UUID-rooted graph', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+    final clientOrderItems = OrderItemRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final serverOrderItems = OrderItemRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'graph-customer',
+      name: 'Graph Customer',
+    );
+    await clientCustomers.insert(customer);
+    await syncWithRealHttpClient();
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final order = makeOrder(
+      uuid: 'graph-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      status: 'In Progress',
+    );
+    await clientOrders.insert(order);
+    final localOrder = (await clientOrders.getAll()).single;
+
+    await clientOrderItems.insert(
+      makeOrderItem(
+        uuid: 'graph-order-item',
+        orderId: localOrder.id!,
+        workType: 'Embroidery',
+        garmentType: 'Blouse',
+      ),
+    );
+
+    final invoice = makeInvoice(
+      uuid: 'graph-invoice',
+      orderId: localOrder.id!,
+      orderUuid: localOrder.uuid,
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+    );
+    await clientInvoices.create(
+      invoice: invoice,
+      items: [
+        makeInvoiceItem(
+          uuid: 'graph-invoice-item',
+          description: 'Blouse embroidery',
+        ),
+      ],
+    );
+
+    final bill = makeBill(
+      uuid: 'graph-bill',
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      billNumber: 'INV-000001',
+      amountPaidPaise: 100000,
+    ).copyWith(
+      orderId: localOrder.id,
+      orderUuid: localOrder.uuid,
+      subtotalPaise: 100000,
+      discountPaise: 0,
+      taxPaise: 0,
+      totalPaise: 100000,
+      amountPaidPaise: 100000,
+    );
+    await clientBills.insert(
+      bill: bill,
+      items: [
+        makeItem(
+          uuid: 'graph-bill-item',
+          description: 'Blouse embroidery',
+          quantity: 1,
+          ratePaise: 100000,
+          amountPaise: 100000,
+        ),
+      ],
+    );
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.ordersPushed, 1);
+    expect(result.invoicesPushed, 1);
+    expect(result.billsPushed, 1);
+
+    final serverOrder = (await serverOrders.getAll()).single;
+    final serverInvoice = (await serverInvoices.getAll()).single;
+    final serverBill = (await serverBills.getAll()).single;
+
+    expect(serverOrder.uuid, 'graph-order');
+    expect(serverInvoice.orderUuid, serverOrder.uuid);
+    expect(serverInvoice.customerUuid, customer.uuid);
+    expect(serverBill.orderUuid, serverOrder.uuid);
+    expect(serverBill.customerUuid, customer.uuid);
+
+    final serverOrderItems = await serverOrderItems.getByOrder(serverOrder.id!);
+    final serverInvoiceItems = await serverInvoices.getItems(serverInvoice.id!);
+    final serverBillItems = await serverBills.getItems(serverBill.id!);
+
+    expect(serverOrderItems.single.uuid, 'graph-order-item');
+    expect(serverInvoiceItems.single.uuid, 'graph-invoice-item');
+    expect(serverBillItems.single.uuid, 'graph-bill-item');
+  });
+
+
   test('syncs an order and all line items from Android to Windows', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
