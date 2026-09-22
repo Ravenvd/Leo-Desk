@@ -70,6 +70,22 @@ class OrderRepository {
     return maps.map(Order.fromMap).toList();
   }
 
+  /// Returns the most recent orders for incremental sync reconciliation.
+  ///
+  /// The sync protocol intentionally works on a bounded recent window rather
+  /// than scanning the complete order history on every sync.
+  Future<List<Order>> getRecent({int limit = 10}) async {
+    if (limit <= 0) return <Order>[];
+
+    final db = await _db;
+    final maps = await db.query(
+      'orders',
+      orderBy: 'order_date DESC, id DESC',
+      limit: limit,
+    );
+    return maps.map(Order.fromMap).toList();
+  }
+
   Future<List<Order>> getByCustomer(int customerId) async {
     final db = await _db;
     final maps = await db.query(
