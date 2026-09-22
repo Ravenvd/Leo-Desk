@@ -304,8 +304,10 @@ class SyncClient {
 
   Future<List<SyncOrder>> fetchOrders({
     required Map<String, int> customerIdsByUuid,
+    int? limit,
   }) async {
-    final decoded = await _getJson('/api/orders');
+    final path = limit == null ? '/api/orders' : '/api/orders?limit=$limit';
+    final decoded = await _getJson(path);
 
     if (decoded is! List) {
       throw const FormatException('Invalid orders response.');
