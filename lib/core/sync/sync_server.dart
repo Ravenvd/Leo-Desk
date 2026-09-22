@@ -269,7 +269,10 @@ class SyncServer {
       }
 
       if (request.method == 'GET' && request.uri.path == '/api/orders') {
-        final orders = await _orderRepository.getAll();
+        final requestedLimit = int.tryParse(request.uri.queryParameters['limit'] ?? '');
+        final orders = requestedLimit == null
+            ? await _orderRepository.getAll()
+            : await _orderRepository.getRecent(limit: requestedLimit);
         final payload = <Map<String, Object?>>[];
 
         for (final order in orders) {
