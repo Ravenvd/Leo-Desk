@@ -756,6 +756,48 @@ void main() {
     expect(localItems.single.garmentType, 'Garment piece');
   });
 
+  test('does not delete a pending local order during reconciliation', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'pending-conflict-customer',
+      name: 'Pending Conflict Customer',
+      syncStatus: 'synced',
+    );
+    await clientCustomers.insert(customer);
+    await clientCustomers.markSynced(customer.uuid);
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final pendingOrder = makeOrder(
+      uuid: 'pending-local-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'pending',
+    );
+    await clientOrders.insert(pendingOrder);
+
+    final incomingOrder = makeOrder(
+      uuid: 'windows-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+
+    final applied = await clientOrders.upsertFromSync(
+      incomingOrder,
+      <OrderItem>[],
+    );
+
+    expect(applied, isFalse);
+
+    final orders = await clientOrders.getAll();
+    expect(orders, hasLength(1));
+    expect(orders.single.uuid, 'pending-local-order');
+    expect(orders.single.orderNumber, 'ORD-000001');
+    expect(orders.single.syncStatus, 'pending');
+  });
+
   test('replaces a stale local order when Windows canonical number conflicts', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
