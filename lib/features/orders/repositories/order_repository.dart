@@ -138,8 +138,7 @@ class OrderRepository {
         // order keeps the server-assigned number exactly as received.
         if (existingWithOrderNumber.isNotEmpty) {
           throw StateError(
-            'Order number ' + order.orderNumber +
-                ' is already used by another order.',
+            'Order number ${order.orderNumber} is already used by another order.',
           );
         }
         localOrderId = await txn.insert('orders', map);
@@ -149,8 +148,7 @@ class OrderRepository {
         if (existingWithOrderNumber.isNotEmpty &&
             existingWithOrderNumber.first['id'] != localOrderId) {
           throw StateError(
-            'Order number ' + order.orderNumber +
-                ' conflicts with another order.',
+            'Order number ${order.orderNumber} conflicts with another order.',
           );
         }
 
