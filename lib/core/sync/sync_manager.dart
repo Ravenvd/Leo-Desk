@@ -184,6 +184,7 @@ class SyncManager {
 
     for (final syncOrder in await _client.fetchOrders(
       customerIdsByUuid: customerIdsByUuid,
+      limit: 10,
     )) {
       final applied = await _orderRepository.upsertFromSync(
         syncOrder.order,
