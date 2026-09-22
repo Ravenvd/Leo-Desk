@@ -144,14 +144,20 @@ class SyncManager {
       }
     }
 
-    // Orders must sync before invoices and bills because both reference them.
-    // --- Push pending orders ---
+    // Orders are the core sync graph. Reconcile the recent window by UUID
+    // before syncing invoices and bills, which depend on the order identity.
     final localCustomers = await _customerRepository.getAll();
     final customerUuidsById = {
       for (final customer in localCustomers) customer.id!: customer.uuid,
     };
+    final customerIdsByUuid = {
+      for (final customer in localCustomers) customer.uuid: customer.id!,
+    };
 
-    for (final order in await _orderRepository.getPending()) {
+    final recentLocalOrders = await _orderRepository.getRecent(limit: 10);
+    for (final order in recentLocalOrders) {
+      if (order.syncStatus != 'pending') continue;
+
       final customerUuid = customerUuidsById[order.customerId];
       if (customerUuid == null) continue;
 
@@ -163,6 +169,7 @@ class SyncManager {
           customerUuid: customerUuid,
         ),
       );
+
       if (pushedOrderNumber != null) {
         if (pushedOrderNumber != order.orderNumber) {
           await _orderRepository.updateOrderNumberAndMarkSynced(
@@ -176,12 +183,8 @@ class SyncManager {
       }
     }
 
-    // --- Pull orders after customers so foreign keys resolve ---
-    final customerIdsByUuid = {
-      for (final customer in await _customerRepository.getAll())
-        customer.uuid: customer.id!,
-    };
-
+    // Pull the canonical recent Windows window after pushing local changes.
+    // UUID is the identity; order number is only a reconciled attribute.
     for (final syncOrder in await _client.fetchOrders(
       customerIdsByUuid: customerIdsByUuid,
       limit: 10,
