@@ -818,6 +818,7 @@ void main() {
       syncStatus: 'synced',
     );
     await clientOrders.insert(staleOrder);
+    await clientOrders.markSynced(staleOrder.uuid);
 
     final incomingOrder = makeOrder(
       uuid: 'windows-canonical-order',
