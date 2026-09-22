@@ -140,7 +140,7 @@ class OrderRepository {
 
       final existingWithOrderNumber = await txn.query(
         'orders',
-        columns: ['id', 'uuid'],
+        columns: ['id', 'uuid', 'sync_status'],
         where: 'order_number = ?',
         whereArgs: [order.orderNumber],
         limit: 1,
@@ -154,7 +154,13 @@ class OrderRepository {
         // canonical number is already occupied locally by a different UUID,
         // replace that stale local graph with the Windows record.
         if (existingWithOrderNumber.isNotEmpty) {
-          final conflictingOrderId = existingWithOrderNumber.first['id'] as int;
+          final conflictingOrder = existingWithOrderNumber.first;
+          if (conflictingOrder['sync_status'] == 'pending') {
+            // Never destroy an unsynced local order. It must be pushed first
+            // so Windows can allocate its canonical order number.
+            return false;
+          }
+          final conflictingOrderId = conflictingOrder['id'] as int;
           await _deleteOrderGraph(txn, conflictingOrderId);
         }
         localOrderId = await txn.insert('orders', map);
@@ -163,7 +169,11 @@ class OrderRepository {
 
         if (existingWithOrderNumber.isNotEmpty &&
             existingWithOrderNumber.first['id'] != localOrderId) {
-          final conflictingOrderId = existingWithOrderNumber.first['id'] as int;
+          final conflictingOrder = existingWithOrderNumber.first;
+          if (conflictingOrder['sync_status'] == 'pending') {
+            return false;
+          }
+          final conflictingOrderId = conflictingOrder['id'] as int;
           await _deleteOrderGraph(txn, conflictingOrderId);
         }
 
