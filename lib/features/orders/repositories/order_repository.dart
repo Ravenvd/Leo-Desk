@@ -134,8 +134,13 @@ class OrderRepository {
       late final int localOrderId;
 
       if (existing.isEmpty) {
+        // Windows is the canonical allocator for order numbers. A pulled
+        // order keeps the server-assigned number exactly as received.
         if (existingWithOrderNumber.isNotEmpty) {
-          map['order_number'] = await _nextAvailableOrderNumber(txn);
+          throw StateError(
+            'Order number ' + order.orderNumber +
+                ' is already used by another order.',
+          );
         }
         localOrderId = await txn.insert('orders', map);
       } else {
@@ -143,7 +148,10 @@ class OrderRepository {
 
         if (existingWithOrderNumber.isNotEmpty &&
             existingWithOrderNumber.first['id'] != localOrderId) {
-          map['order_number'] = await _nextAvailableOrderNumber(txn);
+          throw StateError(
+            'Order number ' + order.orderNumber +
+                ' conflicts with another order.',
+          );
         }
 
         await txn.update(
@@ -170,14 +178,6 @@ class OrderRepository {
     });
   }
 
-  Future<String> _nextAvailableOrderNumber(Transaction txn) async {
-    final rows = await txn.rawQuery(
-      "SELECT MAX(CAST(SUBSTR(order_number, 5) AS INTEGER)) AS last_number "
-      "FROM orders WHERE order_number LIKE 'ORD-%'",
-    );
-    final lastNumber = rows.first['last_number'] as int? ?? 0;
-    return 'ORD-' + (lastNumber + 1).toString().padLeft(6, '0');
-  }
 
   Future<int> updateOrderNumberAndMarkSynced(
     String uuid,
