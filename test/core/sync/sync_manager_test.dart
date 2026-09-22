@@ -756,6 +756,48 @@ void main() {
     expect(localItems.single.garmentType, 'Garment piece');
   });
 
+  test('replaces a stale local order when Windows canonical number conflicts', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'order-reconcile-customer',
+      name: 'Reconcile Customer',
+      syncStatus: 'synced',
+    );
+    await clientCustomers.insert(customer);
+    await clientCustomers.markSynced(customer.uuid);
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final staleOrder = makeOrder(
+      uuid: 'stale-local-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    await clientOrders.insert(staleOrder);
+
+    final incomingOrder = makeOrder(
+      uuid: 'windows-canonical-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+
+    final applied = await clientOrders.upsertFromSync(
+      incomingOrder,
+      <OrderItem>[],
+    );
+
+    expect(applied, isTrue);
+
+    final orders = await clientOrders.getAll();
+    expect(orders, hasLength(1));
+    expect(orders.single.uuid, 'windows-canonical-order');
+    expect(orders.single.orderNumber, 'ORD-000001');
+    expect(orders.single.syncStatus, 'synced');
+  });
+
   test('renumbers a new offline order when Windows already uses its order number', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
