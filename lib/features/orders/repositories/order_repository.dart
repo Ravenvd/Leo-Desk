@@ -150,12 +150,12 @@ class OrderRepository {
       late final int localOrderId;
 
       if (existing.isEmpty) {
-        // Windows is the canonical allocator for order numbers. A pulled
-        // order keeps the server-assigned number exactly as received.
+        // Windows is the canonical allocator for order numbers. If the
+        // canonical number is already occupied locally by a different UUID,
+        // replace that stale local graph with the Windows record.
         if (existingWithOrderNumber.isNotEmpty) {
-          throw StateError(
-            'Order number ${order.orderNumber} is already used by another order.',
-          );
+          final conflictingOrderId = existingWithOrderNumber.first['id'] as int;
+          await _deleteOrderGraph(txn, conflictingOrderId);
         }
         localOrderId = await txn.insert('orders', map);
       } else {
@@ -163,9 +163,8 @@ class OrderRepository {
 
         if (existingWithOrderNumber.isNotEmpty &&
             existingWithOrderNumber.first['id'] != localOrderId) {
-          throw StateError(
-            'Order number ${order.orderNumber} conflicts with another order.',
-          );
+          final conflictingOrderId = existingWithOrderNumber.first['id'] as int;
+          await _deleteOrderGraph(txn, conflictingOrderId);
         }
 
         await txn.update(
@@ -192,6 +191,45 @@ class OrderRepository {
     });
   }
 
+
+  /// Removes an order and every local child rooted at that order.
+  ///
+  /// This is used only when Windows sends the canonical record for a UUID
+  /// whose order number is still occupied by a different local UUID.
+  /// Children are removed first because invoices and bills reference orders
+  /// with restrictive foreign keys.
+  Future<void> _deleteOrderGraph(Transaction txn, int orderId) async {
+    await txn.delete(
+      'bill_items',
+      where: 'bill_id IN (SELECT id FROM bills WHERE order_id = ?)',
+      whereArgs: [orderId],
+    );
+    await txn.delete(
+      'bills',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+    );
+    await txn.delete(
+      'invoice_items',
+      where: 'invoice_id IN (SELECT id FROM invoices WHERE order_id = ?)',
+      whereArgs: [orderId],
+    );
+    await txn.delete(
+      'invoices',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+    );
+    await txn.delete(
+      'order_items',
+      where: 'order_id = ?',
+      whereArgs: [orderId],
+    );
+    await txn.delete(
+      'orders',
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
+  }
 
   Future<int> updateOrderNumberAndMarkSynced(
     String uuid,
