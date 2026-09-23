@@ -77,7 +77,11 @@ class BillRepository {
   /// owning customer is not present locally yet, or because a locally
   /// modified (pending) bill with the same uuid exists (local wins until
   /// it is pushed).
-  Future<bool> upsertFromSync(Bill bill, List<BillItem> items) async {
+  Future<bool> upsertFromSync(
+    Bill bill,
+    List<BillItem> items, {
+    bool force = false,
+  }) async {
     final db = await _db;
 
     final existing = await db.query(
@@ -88,7 +92,9 @@ class BillRepository {
       limit: 1,
     );
 
-    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
+    if (!force &&
+        existing.isNotEmpty &&
+        existing.first['sync_status'] == 'pending') {
       return false;
     }
 
