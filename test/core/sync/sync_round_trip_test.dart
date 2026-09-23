@@ -11,6 +11,9 @@ import 'package:leo_desk/core/sync/sync_server.dart';
 import 'package:leo_desk/features/billing/models/bill.dart';
 import 'package:leo_desk/features/billing/models/bill_item.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
+import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
+import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 
@@ -43,8 +46,14 @@ void main() {
   late Database clientDb;
   late CustomerRepository serverCustomers;
   late BillRepository serverBills;
+  late ExpenseRepository serverExpenses;
+  late InvoiceRepository serverInvoices;
+  late OrderRepository serverOrders;
   late CustomerRepository clientCustomers;
   late BillRepository clientBills;
+  late ExpenseRepository clientExpenses;
+  late InvoiceRepository clientInvoices;
+  late OrderRepository clientOrders;
   late SyncServer server;
   late SyncManager manager;
   late Directory tempDir;
@@ -60,12 +69,21 @@ void main() {
 
     serverCustomers = CustomerRepository(database: serverDb);
     serverBills = BillRepository(database: serverDb);
+    serverExpenses = ExpenseRepository(database: serverDb);
+    serverInvoices = InvoiceRepository(database: serverDb);
+    serverOrders = OrderRepository(database: serverDb);
     clientCustomers = CustomerRepository(database: clientDb);
     clientBills = BillRepository(database: clientDb);
+    clientExpenses = ExpenseRepository(database: clientDb);
+    clientInvoices = InvoiceRepository(database: clientDb);
+    clientOrders = OrderRepository(database: clientDb);
 
     server = SyncServer(
       customerRepository: serverCustomers,
       billRepository: serverBills,
+      expenseRepository: serverExpenses,
+      invoiceRepository: serverInvoices,
+      orderRepository: serverOrders,
     );
     await server.start(port: 0);
 
@@ -73,6 +91,9 @@ void main() {
       client: SyncClient(serverAddress: '127.0.0.1', port: server.port!),
       customerRepository: clientCustomers,
       billRepository: clientBills,
+      expenseRepository: clientExpenses,
+      invoiceRepository: clientInvoices,
+      orderRepository: clientOrders,
     );
   });
 
