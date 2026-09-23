@@ -82,7 +82,7 @@ void _startAutoSync() {
   });
 
   Timer.periodic(
-    const Duration(minutes: 10),
+    const Duration(minutes: 1),
     (_) => unawaited(runSync()),
   );
 }

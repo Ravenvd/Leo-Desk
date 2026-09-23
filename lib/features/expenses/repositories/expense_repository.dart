@@ -34,12 +34,18 @@ class ExpenseRepository {
     );
   }
 
+  /// Marks an expense for deletion. The row is retained until the deletion
+  /// has propagated through sync, then it is physically removed.
   Future<int> delete(int id) async {
     final db = await _db;
-    return db.delete(
+    return db.update(
       'expenses',
-      where: 'id = ?',
-      whereArgs: [id],
+      {
+        'sync_status': Expense.syncStatusDeletedPending,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ? AND sync_status != ?',
+      whereArgs: [id, Expense.syncStatusDeletedPending],
     );
   }
 
@@ -62,6 +68,8 @@ class ExpenseRepository {
 
     final maps = await db.query(
       'expenses',
+      where: 'sync_status != ?',
+      whereArgs: [Expense.syncStatusDeletedPending],
       orderBy: 'expense_date DESC, id DESC',
     );
 
@@ -73,8 +81,11 @@ class ExpenseRepository {
 
     final maps = await db.query(
       'expenses',
-      where: 'sync_status = ?',
-      whereArgs: ['pending'],
+      where: 'sync_status IN (?, ?)',
+      whereArgs: [
+        Expense.syncStatusPending,
+        Expense.syncStatusDeletedPending,
+      ],
       orderBy: 'expense_date DESC, id DESC',
     );
 
@@ -86,10 +97,64 @@ class ExpenseRepository {
 
     return db.update(
       'expenses',
-      {'sync_status': 'synced'},
+      {'sync_status': Expense.syncStatusSynced},
       where: 'uuid = ?',
       whereArgs: [uuid],
     );
+  }
+
+  Future<int> finalizeDeletion(String uuid) async {
+    final db = await _db;
+    return db.delete('expenses', where: 'uuid = ?', whereArgs: [uuid]);
+  }
+
+  Future<int> applyDeletionFromSync(String uuid) async {
+    return finalizeDeletion(uuid);
+  }
+
+  Future<int> markDeletedPendingByUuid(String uuid) async {
+    final db = await _db;
+    return db.update(
+      'expenses',
+      {
+        'sync_status': Expense.syncStatusDeletedPending,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+    );
+  }
+
+  Future<int> acknowledgeSyncedOrDeleted(String uuid) async {
+    final db = await _db;
+    final rows = await db.query(
+      'expenses',
+      columns: ['sync_status'],
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+      limit: 1,
+    );
+    if (rows.isEmpty) return 0;
+
+    if (rows.first['sync_status'] == Expense.syncStatusDeletedPending) {
+      return db.delete('expenses', where: 'uuid = ?', whereArgs: [uuid]);
+    }
+
+    return db.update(
+      'expenses',
+      {'sync_status': Expense.syncStatusSynced},
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+    );
+  }
+
+  Future<List<Expense>> getAllForSync() async {
+    final db = await _db;
+    final maps = await db.query(
+      'expenses',
+      orderBy: 'expense_date DESC, id DESC',
+    );
+    return maps.map(Expense.fromMap).toList();
   }
 
   Future<bool> upsertFromSync(Expense expense) async {
@@ -103,8 +168,12 @@ class ExpenseRepository {
       limit: 1,
     );
 
-    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
-      return false;
+    if (existing.isNotEmpty) {
+      final existingStatus = existing.first['sync_status'];
+      if (existingStatus == Expense.syncStatusPending ||
+          existingStatus == Expense.syncStatusDeletedPending) {
+        return false;
+      }
     }
 
     final map = expense.copyWith(syncStatus: 'synced').toMap()..remove('id');

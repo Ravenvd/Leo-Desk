@@ -1,6 +1,10 @@
 import 'package:uuid/uuid.dart';
 
 class Expense {
+  static const String syncStatusPending = 'pending';
+  static const String syncStatusSynced = 'synced';
+  static const String syncStatusDeletedPending = 'deleted_pending';
+
   static const List<String> categories = [
     'Raw Materials',
     'Salaries',
@@ -22,7 +26,7 @@ class Expense {
   Expense({
     this.id,
     String? uuid,
-    this.syncStatus = 'pending',
+    this.syncStatus = syncStatusPending,
     required this.expenseDate,
     required this.category,
     required this.description,
@@ -77,7 +81,7 @@ class Expense {
     return Expense(
       id: map['id'] as int?,
       uuid: map['uuid'] as String,
-      syncStatus: map['sync_status'] as String? ?? 'synced',
+      syncStatus: map['sync_status'] as String? ?? syncStatusSynced,
       expenseDate: DateTime.parse(map['expense_date'] as String),
       category: map['category'] as String,
       description: map['description'] as String,
