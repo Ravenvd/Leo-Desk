@@ -80,7 +80,7 @@ class OrderRepository {
     final db = await _db;
     final maps = await db.query(
       'orders',
-      orderBy: 'order_date DESC, id DESC',
+      orderBy: 'updated_at DESC, id DESC',
       limit: limit,
     );
     return maps.map(Order.fromMap).toList();
