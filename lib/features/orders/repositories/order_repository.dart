@@ -120,8 +120,10 @@ class OrderRepository {
 
   Future<bool> upsertFromSync(
     Order order,
-    List<OrderItem> items,
-  ) async {
+    List<OrderItem> items, {
+    String? customerUuid,
+    bool force = false,
+  }) async {
     final db = await _db;
 
     return db.transaction((txn) async {
@@ -133,7 +135,8 @@ class OrderRepository {
         limit: 1,
       );
 
-      if (existing.isNotEmpty &&
+      if (!force &&
+          existing.isNotEmpty &&
           existing.first['sync_status'] == 'pending') {
         return false;
       }
@@ -146,7 +149,21 @@ class OrderRepository {
         limit: 1,
       );
 
-      final map = order.copyWith(syncStatus: 'synced').toMap()..remove('id');
+      var customerId = order.customerId;
+      if (customerUuid != null) {
+        final customers = await txn.query(
+          'customers',
+          columns: ['id'],
+          where: 'uuid = ?',
+          whereArgs: [customerUuid],
+          limit: 1,
+        );
+        customerId = customers.first['id'] as int;
+      }
+      final map = order.copyWith(
+        customerId: customerId,
+        syncStatus: 'synced',
+      ).toMap()..remove('id');
       late final int localOrderId;
 
       if (existing.isEmpty) {
@@ -155,7 +172,7 @@ class OrderRepository {
         // replace that stale local graph with the Windows record.
         if (existingWithOrderNumber.isNotEmpty) {
           final conflictingOrder = existingWithOrderNumber.first;
-          if (conflictingOrder['sync_status'] == 'pending') {
+          if (!force && conflictingOrder['sync_status'] == 'pending') {
             // Never destroy an unsynced local order. It must be pushed first
             // so Windows can allocate its canonical order number.
             return false;
@@ -170,7 +187,7 @@ class OrderRepository {
         if (existingWithOrderNumber.isNotEmpty &&
             existingWithOrderNumber.first['id'] != localOrderId) {
           final conflictingOrder = existingWithOrderNumber.first;
-          if (conflictingOrder['sync_status'] == 'pending') {
+          if (!force && conflictingOrder['sync_status'] == 'pending') {
             return false;
           }
           final conflictingOrderId = conflictingOrder['id'] as int;
