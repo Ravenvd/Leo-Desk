@@ -77,8 +77,9 @@ class InvoiceRepository {
 
   Future<bool> upsertFromSync(
     Invoice invoice,
-    List<InvoiceItem> items,
-  ) async {
+    List<InvoiceItem> items, {
+    bool force = false,
+  }) async {
     final db = await _db;
 
     final existing = await db.query(
@@ -89,7 +90,9 @@ class InvoiceRepository {
       limit: 1,
     );
 
-    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
+    if (!force &&
+        existing.isNotEmpty &&
+        existing.first['sync_status'] == 'pending') {
       return false;
     }
 
