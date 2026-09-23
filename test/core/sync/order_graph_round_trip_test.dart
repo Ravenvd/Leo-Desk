@@ -204,7 +204,10 @@ void main() {
       saveLastSyncTime: (_) async {},
     );
 
-    return HttpOverrides.runZoned(manager.sync);
+    return HttpOverrides.runZoned(
+      manager.sync,
+      createHttpClient: (context) => HttpOverrides().createHttpClient(context),
+    );
   }
 
   test('pulls exactly the 10 newest orders at the 10th/11th boundary',
