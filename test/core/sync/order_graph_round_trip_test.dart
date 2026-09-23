@@ -206,7 +206,7 @@ void main() {
 
     return HttpOverrides.runZoned(
       manager.sync,
-      createHttpClient: (context) => HttpOverrides().createHttpClient(context),
+      createHttpClient: (_) => HttpClient(),
     );
   }
 
