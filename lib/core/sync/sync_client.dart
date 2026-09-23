@@ -354,6 +354,14 @@ class SyncClient {
   }
 
   Future<bool> sendExpense(Expense expense) async {
+    if (expense.syncStatus == Expense.syncStatusDeletedPending) {
+      return _postJson(
+        '/api/expenses/delete',
+        {'uuid': expense.uuid},
+        expense.uuid,
+      );
+    }
+
     final map = expense.toMap()
       ..remove('id')
       ..remove('sync_status');
