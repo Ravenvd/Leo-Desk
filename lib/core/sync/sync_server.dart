@@ -388,11 +388,12 @@ class SyncServer {
           request.response,
           200,
           expenses
-              .map(
-                (expense) => expense.toMap()
-                  ..remove('id')
-                  ..remove('sync_status'),
-              )
+              .map((expense) {
+                final map = expense.toMap()..remove('id');
+                // Keep the tombstone status on the wire. A deleted expense
+                // must not be interpreted by the client as a live expense.
+                return map;
+              })
               .toList(),
         );
         return;
