@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/core/sync/sync_client.dart';
 import 'package:leo_desk/core/sync/sync_config.dart';
