@@ -157,7 +157,10 @@ class ExpenseRepository {
     return maps.map(Expense.fromMap).toList();
   }
 
-  Future<bool> upsertFromSync(Expense expense) async {
+  Future<bool> upsertFromSync(
+    Expense expense, {
+    bool force = false,
+  }) async {
     final db = await _db;
 
     final existing = await db.query(
@@ -170,8 +173,9 @@ class ExpenseRepository {
 
     if (existing.isNotEmpty) {
       final existingStatus = existing.first['sync_status'];
-      if (existingStatus == Expense.syncStatusPending ||
-          existingStatus == Expense.syncStatusDeletedPending) {
+      if (!force &&
+          (existingStatus == Expense.syncStatusPending ||
+              existingStatus == Expense.syncStatusDeletedPending)) {
         return false;
       }
     }
