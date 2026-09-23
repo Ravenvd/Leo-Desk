@@ -1,5 +1,6 @@
 import '../../features/billing/repositories/bill_repository.dart';
 import '../../features/customers/repositories/customer_repository.dart';
+import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
@@ -275,13 +276,24 @@ class SyncManager {
     // --- Push pending expenses ---
     for (final expense in await _expenseRepository.getPending()) {
       if (await _client.sendExpense(expense)) {
-        await _expenseRepository.markSynced(expense.uuid);
+        if (expense.syncStatus == Expense.syncStatusDeletedPending) {
+          await _expenseRepository.finalizeDeletion(expense.uuid);
+        } else {
+          await _expenseRepository.markSynced(expense.uuid);
+        }
         expensesPushed++;
       }
     }
 
     // --- Pull expenses ---
     for (final expense in await _client.fetchExpenses()) {
+      if (expense.syncStatus == Expense.syncStatusDeletedPending) {
+        await _expenseRepository.applyDeletionFromSync(expense.uuid);
+        expensesPulled++;
+        acknowledgedExpenses.add(expense.uuid);
+        continue;
+      }
+
       final applied = await _expenseRepository.upsertFromSync(expense);
       if (applied) {
         expensesPulled++;
