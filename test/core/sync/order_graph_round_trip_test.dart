@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/core/sync/sync_client.dart';
 import 'package:leo_desk/core/sync/sync_config.dart';
@@ -21,7 +21,6 @@ import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
@@ -204,10 +203,7 @@ void main() {
       saveLastSyncTime: (_) async {},
     );
 
-    return HttpOverrides.runZoned(
-      manager.sync,
-      createHttpClient: (_) => HttpClient(),
-    );
+    return manager.sync();
   }
 
   test('pulls exactly the 10 newest orders at the 10th/11th boundary',
