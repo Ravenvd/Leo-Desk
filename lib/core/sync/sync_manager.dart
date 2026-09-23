@@ -350,69 +350,56 @@ class SyncManager {
       return SyncResult.notConnected();
     }
 
+    // Pull the complete Windows dataset first. Nothing on the Android
+    // database is touched until every dataset has been downloaded.
     final customers = await _client.fetchCustomers();
+    final orders = await _client.fetchOrders();
+    final invoices = await _client.fetchInvoices();
+    final bills = await _client.fetchBills();
     final expenses = await _client.fetchExpenses();
 
+    // Windows is authoritative for this operation. Replace every local
+    // record, including unsynced local changes.
     await _billRepository.deleteAll();
     await _invoiceRepository.deleteAll();
     await _orderRepository.deleteAll();
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
 
-    var billsApplied = 0;
-    var invoicesApplied = 0;
-    var expensesApplied = 0;
-    var ordersApplied = 0;
-
     for (final customer in customers) {
-      await _customerRepository.upsertFromSync(customer);
+      await _customerRepository.upsertFromSync(
+        customer,
+        force: true,
+      );
     }
-
-    final customerIdsByUuid = {
-      for (final customer in await _customerRepository.getAll())
-        customer.uuid: customer.id!,
-    };
-    final orders = await _client.fetchOrders(
-      customerIdsByUuid: customerIdsByUuid,
-    );
 
     for (final syncOrder in orders) {
-      final applied = await _orderRepository.upsertFromSync(
+      await _orderRepository.upsertFromSync(
         syncOrder.order,
         syncOrder.items,
+        customerUuid: syncOrder.customerUuid,
+        force: true,
       );
-      if (applied) ordersApplied++;
     }
 
-    final localOrderIdsByUuid = {
-      for (final order in await _orderRepository.getAll()) order.uuid: order.id!,
-    };
-    final invoices = await _client.fetchInvoices(
-      customerIdsByUuid: {
-        for (final customer in await _customerRepository.getAll())
-          customer.uuid: customer.id!,
-      },
-      orderIdsByUuid: localOrderIdsByUuid,
-    );
-    final bills = await _client.fetchBills();
-
     for (final syncInvoice in invoices) {
-      final applied = await _invoiceRepository.upsertFromSync(
+      await _invoiceRepository.upsertFromSync(
         syncInvoice.invoice,
         syncInvoice.items,
+        force: true,
       );
-      if (applied) invoicesApplied++;
     }
 
     for (final syncBill in bills) {
-      final applied = await _billRepository.upsertFromSync(
+      await _billRepository.upsertFromSync(
         syncBill.bill,
         syncBill.items,
+        force: true,
       );
-      if (applied) billsApplied++;
     }
 
     final acknowledgedExpenses = <String>[];
+    var expensesApplied = 0;
 
     for (final expense in expenses) {
       if (expense.syncStatus == Expense.syncStatusDeletedPending) {
@@ -420,10 +407,15 @@ class SyncManager {
         continue;
       }
 
-      final applied = await _expenseRepository.upsertFromSync(expense);
-      if (applied) expensesApplied++;
+      await _expenseRepository.upsertFromSync(
+        expense,
+        force: true,
+      );
+      expensesApplied++;
     }
 
+    // Windows tombstones are temporary. Once the replacement has completed,
+    // acknowledge them so Windows can physically remove them as well.
     if (acknowledgedExpenses.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: const [],
@@ -434,7 +426,7 @@ class SyncManager {
       );
       if (!acknowledged) {
         throw StateError(
-          'Pulled expense deletions were applied, but Windows could not confirm sync.',
+          'Windows database was pulled, but expense deletions could not be acknowledged.',
         );
       }
     }
@@ -442,10 +434,10 @@ class SyncManager {
     final result = SyncResult(
       connected: true,
       customersPulled: customers.length,
-      billsPulled: billsApplied,
-      invoicesPulled: invoicesApplied,
+      billsPulled: bills.length,
+      invoicesPulled: invoices.length,
       expensesPulled: expensesApplied,
-      ordersPulled: ordersApplied,
+      ordersPulled: orders.length,
       syncedAt: DateTime.now(),
     );
 
