@@ -266,16 +266,26 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
               'on this device.',
             ),
             const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _isSyncing ? null : _syncNow,
-              icon: _isSyncing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.sync_rounded),
-              label: Text(_isSyncing ? 'Syncing…' : 'Sync Now'),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: _isSyncing ? null : _syncNow,
+                  icon: _isSyncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync_rounded),
+                  label: Text(_isSyncing ? 'Syncing…' : 'Sync Now'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _isSyncing ? null : _pullDatabase,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Pull Database'),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             if (_lastSyncAt != null)
@@ -294,6 +304,73 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _pullDatabase() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pull Database from Windows?'),
+        content: const Text(
+          'This will replace all data on this device with the current '
+          'Windows database. Any local changes that have not synced yet '
+          'will be lost. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Pull Database'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isSyncing = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final config = await SyncConfig.load();
+      if (!config.isConfigured) {
+        if (!mounted) return;
+        setState(() {
+          _statusMessage = 'Save the Windows server address first.';
+        });
+        return;
+      }
+
+      final result = await SyncManager.fromConfig(config).pullAndReplace();
+
+      if (!mounted) return;
+
+      if (result.connected) {
+        notifySyncCompleted();
+        setState(() {
+          _lastSyncAt = result.syncedAt;
+          _statusMessage = 'Database pulled from Windows successfully.';
+        });
+      } else {
+        setState(() {
+          _statusMessage = 'Could not reach the Windows server.';
+        });
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = 'Database pull failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
   }
 
   String _formatTime(DateTime time) {
