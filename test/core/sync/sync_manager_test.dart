@@ -801,6 +801,208 @@ void main() {
   });
 
 
+  test('replaces a stale order graph with the Windows canonical graph', () async {
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+    final clientOrderItems = OrderItemRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase);
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final serverOrderItems = OrderItemRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'graph-reconcile-customer',
+      name: 'Graph Reconcile Customer',
+      syncStatus: 'synced',
+    );
+    await serverCustomers.insert(customer);
+    await serverCustomers.markSynced(customer.uuid);
+    await syncWithRealHttpClient();
+
+    final serverCustomer = (await serverCustomers.getAll()).single;
+    final canonicalOrder = makeOrder(
+      uuid: 'canonical-graph-order',
+      customerId: serverCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+      status: 'In Progress',
+    );
+    await serverOrders.insert(canonicalOrder);
+    await serverOrders.markSynced(canonicalOrder.uuid);
+    final serverOrder = (await serverOrders.getAll()).single;
+
+    await serverOrderItems.insert(
+      makeOrderItem(
+        uuid: 'canonical-order-item',
+        orderId: serverOrder.id!,
+        workType: 'Embroidery',
+        garmentType: 'Blouse',
+      ),
+    );
+
+    final canonicalInvoice = makeInvoice(
+      uuid: 'canonical-invoice',
+      orderId: serverOrder.id!,
+      orderUuid: serverOrder.uuid,
+      customerId: serverCustomer.id!,
+      customerUuid: serverCustomer.uuid,
+      syncStatus: 'synced',
+    );
+    await serverInvoices.create(
+      invoice: canonicalInvoice,
+      items: [
+        makeInvoiceItem(
+          uuid: 'canonical-invoice-item',
+          description: 'Canonical blouse embroidery',
+        ),
+      ],
+    );
+    await serverInvoices.markSynced(canonicalInvoice.uuid);
+
+    final canonicalBill = makeBill(
+      uuid: 'canonical-bill',
+      customerId: serverCustomer.id!,
+      customerUuid: serverCustomer.uuid,
+      billNumber: 'INV-000001',
+      syncStatus: 'synced',
+      amountPaidPaise: 100000,
+    ).copyWith(
+      orderId: serverOrder.id,
+      orderUuid: serverOrder.uuid,
+      subtotalPaise: 100000,
+      discountPaise: 0,
+      taxPaise: 0,
+      totalPaise: 100000,
+      amountPaidPaise: 100000,
+    );
+    await serverBills.insert(
+      bill: canonicalBill,
+      items: [
+        makeItem(
+          uuid: 'canonical-bill-item',
+          description: 'Canonical blouse embroidery',
+          quantity: 1,
+          ratePaise: 100000,
+          amountPaise: 100000,
+        ),
+      ],
+    );
+    await serverBills.markSynced(canonicalBill.uuid);
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final staleOrder = makeOrder(
+      uuid: 'stale-graph-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+      status: 'In Progress',
+    );
+    await clientOrders.insert(staleOrder);
+    await clientOrders.markSynced(staleOrder.uuid);
+    final localStaleOrder = (await clientOrders.getAll()).single;
+
+    await clientOrderItems.insert(
+      makeOrderItem(
+        uuid: 'stale-order-item',
+        orderId: localStaleOrder.id!,
+        workType: 'Aari',
+        garmentType: 'Old blouse',
+      ),
+    );
+
+    final staleInvoice = makeInvoice(
+      uuid: 'stale-invoice',
+      orderId: localStaleOrder.id!,
+      orderUuid: localStaleOrder.uuid,
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      syncStatus: 'synced',
+    );
+    await clientInvoices.create(
+      invoice: staleInvoice,
+      items: [
+        makeInvoiceItem(
+          uuid: 'stale-invoice-item',
+          description: 'Stale invoice item',
+        ),
+      ],
+    );
+    await clientInvoices.markSynced(staleInvoice.uuid);
+
+    final staleBill = makeBill(
+      uuid: 'stale-bill',
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      billNumber: 'INV-000001',
+      syncStatus: 'synced',
+      amountPaidPaise: 100000,
+    ).copyWith(
+      orderId: localStaleOrder.id,
+      orderUuid: localStaleOrder.uuid,
+      subtotalPaise: 100000,
+      discountPaise: 0,
+      taxPaise: 0,
+      totalPaise: 100000,
+      amountPaidPaise: 100000,
+    );
+    await clientBills.insert(
+      bill: staleBill,
+      items: [
+        makeItem(
+          uuid: 'stale-bill-item',
+          description: 'Stale bill item',
+          quantity: 1,
+          ratePaise: 100000,
+          amountPaise: 100000,
+        ),
+      ],
+    );
+    await clientBills.markSynced(staleBill.uuid);
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.ordersPushed, 0);
+    expect(result.ordersPulled, 1);
+    expect(result.invoicesPulled, 1);
+    expect(result.billsPulled, 1);
+
+    final localOrders = await clientOrders.getAll();
+    expect(localOrders, hasLength(1));
+    expect(localOrders.single.uuid, canonicalOrder.uuid);
+    expect(localOrders.single.orderNumber, 'ORD-000001');
+
+    final localOrderItems = await clientOrderItems.getByOrder(localOrders.single.id!);
+    expect(localOrderItems, hasLength(1));
+    expect(localOrderItems.single.uuid, 'canonical-order-item');
+    expect(localOrderItems.single.orderId, localOrders.single.id);
+
+    final localInvoices = await clientInvoices.getAll();
+    expect(localInvoices, hasLength(1));
+    expect(localInvoices.single.uuid, canonicalInvoice.uuid);
+    expect(localInvoices.single.orderUuid, canonicalOrder.uuid);
+    expect(localInvoices.single.orderId, localOrders.single.id);
+
+    final localInvoiceItems = await clientInvoices.getItems(localInvoices.single.id!);
+    expect(localInvoiceItems, hasLength(1));
+    expect(localInvoiceItems.single.uuid, 'canonical-invoice-item');
+    expect(localInvoiceItems.single.invoiceId, localInvoices.single.id);
+
+    final localBills = await clientBills.getAll();
+    expect(localBills, hasLength(1));
+    expect(localBills.single.uuid, canonicalBill.uuid);
+    expect(localBills.single.orderUuid, canonicalOrder.uuid);
+    expect(localBills.single.orderId, localOrders.single.id);
+
+    final localBillItems = await clientBills.getItems(localBills.single.id!);
+    expect(localBillItems, hasLength(1));
+    expect(localBillItems.single.uuid, 'canonical-bill-item');
+    expect(localBillItems.single.billId, localBills.single.id);
+  });
+
   test('syncs an order and all line items from Android to Windows', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
