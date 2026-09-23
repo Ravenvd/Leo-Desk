@@ -12,7 +12,6 @@ import 'package:leo_desk/features/expenses/models/expense.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -29,10 +28,10 @@ void main() {
         await Directory.systemTemp.createTemp('leo_desk_sync_offline_test_');
 
     serverDatabase = await AppDatabase.openTestDatabase(
-      path: testDirectory.path + Platform.pathSeparator + 'server.db',
+      path: '${testDirectory.path}${Platform.pathSeparator}server.db',
     );
     clientDatabase = await AppDatabase.openTestDatabase(
-      path: testDirectory.path + Platform.pathSeparator + 'client.db',
+      path: '${testDirectory.path}${Platform.pathSeparator}client.db',
     );
 
     final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
