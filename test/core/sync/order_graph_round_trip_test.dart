@@ -18,15 +18,7 @@ import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/models/order_item.dart';
 import 'package:leo_desk/features/orders/repositories/order_item_repository.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
-class _RealHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context);
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -176,10 +168,10 @@ void main() {
         await Directory.systemTemp.createTemp('leo_desk_sync_graph_test_');
 
     serverDatabase = await AppDatabase.openTestDatabase(
-      path: testDirectory.path + Platform.pathSeparator + 'server.db',
+      path: '${testDirectory.path}${Platform.pathSeparator}server.db',
     );
     clientDatabase = await AppDatabase.openTestDatabase(
-      path: testDirectory.path + Platform.pathSeparator + 'client.db',
+      path: '${testDirectory.path}${Platform.pathSeparator}client.db',
     );
 
     server = SyncServer(
@@ -212,11 +204,7 @@ void main() {
       saveLastSyncTime: (_) async {},
     );
 
-    return HttpOverrides.runZoned(
-      manager.sync,
-      createHttpClient: (context) =>
-          _RealHttpOverrides().createHttpClient(context),
-    );
+    return HttpOverrides.runZoned(manager.sync);
   }
 
   test('pulls exactly the 10 newest orders at the 10th/11th boundary',
@@ -238,7 +226,7 @@ void main() {
       final order = makeOrder(
         uuid: 'ten-order-boundary-$rank',
         customerId: serverCustomer.id!,
-        orderNumber: 'ORD-' + rank.toString().padLeft(6, '0'),
+        orderNumber: 'ORD-${rank.toString().padLeft(6, '0')}',
         updatedAt: DateTime.utc(2026, 1, 1).add(
           Duration(days: 12 - rank),
         ),
