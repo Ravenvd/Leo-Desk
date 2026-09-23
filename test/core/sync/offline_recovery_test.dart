@@ -6,7 +6,11 @@ import 'package:leo_desk/core/sync/sync_client.dart';
 import 'package:leo_desk/core/sync/sync_config.dart';
 import 'package:leo_desk/core/sync/sync_manager.dart';
 import 'package:leo_desk/core/sync/sync_server.dart';
+import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
+import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/expenses/models/expense.dart';
+import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -80,7 +84,11 @@ void main() {
       expect(await serverExpenses.getById(1), isNull);
 
       final server = SyncServer(
+        customerRepository: CustomerRepository(database: serverDatabase),
+        billRepository: BillRepository(database: serverDatabase),
         expenseRepository: serverExpenses,
+        invoiceRepository: InvoiceRepository(database: serverDatabase),
+        orderRepository: OrderRepository(database: serverDatabase),
       );
       await server.start(port: port);
 
