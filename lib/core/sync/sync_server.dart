@@ -101,7 +101,7 @@ class SyncServer {
           await _billRepository.markSynced(uuid);
         }
         for (final uuid in uuids('expenses')) {
-          await _expenseRepository.markSynced(uuid);
+          await _expenseRepository.acknowledgeSyncedOrDeleted(uuid);
         }
 
         await _sendJson(request.response, 200, {
@@ -382,7 +382,7 @@ class SyncServer {
       }
 
       if (request.method == 'GET' && request.uri.path == '/api/expenses') {
-        final expenses = await _expenseRepository.getAll();
+        final expenses = await _expenseRepository.getAllForSync();
 
         await _sendJson(
           request.response,
@@ -395,6 +395,25 @@ class SyncServer {
               )
               .toList(),
         );
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/expenses/delete') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {
+            'error': 'Invalid expense deletion data.',
+          });
+          return;
+        }
+
+        final uuid = decoded['uuid'] as String;
+        await _expenseRepository.markDeletedPendingByUuid(uuid);
+
+        await _sendJson(request.response, 200, {
+          'status': 'ok',
+          'uuid': uuid,
+        });
         return;
       }
 
