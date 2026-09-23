@@ -1003,6 +1003,53 @@ void main() {
     expect(localBillItems.single.billId, localBills.single.id);
   });
 
+  test('pulls an older order when it is among the 10 most recently updated', () async {
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'recent-update-window-customer',
+      name: 'Recent Update Window Customer',
+      syncStatus: 'synced',
+    );
+    await serverCustomers.insert(customer);
+    await serverCustomers.markSynced(customer.uuid);
+    await syncWithRealHttpClient();
+
+    final serverCustomer = (await serverCustomers.getAll()).single;
+    final target = makeOrder(
+      uuid: 'recently-updated-old-order',
+      customerId: serverCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    ).copyWith(
+      updatedAt: DateTime.utc(2026, 1, 2),
+    );
+    await serverOrders.insert(target);
+    await serverOrders.markSynced(target.uuid);
+
+    for (var i = 2; i <= 11; i++) {
+      final order = makeOrder(
+        uuid: 'older-window-order-' + i.toString(),
+        customerId: serverCustomer.id!,
+        orderNumber: 'ORD-' + i.toString().padLeft(6, '0'),
+        syncStatus: 'synced',
+      );
+      await serverOrders.insert(order);
+      await serverOrders.markSynced(order.uuid);
+    }
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.ordersPulled, 1);
+
+    final localOrders = await clientOrders.getAll();
+    expect(localOrders, hasLength(1));
+    expect(localOrders.single.uuid, target.uuid);
+    expect(localOrders.single.updatedAt, target.updatedAt);
+  });
   test('syncs an order and all line items from Android to Windows', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
