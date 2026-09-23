@@ -28,7 +28,10 @@ class CustomerRepository {
   ///
   /// Otherwise the server copy is applied and the resulting row is marked
   /// as synced.
-  Future<bool> upsertFromSync(Customer customer) async {
+  Future<bool> upsertFromSync(
+    Customer customer, {
+    bool force = false,
+  }) async {
     final db = await _db;
 
     final existing = await db.query(
@@ -39,7 +42,9 @@ class CustomerRepository {
       limit: 1,
     );
 
-    if (existing.isNotEmpty && existing.first['sync_status'] == 'pending') {
+    if (!force &&
+        existing.isNotEmpty &&
+        existing.first['sync_status'] == 'pending') {
       return false;
     }
 

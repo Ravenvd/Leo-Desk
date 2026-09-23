@@ -254,8 +254,8 @@ class SyncClient {
   }
 
   Future<List<SyncInvoice>> fetchInvoices({
-    required Map<String, int> customerIdsByUuid,
-    required Map<String, int> orderIdsByUuid,
+    Map<String, int> customerIdsByUuid = const {},
+    Map<String, int> orderIdsByUuid = const {},
   }) async {
     final decoded = await _getJson('/api/invoices');
 
@@ -270,9 +270,8 @@ class SyncClient {
       final orderUuid = map['order_uuid'] as String?;
       if (customerUuid == null || orderUuid == null) continue;
 
-      final customerId = customerIdsByUuid[customerUuid];
-      final orderId = orderIdsByUuid[orderUuid];
-      if (customerId == null || orderId == null) continue;
+      final customerId = customerIdsByUuid[customerUuid] ?? 0;
+      final orderId = orderIdsByUuid[orderUuid] ?? 0;
 
       invoices.add(
         SyncInvoice.fromMap(
@@ -306,7 +305,7 @@ class SyncClient {
   }
 
   Future<List<SyncOrder>> fetchOrders({
-    required Map<String, int> customerIdsByUuid,
+    Map<String, int> customerIdsByUuid = const {},
     int? limit,
   }) async {
     final path = limit == null ? '/api/orders' : '/api/orders?limit=$limit';
@@ -322,8 +321,7 @@ class SyncClient {
       final customerUuid = map['customer_uuid'] as String?;
       if (customerUuid == null) continue;
 
-      final customerId = customerIdsByUuid[customerUuid];
-      if (customerId == null) continue;
+      final customerId = customerIdsByUuid[customerUuid] ?? 0;
 
       orders.add(SyncOrder.fromMap(map, customerId: customerId));
     }
