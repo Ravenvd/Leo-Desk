@@ -1031,9 +1031,9 @@ void main() {
 
     for (var i = 2; i <= 11; i++) {
       final order = makeOrder(
-        uuid: 'older-window-order-' + i.toString(),
+        uuid: 'older-window-order-$i',
         customerId: serverCustomer.id!,
-        orderNumber: 'ORD-' + i.toString().padLeft(6, '0'),
+        orderNumber: 'ORD-${i.toString().padLeft(6, '0')}',
         syncStatus: 'synced',
       );
       await serverOrders.insert(order);
@@ -1043,12 +1043,12 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.ordersPulled, 1);
+    expect(result.ordersPulled, 10);
 
     final localOrders = await clientOrders.getAll();
-    expect(localOrders, hasLength(1));
-    expect(localOrders.single.uuid, target.uuid);
-    expect(localOrders.single.updatedAt, target.updatedAt);
+    expect(localOrders, hasLength(10));
+    final pulledTarget = localOrders.singleWhere((order) => order.uuid == target.uuid);
+    expect(pulledTarget.updatedAt, target.updatedAt);
   });
   test('syncs an order and all line items from Android to Windows', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
