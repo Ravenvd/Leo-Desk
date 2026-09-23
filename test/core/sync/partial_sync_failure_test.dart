@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:leo_desk/core/database/app_database.dart';
 import 'package:leo_desk/core/sync/sync_client.dart';
-import 'package:leo_desk/core/sync/sync_config.dart';
 import 'package:leo_desk/core/sync/sync_manager.dart';
 import 'package:leo_desk/core/sync/sync_server.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
@@ -15,7 +14,6 @@ import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class FailingInvoiceSyncClient extends SyncClient {
