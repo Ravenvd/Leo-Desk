@@ -412,9 +412,31 @@ class SyncManager {
       if (applied) billsApplied++;
     }
 
+    final acknowledgedExpenses = <String>[];
+
     for (final expense in expenses) {
+      if (expense.syncStatus == Expense.syncStatusDeletedPending) {
+        acknowledgedExpenses.add(expense.uuid);
+        continue;
+      }
+
       final applied = await _expenseRepository.upsertFromSync(expense);
       if (applied) expensesApplied++;
+    }
+
+    if (acknowledgedExpenses.isNotEmpty) {
+      final acknowledged = await _client.acknowledgePulled(
+        customerUuids: const [],
+        orderUuids: const [],
+        invoiceUuids: const [],
+        billUuids: const [],
+        expenseUuids: acknowledgedExpenses,
+      );
+      if (!acknowledged) {
+        throw StateError(
+          'Pulled expense deletions were applied, but Windows could not confirm sync.',
+        );
+      }
     }
 
     final result = SyncResult(
