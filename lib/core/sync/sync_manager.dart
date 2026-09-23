@@ -80,6 +80,8 @@ class SyncManager {
   final OrderRepository _orderRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
+  Future<SyncResult>? _activeSync;
+
   SyncManager({
     required this._client,
     CustomerRepository? customerRepository,
@@ -105,7 +107,28 @@ class SyncManager {
     );
   }
 
-  Future<SyncResult> sync() async {
+  /// Runs at most one sync at a time.
+  ///
+  /// Concurrent callers share the active sync Future rather than starting
+  /// another sync operation against the same local database and server.
+  Future<SyncResult> sync() {
+    final activeSync = _activeSync;
+    if (activeSync != null) return activeSync;
+
+    final syncFuture = _runSync();
+    _activeSync = syncFuture;
+    return syncFuture;
+  }
+
+  Future<SyncResult> _runSync() async {
+    try {
+      return await _syncInternal();
+    } finally {
+      _activeSync = null;
+    }
+  }
+
+  Future<SyncResult> _syncInternal() async {
     if (!await _client.checkConnection()) {
       return SyncResult.notConnected();
     }
