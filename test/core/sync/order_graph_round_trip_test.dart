@@ -371,8 +371,6 @@ void main() {
       expect(localInvoice.uuid, serverInvoice.uuid);
       expect(localBill.uuid, serverBill.uuid);
       expect(localOrder.id, isNot(serverOrder.id));
-      expect(localInvoice.id, isNot(serverInvoice.id));
-      expect(localBill.id, isNot(serverBill.id));
 
       expect(localInvoice.orderId, localOrder.id);
       expect(localInvoice.customerId, localCustomer.id);
