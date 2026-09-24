@@ -48,9 +48,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   String _currentMonthKey() {
     final now = DateTime.now();
-    return now.year.toString() +
-        '-' +
-        now.month.toString().padLeft(2, '0');
+    return '\${now.year}-\${now.month.toString().padLeft(2, '0')}';
   }
 
   Future<void> _loadMonthlySettings() async {
@@ -196,7 +194,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           monthlyRent: _monthlyRent,
           deliveryWindow: _deliveryWindow,
           isAari: _isAari,
-          ratePerThousandStitches: _ratePerThousandStitches,
           machineSpeed: _machineSpeed,
           timeSurchargePercent: _timeSurchargePercent,
           aariSurchargePercent: _aariSurchargePercent,
@@ -283,7 +280,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<DeliveryWindow>(
-              value: _deliveryWindow,
+              initialValue: _deliveryWindow,
               decoration: const InputDecoration(
                 labelText: 'Delivery date',
                 prefixIcon: Icon(Icons.event_available_rounded),
@@ -317,10 +314,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.receipt_long_rounded),
                   title: Text(
-                    'This month: EB ₹' +
-                        _monthlyEbBill.toStringAsFixed(0) +
-                        ' • Rent ₹' +
-                        _monthlyRent.toStringAsFixed(0),
+                    'This month: EB ₹\${_monthlyEbBill.toStringAsFixed(0)} • '
+                    'Rent ₹\${_monthlyRent.toStringAsFixed(0)}',
                   ),
                   subtitle: const Text(
                     'Saved for the current month • tap the calendar icon to update',
@@ -452,8 +447,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           Expanded(child: Text(label, style: style)),
           Text(
             suffix.isEmpty
-                ? '₹' + value.toStringAsFixed(0)
-                : value.toStringAsFixed(1) + suffix,
+                ? '₹\${value.toStringAsFixed(0)}'
+                : '\${value.toStringAsFixed(1)}$suffix',
             style: style,
           ),
         ],
