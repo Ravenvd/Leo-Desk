@@ -15,7 +15,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   final _piecesController = TextEditingController();
   final _timePerPieceController = TextEditingController();
 
-  static const _ratePerThousandStitches = 40.0;
   static const _machineSpeed = 800.0;
   static const _timeSurchargePercent = 20.0;
   static const _aariSurchargePercent = 60.0;
@@ -318,7 +317,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     'Rent ₹\${_monthlyRent.toStringAsFixed(0)}',
                   ),
                   subtitle: const Text(
-                    'Saved for the current month • tap the calendar icon to update',
+                    'Saved for the current month',
                   ),
                 ),
               ),
