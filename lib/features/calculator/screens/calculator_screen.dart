@@ -13,20 +13,11 @@ class CalculatorScreen extends StatefulWidget {
 class _CalculatorScreenState extends State<CalculatorScreen> {
   final _stitchesController = TextEditingController();
   final _piecesController = TextEditingController();
+  final _basePriceController = TextEditingController();
   final _timePerPieceController = TextEditingController();
 
   static const _machineSpeed = 800.0;
-  static const _timeSurchargePercent = 20.0;
-  static const _aariSurchargePercent = 60.0;
-  static const _ebAllocationPercent = 5.0;
-  static const _rentAllocationPercent = 5.0;
-  static const _overnightSurchargePercent = 25.0;
-  static const _labourPercent = 20.0;
 
-  double _monthlyEbBill = 0;
-  double _monthlyRent = 0;
-  String? _savedMonthKey;
-  bool _settingsLoaded = false;
   bool _isAari = false;
   DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
   PriceCalculation? _calculation;
@@ -35,7 +26,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void initState() {
     super.initState();
     _stitchesController.addListener(_updateTimePerPiece);
-    _loadMonthlySettings();
   }
 
   void _updateTimePerPiece() {
@@ -63,143 +53,27 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     _stitchesController.removeListener(_updateTimePerPiece);
     _stitchesController.dispose();
     _piecesController.dispose();
+    _basePriceController.dispose();
     _timePerPieceController.dispose();
     super.dispose();
-  }
-
-  String _currentMonthKey() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _loadMonthlySettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final monthKey = _currentMonthKey();
-    final savedMonth = prefs.getString('calculator_settings_month');
-
-    if (!mounted) return;
-
-    setState(() {
-      _monthlyEbBill = prefs.getDouble('calculator_monthly_eb') ?? 0;
-      _monthlyRent = prefs.getDouble('calculator_monthly_rent') ?? 0;
-      _savedMonthKey = savedMonth;
-      _settingsLoaded = true;
-    });
-
-    if (savedMonth != monthKey) {
-      await _showMonthlySettingsDialog();
-    }
-  }
-
-  Future<void> _showMonthlySettingsDialog() async {
-    final ebController = TextEditingController(
-      text: _monthlyEbBill == 0 ? '' : _monthlyEbBill.toStringAsFixed(0),
-    );
-    final rentController = TextEditingController(
-      text: _monthlyRent == 0 ? '' : _monthlyRent.toStringAsFixed(0),
-    );
-
-    try {
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Monthly cost setup'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter this month’s EB bill and rent. These values will be '
-                'saved and used for all calculations until next month.',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: ebController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Monthly EB bill',
-                  prefixText: '₹ ',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: rentController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Monthly rent',
-                  prefixText: '₹ ',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () async {
-                final eb = double.tryParse(ebController.text.trim());
-                final rent = double.tryParse(rentController.text.trim());
-
-                if (eb == null || eb < 0 || rent == null || rent < 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Enter valid EB and rent amounts.'),
-                    ),
-                  );
-                  return;
-                }
-
-                final monthKey = _currentMonthKey();
-                final prefs = await SharedPreferences.getInstance();
-
-                await prefs.setDouble('calculator_monthly_eb', eb);
-                await prefs.setDouble('calculator_monthly_rent', rent);
-                await prefs.setString('calculator_settings_month', monthKey);
-
-                if (!mounted) return;
-                setState(() {
-                  _monthlyEbBill = eb;
-                  _monthlyRent = rent;
-                  _savedMonthKey = monthKey;
-                });
-                if (context.mounted) Navigator.of(context).pop();
-              },
-              child: const Text('Save for this month'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      ebController.dispose();
-      rentController.dispose();
-    }
   }
 
   void _calculate() {
     final stitches = int.tryParse(_stitchesController.text.trim());
     final pieces = int.tryParse(_piecesController.text.trim());
-    final timePerPiece =
-        double.tryParse(_timePerPieceController.text.trim());
-
-    if (!_settingsLoaded || _savedMonthKey == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Set this month’s EB bill and rent first.'),
-        ),
-      );
-      return;
-    }
+    final basePrice = double.tryParse(_basePriceController.text.trim());
 
     if (stitches == null ||
         stitches <= 0 ||
         pieces == null ||
         pieces <= 0 ||
-        timePerPiece == null ||
-        timePerPiece <= 0) {
+        basePrice == null ||
+        basePrice < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter valid stitches, pieces, and time per piece.'),
+          content: Text(
+            'Enter valid stitches, pieces, and base price per piece.',
+          ),
         ),
       );
       return;
@@ -210,18 +84,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         PriceCalculationInput(
           stitches: stitches,
           pieces: pieces,
-          timePerPieceMinutes: timePerPiece,
-          monthlyEbBill: _monthlyEbBill,
-          monthlyRent: _monthlyRent,
+          basePricePerPiece: basePrice,
+          monthlyEbBill: 0,
+          monthlyRent: 0,
           deliveryWindow: _deliveryWindow,
           isAari: _isAari,
           machineSpeed: _machineSpeed,
-          timeSurchargePercent: _timeSurchargePercent,
-          aariSurchargePercent: _aariSurchargePercent,
-          ebAllocationPercent: _ebAllocationPercent,
-          rentAllocationPercent: _rentAllocationPercent,
-          overnightSurchargePercent: _overnightSurchargePercent,
-          labourPercent: _labourPercent,
         ),
       );
     });
@@ -231,7 +99,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cost Calculator'),
+        title: const Text('Pricing Calculator'),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -270,13 +138,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Work details', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Order details',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: _stitchesController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Number of stitches',
+                labelText: 'Stitches per piece',
                 prefixIcon: Icon(Icons.grid_4x4_rounded),
               ),
             ),
@@ -291,10 +162,22 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _basePriceController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Base price per piece',
+                helperText: 'Normal price before bulk discount',
+                prefixText: '₹ ',
+                prefixIcon: Icon(Icons.currency_rupee_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _timePerPieceController,
               readOnly: true,
               decoration: const InputDecoration(
-                labelText: 'Time per piece (minutes)',
+                labelText: 'Machine time per piece (minutes)',
                 helperText: 'Calculated automatically at 800 stitches/min',
                 prefixIcon: Icon(Icons.timer_outlined),
               ),
@@ -303,7 +186,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             DropdownButtonFormField<DeliveryWindow>(
               initialValue: _deliveryWindow,
               decoration: const InputDecoration(
-                labelText: 'Delivery date',
+                labelText: 'Delivery window',
                 prefixIcon: Icon(Icons.event_available_rounded),
               ),
               items: DeliveryWindow.values
@@ -324,46 +207,27 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Aari work'),
-              subtitle: const Text('+60% of stitch charge'),
+              subtitle: const Text('+60% to the base embroidery price'),
               value: _isAari,
               onChanged: (value) => setState(() => _isAari = value),
             ),
             const SizedBox(height: 8),
-            if (_settingsLoaded)
-              Card(
-                margin: EdgeInsets.zero,
-                child: ListTile(
-                  leading: const Icon(Icons.receipt_long_rounded),
-                  title: Text(
-                    'This month: EB ₹${_monthlyEbBill.toStringAsFixed(0)} • '
-                    'Rent ₹${_monthlyRent.toStringAsFixed(0)}',
-                  ),
-                  subtitle: const Text(
-                    'Saved for the current month',
-                  ),
-                ),
-              ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _settingsLoaded ? _calculate : null,
-              icon: const Icon(Icons.calculate_rounded),
-              label: const Text('Calculate cost'),
+            const Text(
+              'Bulk discount: 5–9 pieces 2% • 10–19 pieces 5% • '
+              '20–29 pieces 7% • 30–39 pieces 9% • 40+ pieces 10%',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Designer fee is charged once per order based on stitches: '
+              '<10,000 = ₹100 • 10,000–19,999 = ₹200 • '
+              '20,000–29,999 = ₹300 • 30,000–39,999 = ₹400 • '
+              '40,000+ = ₹500.',
             ),
             const SizedBox(height: 16),
-            Text(
-              'Fixed assumptions',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '₹40 per 1,000 stitches • 800 stitches/min • +20% when total '
-              'work time exceeds 1 hour • Aari +60% • EB 5% • Rent 5% • '
-              'Labour 20% • Overnight +25% • final cost rounded to nearest ₹50',
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Overnight is automatic when the required work exceeds 12 hours '
-              'per day within the selected delivery window.',
+            FilledButton.icon(
+              onPressed: _calculate,
+              icon: const Icon(Icons.calculate_rounded),
+              label: const Text('Calculate price'),
             ),
           ],
         ),
@@ -378,11 +242,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Center(
-            child: Text('Enter the work details to calculate the cost.'),
+            child: Text('Enter the order details to calculate the price.'),
           ),
         ),
       );
     }
+
+    final effectivePerPiece =
+        calculation.totalOrderPrice / calculation.pieces;
+
+    final discountLabel =
+        'Bulk discount (' +
+        calculation.discountPercent.toStringAsFixed(0) +
+        '%)';
 
     return Card(
       child: Padding(
@@ -391,56 +263,60 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Cost breakdown',
+              'Price breakdown',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             _row(
-              'Theoretical machine time',
-              calculation.estimatedMachineMinutes / 60,
-              suffix: ' h',
+              'Machine time per piece',
+              calculation.estimatedMachineMinutesPerPiece,
+              suffix: ' min',
             ),
             _row(
-              'Maximum embroidery time',
-              calculation.totalWorkMinutes / 60,
+              'Total machine time',
+              calculation.totalMachineMinutes / 60,
               suffix: ' h',
-              emphasized: true,
             ),
             _row(
               'Required work per day',
               calculation.requiredHoursPerDay,
               suffix: ' h/day',
             ),
-            const SizedBox(height: 4),
-            Text(
-              calculation.overnightRequired
-                  ? 'Overnight work: YES (+25%)'
-                  : 'Overnight work: NO',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Divider(height: 28),
-            _row('Stitch charge', calculation.stitchCharge),
-            if (calculation.timeSurcharge > 0)
-              _row('Time surcharge', calculation.timeSurcharge),
-            if (calculation.aariSurcharge > 0)
-              _row('Aari surcharge', calculation.aariSurcharge),
-            _row('Work charge', calculation.workCharge, emphasized: true),
-            const Divider(height: 28),
-            _row('EB allocation (5%)', calculation.ebAllocation),
-            _row('Rent allocation (5%)', calculation.rentAllocation),
-            if (calculation.overnightSurcharge > 0)
-              _row(
-                'Overnight surcharge (25%)',
-                calculation.overnightSurcharge,
+            if (calculation.overnightRequired)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Over 12 h/day at this delivery window',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
-            _row('Labour (20%)', calculation.labourCharge),
             const Divider(height: 28),
-            _row('Calculated cost', calculation.totalBeforeRounding),
+            _row('Base price per piece', calculation.basePricePerPiece),
+            if (calculation.aariAdjustment > 0)
+              _row('Aari adjustment (+60%)', calculation.aariAdjustment),
             _row(
-              'FINAL COST',
-              calculation.finalCost,
+              discountLabel,
+              -calculation.discountPerPiece,
+            ),
+            _row(
+              'Final price per piece',
+              calculation.discountedPricePerPiece,
+              emphasized: true,
+            ),
+            _row('Embroidery total', calculation.embroideryTotal),
+            const Divider(height: 28),
+            _row('Designer fee (one time)', calculation.designerFee),
+            const Divider(height: 28),
+            _row(
+              'TOTAL ORDER PRICE',
+              calculation.totalOrderPrice,
               emphasized: true,
               large: true,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Effective price per piece: ₹' +
+                  effectivePerPiece.toStringAsFixed(2),
             ),
           ],
         ),
@@ -461,17 +337,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ? Theme.of(context).textTheme.titleMedium
             : Theme.of(context).textTheme.bodyMedium;
 
+    final formatted = suffix.isEmpty
+        ? '₹' + value.toStringAsFixed(0)
+        : value.toStringAsFixed(1) + suffix;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
           Expanded(child: Text(label, style: style)),
-          Text(
-            suffix.isEmpty
-                ? '₹${value.toStringAsFixed(0)}'
-                : '${value.toStringAsFixed(1)}$suffix',
-            style: style,
-          ),
+          Text(formatted, style: style),
         ],
       ),
     );
