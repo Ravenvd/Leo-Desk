@@ -193,7 +193,7 @@ class InvoicePdfService {
           pw.SizedBox(height: 30),
           pw.Center(
             child: pw.Text(
-              'Thank you for your business.',
+              'Thank you for choosing us to stitch your happiness.',
               style: pw.TextStyle(
                 fontStyle: pw.FontStyle.italic,
                 fontSize: 10,
