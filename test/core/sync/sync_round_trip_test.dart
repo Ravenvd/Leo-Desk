@@ -23,8 +23,6 @@ Customer makeCustomer(String name) {
     name: name,
     createdAt: now,
     updatedAt: now,
-    customerType: 'personal',
-    serviceRequired: 'embroidery',
   );
 }
 
