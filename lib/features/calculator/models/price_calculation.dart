@@ -53,8 +53,6 @@ class PriceCalculation {
     required this.machineSpeed,
     required this.baseProductionPricePerPiece,
     required this.aariAdjustment,
-    required this.ebAllocation,
-    required this.rentAllocation,
     required this.designerFee,
     required this.discountPercent,
     required this.discountPerPiece,
@@ -66,6 +64,12 @@ class PriceCalculation {
     required this.totalMachineMinutes,
     required this.requiredHoursPerDay,
     required this.overnightRequired,
+    required this.monthlyOperatingHours,
+    required this.monthlyOperatingCost,
+    required this.productionCostPerHour,
+    required this.sellingRatePerHour,
+    required this.monthlyRevenueTarget,
+    required this.targetRevenuePerHour,
   });
 
   final int pieces;
@@ -73,8 +77,6 @@ class PriceCalculation {
   final double machineSpeed;
   final double baseProductionPricePerPiece;
   final double aariAdjustment;
-  final double ebAllocation;
-  final double rentAllocation;
   final double designerFee;
   final double discountPercent;
   final double discountPerPiece;
@@ -86,21 +88,31 @@ class PriceCalculation {
   final double totalMachineMinutes;
   final double requiredHoursPerDay;
   final bool overnightRequired;
+  final double monthlyOperatingHours;
+  final double monthlyOperatingCost;
+  final double productionCostPerHour;
+  final double sellingRatePerHour;
+  final double monthlyRevenueTarget;
+  final double targetRevenuePerHour;
 }
 
 class PriceCalculator {
   const PriceCalculator._();
 
-  // Standard Leo Stitch & Design pricing constants.
-  // Derived from the current 12-month recovery model:
-  // ₹10L loan + 8% interest + wages/rent at 275 productive hours/month,
-  // with a 15% profit target.
-  static const double standardMachineRatePerHour = 460;
+  static const double operatingHoursPerDay = 8;
+  static const double operatingDaysPerMonth = 29;
+  static const double ownerAndLabourWagesPerMonth = 15000;
+  static const double businessLoanPrincipal = 1000000;
+  static const double businessLoanInterestRate = 0.08;
+  static const double loanRecoveryMonths = 12;
+  static const double profitMarkup = 0.15;
+
   static const double normalEffectiveSpm = 550;
   static const double aariEffectiveSpm = 300;
-  static const double ebAllocationPercent = 5;
-  static const double rentAllocationPercent = 5;
   static const double aariSurchargePercent = 60;
+
+  static double get monthlyOperatingHours =>
+      operatingHoursPerDay * operatingDaysPerMonth;
 
   static double _bulkDiscountPercent(int pieces) {
     if (pieces >= 40) return 10;
@@ -149,11 +161,24 @@ class PriceCalculator {
       );
     }
 
+    final monthlyInterest =
+        businessLoanPrincipal * businessLoanInterestRate / 12;
+
+    // Operating costs are allocated across the conservative 232 machine
+    // hours/month. Loan principal recovery remains a separate business target.
+    final monthlyOperatingCost = ownerAndLabourWagesPerMonth +
+        input.monthlyRent +
+        input.monthlyEbBill +
+        monthlyInterest;
+    final productionCostPerHour =
+        monthlyOperatingCost / monthlyOperatingHours;
+    final sellingRatePerHour = productionCostPerHour * (1 + profitMarkup);
+
     final machineSpeed =
         input.isAari ? aariEffectiveSpm : normalEffectiveSpm;
     final estimatedMachineMinutesPerPiece = input.stitches / machineSpeed;
     final baseProductionPricePerPiece =
-        estimatedMachineMinutesPerPiece / 60 * standardMachineRatePerHour;
+        estimatedMachineMinutesPerPiece / 60 * sellingRatePerHour;
 
     final aariAdjustment = input.isAari
         ? baseProductionPricePerPiece * aariSurchargePercent / 100
@@ -167,18 +192,12 @@ class PriceCalculator {
     final discountedProductionPricePerPiece =
         adjustedProductionPricePerPiece - discountPerPiece;
 
-    // EB and rent are allocated separately from the production charge.
-    // They are one-time order allocations, not per-piece additions.
-    final ebAllocation = input.monthlyEbBill * ebAllocationPercent / 100;
-    final rentAllocation = input.monthlyRent * rentAllocationPercent / 100;
-
     final designerFee = _designerFee(input.stitches);
     final finalPricePerPiece =
-        discountedProductionPricePerPiece +
-        (ebAllocation + rentAllocation + designerFee) / input.pieces;
-    final embroideryTotal = discountedProductionPricePerPiece * input.pieces;
-    final totalOrderPrice =
-        embroideryTotal + ebAllocation + rentAllocation + designerFee;
+        discountedProductionPricePerPiece + designerFee / input.pieces;
+    final embroideryTotal =
+        discountedProductionPricePerPiece * input.pieces;
+    final totalOrderPrice = embroideryTotal + designerFee;
 
     final totalMachineMinutes =
         estimatedMachineMinutesPerPiece * input.pieces;
@@ -186,18 +205,32 @@ class PriceCalculator {
         totalMachineMinutes / 60 / input.deliveryWindow.availableDays;
     final overnightRequired = requiredHoursPerDay > 12;
 
+    // Business target: recover the full loan principal plus annual interest,
+    // wages, rent and EB within 12 months, then apply the 15% markup.
+    final annualLoanInterest =
+        businessLoanPrincipal * businessLoanInterestRate;
+    final annualOperatingCosts = ownerAndLabourWagesPerMonth * 12 +
+        input.monthlyRent * 12 +
+        input.monthlyEbBill * 12 +
+        annualLoanInterest;
+    final annualRecoveryRequirement =
+        businessLoanPrincipal + annualOperatingCosts;
+    final monthlyRevenueTarget =
+        annualRecoveryRequirement / loanRecoveryMonths * (1 + profitMarkup);
+    final targetRevenuePerHour =
+        monthlyRevenueTarget / monthlyOperatingHours;
+
     return PriceCalculation(
       pieces: input.pieces,
-      machineRatePerHour: standardMachineRatePerHour,
+      machineRatePerHour: sellingRatePerHour,
       machineSpeed: machineSpeed,
       baseProductionPricePerPiece: baseProductionPricePerPiece,
       aariAdjustment: aariAdjustment,
-      ebAllocation: ebAllocation,
-      rentAllocation: rentAllocation,
       designerFee: designerFee,
       discountPercent: discountPercent,
       discountPerPiece: discountPerPiece,
-      discountedProductionPricePerPiece: discountedProductionPricePerPiece,
+      discountedProductionPricePerPiece:
+          discountedProductionPricePerPiece,
       finalPricePerPiece: finalPricePerPiece,
       embroideryTotal: embroideryTotal,
       totalOrderPrice: totalOrderPrice,
@@ -205,6 +238,12 @@ class PriceCalculator {
       totalMachineMinutes: totalMachineMinutes,
       requiredHoursPerDay: requiredHoursPerDay,
       overnightRequired: overnightRequired,
+      monthlyOperatingHours: monthlyOperatingHours,
+      monthlyOperatingCost: monthlyOperatingCost,
+      productionCostPerHour: productionCostPerHour,
+      sellingRatePerHour: sellingRatePerHour,
+      monthlyRevenueTarget: monthlyRevenueTarget,
+      targetRevenuePerHour: targetRevenuePerHour,
     );
   }
 }
