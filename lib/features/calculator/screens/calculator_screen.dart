@@ -16,6 +16,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   final _monthlyEbController = TextEditingController();
   final _monthlyRentController = TextEditingController(text: '4500');
   final _timePerPieceController = TextEditingController();
+  final _effectivePriceController = TextEditingController();
 
 
   bool _isAari = false;
@@ -23,6 +24,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   double _monthlyRent = 4500;
   DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
   PriceCalculation? _calculation;
+  double? _revenueRateDeficiencyPercent;
 
   @override
   void initState() {
@@ -79,6 +81,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     _monthlyEbController.dispose();
     _monthlyRentController.dispose();
     _timePerPieceController.dispose();
+    _effectivePriceController.dispose();
     super.dispose();
   }
 
@@ -107,6 +110,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           isAari: _isAari,
         ),
       );
+      _revenueRateDeficiencyPercent = null;
+      _effectivePriceController.clear();
     });
   }
 
@@ -130,7 +135,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     children: [
                       Expanded(child: form),
                       const SizedBox(width: 20),
-                      Expanded(child: result),
+                      Expanded(child: Column(children: [result, if (_calculation != null) ...[
+                        const SizedBox(height: 20),
+                        _buildRevenueRateChecker(),
+                      ]])),
                     ],
                   )
                 : Column(
@@ -138,6 +146,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       form,
                       const SizedBox(height: 20),
                       result,
+                      if (_calculation != null) ...[
+                        const SizedBox(height: 20),
+                        _buildRevenueRateChecker(),
+                      ],
                     ],
                   ),
           );
@@ -331,7 +343,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               suffix: ' /h',
             ),
             _row(
-              'Selling rate (+15%)',
+              'Selling rate (+15% profit)',
               calculation.sellingRatePerHour,
               suffix: ' /h',
             ),
@@ -404,11 +416,101 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             const SizedBox(height: 8),
             Text(
               'Target includes 12-month recovery of the ₹10 lakh business loan, '
-              '8% annual interest, wages, rent, EB and 15% markup. '
+              '8% annual interest, wages, rent, EB, a 15% overhead & consumables buffer '
+              'and 15% profit markup. '
               'It is shown here as a business target and is not added again '
               'to this order.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRevenueRateChecker() {
+    final calculation = _calculation!;
+    final deficiency = _revenueRateDeficiencyPercent;
+    final aboveTarget = deficiency != null && deficiency < 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Revenue rate checker',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Enter the effective price per piece you have decided to charge. '
+              'The price is converted to an hourly revenue rate using the '
+              'calculated machine time and compared with the target revenue rate.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _effectivePriceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Effective price per piece',
+                prefixText: '₹ ',
+                prefixIcon: Icon(Icons.sell_outlined),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () {
+                final price = double.tryParse(_effectivePriceController.text.trim());
+                if (price == null || price < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter a valid effective price per piece.')),
+                  );
+                  return;
+                }
+                final realizedRevenueRate =
+                    price / (calculation.estimatedMachineMinutesPerPiece / 60);
+                setState(() {
+                  _revenueRateDeficiencyPercent =
+                      (calculation.targetRevenuePerHour - realizedRevenueRate) /
+                          calculation.targetRevenuePerHour *
+                          100;
+                });
+              },
+              icon: const Icon(Icons.compare_arrows_rounded),
+              label: const Text('Check revenue rate'),
+            ),
+            if (deficiency != null) ...[
+              const Divider(height: 28),
+              _row(
+                'Your revenue rate',
+                double.parse(_effectivePriceController.text.trim()) /
+                    (calculation.estimatedMachineMinutesPerPiece / 60),
+                suffix: ' /h',
+              ),
+              _row(
+                'Target revenue rate',
+                calculation.targetRevenuePerHour,
+                suffix: ' /h',
+              ),
+              _row(
+                aboveTarget ? 'Above target' : 'Revenue rate deficiency',
+                deficiency.abs(),
+                suffix: '%',
+                emphasized: true,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                aboveTarget
+                    ? 'The chosen price produces a revenue rate ' + deficiency.abs().toStringAsFixed(1) + '% above the target.'
+                    : deficiency == 0
+                        ? 'The chosen price exactly matches the target revenue rate.'
+                        : 'The chosen price produces a revenue rate ' + deficiency.toStringAsFixed(1) + '% below the target.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
           ],
         ),
       ),
