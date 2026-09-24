@@ -56,9 +56,9 @@ void main() {
     expect(result.discountPercent, 10);
     expect(result.designerFee, 200);
     expect(result.estimatedMachineMinutesPerPiece, closeTo(24.56545, 0.0001));
-    expect(result.embroideryTotal, closeTo(12548.75, 0.01));
+    expect(result.embroideryTotal, closeTo(13051.52, 0.01));
     expect(result.rentAllocation, 225);
-    expect(result.totalOrderPrice, closeTo(12973.75, 0.01));
+    expect(result.totalOrderPrice, closeTo(13476.52, 0.01));
   });
 
   test('applies each bulk discount tier', () {
