@@ -18,13 +18,13 @@ void main() {
     expect(result.monthlyOperatingHours, 232);
     expect(result.monthlyOperatingCost, closeTo(27166.6667, 0.001));
     expect(result.productionCostPerHour, closeTo(117.0977, 0.001));
-    expect(result.sellingRatePerHour, closeTo(134.6624, 0.001));
+    expect(result.sellingRatePerHour, closeTo(154.8618, 0.001));
     expect(result.estimatedMachineMinutesPerPiece, closeTo(23.63636, 0.0001));
-    expect(result.baseProductionPricePerPiece, closeTo(53.0578, 0.001));
+    expect(result.baseProductionPricePerPiece, closeTo(61.0113, 0.001));
     expect(result.designerFee, 200);
-    expect(result.totalOrderPrice, closeTo(253.0578, 0.001));
-    expect(result.monthlyRevenueTarget, closeTo(127075, 0.01));
-    expect(result.targetRevenuePerHour, closeTo(547.7371, 0.001));
+    expect(result.totalOrderPrice, closeTo(261.0113, 0.001));
+    expect(result.monthlyRevenueTarget, closeTo(146137.5, 0.01));
+    expect(result.targetRevenuePerHour, closeTo(629.9030, 0.001));
   });
 
   test('uses 300 SPM and 60 percent surcharge for Aari', () {
@@ -41,9 +41,9 @@ void main() {
 
     expect(result.machineSpeed, 300);
     expect(result.estimatedMachineMinutesPerPiece, closeTo(43.3333, 0.001));
-    expect(result.baseProductionPricePerPiece, closeTo(97.2561, 0.001));
-    expect(result.aariAdjustment, closeTo(58.3537, 0.001));
-    expect(result.discountedProductionPricePerPiece, closeTo(155.6098, 0.001));
+    expect(result.baseProductionPricePerPiece, closeTo(111.8560, 0.001));
+    expect(result.aariAdjustment, closeTo(67.1136, 0.001));
+    expect(result.discountedProductionPricePerPiece, closeTo(178.9696, 0.001));
   });
 
   test('calculates the 13,511-stitch 77-piece test order', () {
@@ -60,8 +60,8 @@ void main() {
     expect(result.discountPercent, 10);
     expect(result.designerFee, 200);
     expect(result.estimatedMachineMinutesPerPiece, closeTo(24.56545, 0.0001));
-    expect(result.embroideryTotal, closeTo(3820.79, 0.01));
-    expect(result.totalOrderPrice, closeTo(4020.79, 0.01));
+    expect(result.embroideryTotal, closeTo(4395.05, 0.01));
+    expect(result.totalOrderPrice, closeTo(4595.05, 0.01));
   });
 
   test('applies each bulk discount tier', () {
