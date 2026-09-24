@@ -12,8 +12,6 @@ Customer makeCustomer({
   String? email,
   String? address,
   String? notes,
-  String customerType = 'personal',
-  String serviceRequired = 'embroidery',
 }) {
   final now = DateTime.now();
 
@@ -24,8 +22,6 @@ Customer makeCustomer({
     email: email,
     address: address,
     notes: notes,
-    customerType: customerType,
-    serviceRequired: serviceRequired,
     createdAt: now,
     updatedAt: now,
   );
@@ -55,8 +51,6 @@ void main() {
         email: 'alice@example.com',
         address: 'Kanyakumari',
         notes: 'Regular customer',
-        customerType: 'personal',
-        serviceRequired: 'embroidery',
       );
 
       final id = await repository.insert(customer);
@@ -73,24 +67,18 @@ void main() {
       expect(savedCustomer.email, 'alice@example.com');
       expect(savedCustomer.address, 'Kanyakumari');
       expect(savedCustomer.notes, 'Regular customer');
-      expect(savedCustomer.customerType, 'personal');
-      expect(savedCustomer.serviceRequired, 'embroidery');
     });
 
     test('gets all customers ordered by name', () async {
       await repository.insert(
         makeCustomer(
           name: 'Zebra',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
       await repository.insert(
         makeCustomer(
           name: 'Alice',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
@@ -106,8 +94,6 @@ void main() {
         makeCustomer(
           name: 'Alice',
           phone: '1111111111',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
@@ -118,8 +104,6 @@ void main() {
       final updated = existing!.copyWith(
         name: 'Alice Updated',
         phone: '2222222222',
-        customerType: 'business',
-        serviceRequired: 'stitching',
         notes: 'Updated customer',
       );
 
@@ -132,8 +116,6 @@ void main() {
       expect(result, isNotNull);
       expect(result!.name, 'Alice Updated');
       expect(result.phone, '2222222222');
-      expect(result.customerType, 'business');
-      expect(result.serviceRequired, 'stitching');
       expect(result.notes, 'Updated customer');
     });
 
@@ -141,8 +123,6 @@ void main() {
       final id = await repository.insert(
         makeCustomer(
           name: 'Alice',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
@@ -159,16 +139,12 @@ void main() {
       await repository.insert(
         makeCustomer(
           name: 'Alice Embroidery',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
       await repository.insert(
         makeCustomer(
           name: 'Bob Stitching',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
@@ -183,8 +159,6 @@ void main() {
         makeCustomer(
           name: 'Alice',
           phone: '9876543210',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
@@ -192,8 +166,6 @@ void main() {
         makeCustomer(
           name: 'Bob',
           phone: '9123456789',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
@@ -208,8 +180,6 @@ void main() {
         makeCustomer(
           name: 'Alice',
           whatsapp: '9876543210',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
@@ -217,8 +187,6 @@ void main() {
         makeCustomer(
           name: 'Bob',
           whatsapp: '9123456789',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
@@ -233,8 +201,6 @@ void main() {
         makeCustomer(
           name: 'Alice',
           email: 'alice@example.com',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
@@ -242,8 +208,6 @@ void main() {
         makeCustomer(
           name: 'Bob',
           email: 'bob@example.com',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
@@ -257,16 +221,12 @@ void main() {
       await repository.insert(
         makeCustomer(
           name: 'Alice',
-          customerType: 'personal',
-          serviceRequired: 'embroidery',
         ),
       );
 
       await repository.insert(
         makeCustomer(
           name: 'Bob',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
@@ -301,16 +261,12 @@ void main() {
       final id = await repository.insert(
         makeCustomer(
           name: 'Leo Designs',
-          customerType: 'business',
-          serviceRequired: 'stitching',
         ),
       );
 
       final customer = await repository.getById(id);
 
       expect(customer, isNotNull);
-      expect(customer!.customerType, 'business');
-      expect(customer.serviceRequired, 'stitching');
     });
   });
 }
