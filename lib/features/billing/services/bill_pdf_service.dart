@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -8,8 +8,14 @@ import '../models/bill.dart';
 import '../models/bill_item.dart';
 
 class BillPdfService {
-  static const businessName = 'Leo Stitch and Design';
+  static const businessName = 'Leo Stitch & Design';
   static const businessLocation = 'Kodunkulam, Marthandam';
+
+  static final _espresso = PdfColor.fromInt(0xFF5F584E);
+  static final _darkEspresso = PdfColor.fromInt(0xFF403B35);
+  static final _ivory = PdfColor.fromInt(0xFFFAF7F0);
+  static final _greige = PdfColor.fromInt(0xFFD8D0C4);
+  static final _taupe = PdfColor.fromInt(0xFF9A8F80);
 
   static Future<Uint8List> generate({
     required Bill bill,
@@ -20,6 +26,8 @@ class BillPdfService {
       throw StateError('A bill PDF can only be generated after full payment.');
     }
 
+    final logoBytes = (await rootBundle.load('assets/images/leo_logo.png')).buffer.asUint8List();
+    final logo = pw.MemoryImage(logoBytes);
     final document = pw.Document();
 
     document.addPage(
@@ -27,25 +35,44 @@ class BillPdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(36),
         build: (_) => [
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                businessName,
-                style: pw.TextStyle(
-                  fontSize: 22,
-                  fontWeight: pw.FontWeight.bold,
+          pw.Container(
+            padding: const pw.EdgeInsets.fromLTRB(12, 10, 12, 14),
+            decoration: pw.BoxDecoration(
+              color: _ivory,
+              border: pw.Border(bottom: pw.BorderSide(color: _greige, width: 1)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Image(logo, width: 82, height: 64, fit: pw.BoxFit.contain),
+                pw.SizedBox(width: 12),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      businessName,
+                      style: pw.TextStyle(
+                        color: _darkEspresso,
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 3),
+                    pw.Text(
+                      'Machine Embroidery & Aari',
+                      style: pw.TextStyle(color: _taupe, fontSize: 8.5),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      businessLocation,
+                      style: const pw.TextStyle(fontSize: 8),
+                    ),
+                  ],
                 ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                businessLocation,
-                style: const pw.TextStyle(fontSize: 11),
-              ),
-            ],
+              ],
+            ),
           ),
           pw.SizedBox(height: 12),
-          pw.Divider(),
+          pw.Container(height: 4, color: _espresso),
           pw.SizedBox(height: 16),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -60,8 +87,14 @@ class BillPdfService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text('Bill No: ${bill.billNumber}'),
-                  pw.Text('Date: ${_date(bill.billDate)}'),
+                  pw.Text(
+                    'Bill No: ${bill.billNumber}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    'Date: ${_date(bill.billDate)}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 ],
               ),
             ],
@@ -90,13 +123,25 @@ class BillPdfService {
                   ),
                 ),
                 if (customer.phone?.trim().isNotEmpty == true)
-                  pw.Text('Phone: ${customer.phone}'),
+                  pw.Text(
+                    'Phone: ${customer.phone}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 if (customer.whatsapp?.trim().isNotEmpty == true)
-                  pw.Text('WhatsApp: ${customer.whatsapp}'),
+                  pw.Text(
+                    'WhatsApp: ${customer.whatsapp}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 if (customer.email?.trim().isNotEmpty == true)
-                  pw.Text('Email: ${customer.email}'),
+                  pw.Text(
+                    'Email: ${customer.email}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 if (customer.address?.trim().isNotEmpty == true)
-                  pw.Text('Address: ${customer.address}'),
+                  pw.Text(
+                    'Address: ${customer.address}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
               ],
             ),
           ),
@@ -113,9 +158,11 @@ class BillPdfService {
                   ],
                 )
                 .toList(),
-            border: pw.TableBorder.all(width: .5),
+            border: pw.TableBorder.all(color: _greige, width: .5),
+            headerDecoration: pw.BoxDecoration(color: _espresso),
             cellPadding: const pw.EdgeInsets.all(7),
             headerStyle: pw.TextStyle(
+              color: PdfColors.white,
               fontWeight: pw.FontWeight.bold,
               fontSize: 9,
             ),
@@ -156,7 +203,7 @@ class BillPdfService {
           pw.SizedBox(height: 30),
           pw.Center(
             child: pw.Text(
-              'Thank you for your business.',
+              'Thank you for choosing us to stitch your happiness.',
               style: pw.TextStyle(fontStyle: pw.FontStyle.italic, fontSize: 10),
             ),
           ),

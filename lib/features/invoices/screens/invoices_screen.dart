@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../../orders/repositories/order_repository.dart';
@@ -135,7 +137,22 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Invoices')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppColors.softGreige,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Icon(Icons.description_outlined, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Text('Invoices'),
+          ],
+        ),
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadInvoices,
@@ -205,7 +222,18 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              const Icon(Icons.receipt_long_outlined, size: 36),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.softGreige,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.receipt_long_outlined,
+                  size: 28,
+                  color: AppColors.deepEspresso,
+                ),
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -225,9 +253,23 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                   ],
                 ),
               ),
-              Text(
-                _money(invoice.totalPaise),
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'PAYABLE',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.mutedTaupe,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _money(invoice.totalPaise),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
               ),
               const SizedBox(width: 8),
               const Icon(Icons.chevron_right_rounded),

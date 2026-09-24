@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 import '../../customers/models/customer.dart';
 import '../../customers/repositories/customer_repository.dart';
 import '../models/bill.dart';
@@ -89,9 +91,24 @@ class _BillsScreenState extends State<BillsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Bills',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.softGreige,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: AppColors.deepEspresso),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'Bills',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(
@@ -159,9 +176,16 @@ class _BillsScreenState extends State<BillsScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const DataCell(
+                  DataCell(
                     Chip(
-                      label: Text('Paid'),
+                      label: const Text('PAID'),
+                      labelStyle: const TextStyle(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                      backgroundColor: AppColors.softCream,
+                      side: const BorderSide(color: AppColors.success),
                       visualDensity: VisualDensity.compact,
                     ),
                   ),

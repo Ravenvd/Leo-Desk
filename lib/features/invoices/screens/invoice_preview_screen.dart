@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:printing/printing.dart';
 
 import '../../customers/models/customer.dart';
@@ -97,7 +99,14 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.receipt_long_rounded, size: 32),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.softGreige,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.receipt_long_rounded, color: AppColors.deepEspresso),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -157,7 +166,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                       ),
                     ),
                   ),
-                  const Divider(height: 28),
+                  Divider(height: 28, color: AppColors.warmGreige),
                   Row(
                     children: [
                       const Expanded(
