@@ -103,24 +103,6 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     }
   }
 
-  String _customerTypeLabel(String value) {
-    switch (value) {
-      case 'business':
-        return 'Business';
-      default:
-        return 'Personal';
-    }
-  }
-
-  String _serviceLabel(String value) {
-    switch (value) {
-      case 'stitching':
-        return 'Stitching';
-      default:
-        return 'Embroidery';
-    }
-  }
-
   String _formatDate(DateTime date) {
     final local = date.toLocal();
     final day = local.day.toString().padLeft(2, '0');
@@ -195,26 +177,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     style: Theme.of(context).textTheme.headlineSmall
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(
-                        avatar: const Icon(Icons.badge_outlined, size: 18),
-                        label: Text(_customerTypeLabel(_customer.customerType)),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      Chip(
-                        avatar: const Icon(
-                          Icons.design_services_outlined,
-                          size: 18,
-                        ),
-                        label: Text(_serviceLabel(_customer.serviceRequired)),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  ),
+
                  ],
               ),
             ),
