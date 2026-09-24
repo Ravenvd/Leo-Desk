@@ -74,6 +74,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
       final customer = Customer(
         id: existingCustomer?.id,
+        uuid: existingCustomer?.uuid,
         name: _nameController.text.trim(),
         phone: _nullableValue(_phoneController.text),
         whatsapp: _nullableValue(_whatsappController.text),
@@ -314,21 +315,6 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDropdown({
-    required String label,
-    required String value,
-    required IconData icon,
-    required List<DropdownMenuItem<String>> items,
-    required ValueChanged<String?>? onChanged,
-  }) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      items: items,
-      onChanged: onChanged,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
     );
   }
 
