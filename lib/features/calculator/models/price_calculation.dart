@@ -105,6 +105,7 @@ class PriceCalculator {
   static const double businessLoanPrincipal = 1000000;
   static const double businessLoanInterestRate = 0.08;
   static const double loanRecoveryMonths = 12;
+  static const double overheadBuffer = 0.15;
   static const double profitMarkup = 0.15;
 
   static const double normalEffectiveSpm = 550;
@@ -172,7 +173,10 @@ class PriceCalculator {
         monthlyInterest;
     final productionCostPerHour =
         monthlyOperatingCost / monthlyOperatingHours;
-    final sellingRatePerHour = productionCostPerHour * (1 + profitMarkup);
+    final costWithOverheadPerHour =
+        productionCostPerHour * (1 + overheadBuffer);
+    final sellingRatePerHour =
+        costWithOverheadPerHour * (1 + profitMarkup);
 
     final machineSpeed =
         input.isAari ? aariEffectiveSpm : normalEffectiveSpm;
@@ -206,7 +210,8 @@ class PriceCalculator {
     final overnightRequired = requiredHoursPerDay > 12;
 
     // Business target: recover the full loan principal plus annual interest,
-    // wages, rent and EB within 12 months, then apply the 15% markup.
+    // wages, rent and EB within 12 months, then apply the 15% overhead buffer
+    // and 15% profit markup.
     final annualLoanInterest =
         businessLoanPrincipal * businessLoanInterestRate;
     final annualOperatingCosts = ownerAndLabourWagesPerMonth * 12 +
@@ -216,7 +221,9 @@ class PriceCalculator {
     final annualRecoveryRequirement =
         businessLoanPrincipal + annualOperatingCosts;
     final monthlyRevenueTarget =
-        annualRecoveryRequirement / loanRecoveryMonths * (1 + profitMarkup);
+        annualRecoveryRequirement / loanRecoveryMonths *
+        (1 + overheadBuffer) *
+        (1 + profitMarkup);
     final targetRevenuePerHour =
         monthlyRevenueTarget / monthlyOperatingHours;
 
