@@ -335,8 +335,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.receipt_long_rounded),
                   title: Text(
-                    'This month: EB ₹\${_monthlyEbBill.toStringAsFixed(0)} • '
-                    'Rent ₹\${_monthlyRent.toStringAsFixed(0)}',
+                    'This month: EB ₹${_monthlyEbBill.toStringAsFixed(0)} • '
+                    'Rent ₹${_monthlyRent.toStringAsFixed(0)}',
                   ),
                   subtitle: const Text(
                     'Saved for the current month',
@@ -468,8 +468,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           Expanded(child: Text(label, style: style)),
           Text(
             suffix.isEmpty
-                ? '₹\${value.toStringAsFixed(0)}'
-                : '\${value.toStringAsFixed(1)}$suffix',
+                ? '₹${value.toStringAsFixed(0)}'
+                : '${value.toStringAsFixed(1)}$suffix',
             style: style,
           ),
         ],
