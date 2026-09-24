@@ -133,23 +133,30 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: form),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            form,
+                            if (_calculation != null) ...[
+                              const SizedBox(height: 20),
+                              _buildRevenueRateChecker(),
+                            ],
+                          ],
+                        ),
+                      ),
                       const SizedBox(width: 20),
-                      Expanded(child: Column(children: [result, if (_calculation != null) ...[
-                        const SizedBox(height: 20),
-                        _buildRevenueRateChecker(),
-                      ]])),
+                      Expanded(child: result),
                     ],
                   )
                 : Column(
                     children: [
                       form,
-                      const SizedBox(height: 20),
-                      result,
                       if (_calculation != null) ...[
                         const SizedBox(height: 20),
                         _buildRevenueRateChecker(),
                       ],
+                      const SizedBox(height: 20),
+                      result,
                     ],
                   ),
           );
@@ -298,9 +305,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         calculation.totalOrderPrice / calculation.pieces;
 
     final discountLabel =
-        'Bulk discount (' +
-        calculation.discountPercent.toStringAsFixed(0) +
-        '%)';
+        'Bulk discount (${calculation.discountPercent.toStringAsFixed(0)}%)';
 
     return Card(
       child: Padding(
@@ -384,8 +389,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Effective price per piece: ₹' +
-                  effectivePerPiece.toStringAsFixed(2),
+              'Effective price per piece: ₹${effectivePerPiece.toStringAsFixed(2)}',
             ),
             const Divider(height: 32),
             Text(
@@ -431,7 +435,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Widget _buildRevenueRateChecker() {
     final calculation = _calculation!;
     final deficiency = _revenueRateDeficiencyPercent;
-    final aboveTarget = deficiency != null && deficiency < 0;
 
     return Card(
       child: Padding(
@@ -443,17 +446,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               'Revenue rate checker',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Enter the effective price per piece you have decided to charge. '
-              'The price is converted to an hourly revenue rate using the '
-              'calculated machine time and compared with the target revenue rate.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
             const SizedBox(height: 16),
             TextField(
               controller: _effectivePriceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Effective price per piece',
                 prefixText: '₹ ',
@@ -463,10 +460,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () {
-                final price = double.tryParse(_effectivePriceController.text.trim());
+                final price =
+                    double.tryParse(_effectivePriceController.text.trim());
                 if (price == null || price < 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enter a valid effective price per piece.')),
+                    const SnackBar(
+                      content: Text(
+                        'Enter a valid effective price per piece.',
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -491,24 +493,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 suffix: ' /h',
               ),
               _row(
-                'Target revenue rate',
-                calculation.targetRevenuePerHour,
-                suffix: ' /h',
-              ),
-              _row(
-                aboveTarget ? 'Above target' : 'Revenue rate deficiency',
+                'Revenue rate deficiency',
                 deficiency.abs(),
                 suffix: '%',
                 emphasized: true,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                aboveTarget
-                    ? 'The chosen price produces a revenue rate ' + deficiency.abs().toStringAsFixed(1) + '% above the target.'
-                    : deficiency == 0
-                        ? 'The chosen price exactly matches the target revenue rate.'
-                        : 'The chosen price produces a revenue rate ' + deficiency.toStringAsFixed(1) + '% below the target.',
-                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
           ],
@@ -531,8 +519,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             : Theme.of(context).textTheme.bodyMedium;
 
     final formatted = suffix.isEmpty
-        ? '₹' + value.toStringAsFixed(0)
-        : value.toStringAsFixed(1) + suffix;
+        ? '₹${value.toStringAsFixed(0)}'
+        : '${value.toStringAsFixed(1)}$suffix';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
