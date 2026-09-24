@@ -10,6 +10,7 @@ import 'core/sync/sync_config.dart';
 import 'core/sync/sync_events.dart';
 import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
+import 'core/theme/app_theme.dart';
 import 'features/billing/repositories/bill_repository.dart';
 import 'features/billing/screens/bills_screen.dart';
 import 'features/customers/repositories/customer_repository.dart';
@@ -97,15 +98,7 @@ class LeoDeskApp extends StatelessWidget {
     return MaterialApp(
       title: 'Leo Desk',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFFF7F8FC),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-        ),
-      ),
+      theme: AppTheme.light,
       home: LeoDeskShell(syncServer: syncServer),
     );
   }
