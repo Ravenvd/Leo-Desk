@@ -19,7 +19,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
 
   bool _isAari = false;
-  double _monthlyEbBill = 0;
+  double _monthlyEbBill = 1000;
   double _monthlyRent = 4500;
   DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
   PriceCalculation? _calculation;
@@ -33,7 +33,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   Future<void> _loadMonthlyCosts() async {
     final prefs = await SharedPreferences.getInstance();
-    final eb = prefs.getDouble('calculator_monthly_eb_bill') ?? 0;
+    final eb = prefs.getDouble('calculator_monthly_eb_bill') ?? 1000;
     final rent = prefs.getDouble('calculator_monthly_rent') ?? 4500;
     if (!mounted) return;
     setState(() {
@@ -325,11 +325,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 ),
               ),
             const Divider(height: 28),
-            _row('Machine rate', calculation.machineRatePerHour, suffix: ' /h'),
-            _row('Machine speed', calculation.machineSpeed, suffix: ' SPM'),
-            _row('Base production price', calculation.baseProductionPricePerPiece),
+            _row(
+              'Production cost',
+              calculation.productionCostPerHour,
+              suffix: ' /h',
+            ),
+            _row(
+              'Selling rate (+15%)',
+              calculation.sellingRatePerHour,
+              suffix: ' /h',
+            ),
+            _row(
+              'Base production price',
+              calculation.baseProductionPricePerPiece,
+            ),
             if (calculation.aariAdjustment > 0)
-              _row('Aari adjustment (+60%)', calculation.aariAdjustment),
+              _row(
+                'Aari adjustment (+60%)',
+                calculation.aariAdjustment,
+              ),
             _row(
               discountLabel,
               -calculation.discountPerPiece,
@@ -338,12 +352,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               'Production price after discount',
               calculation.discountedProductionPricePerPiece,
             ),
-            _row('EB allocation (5%)', calculation.ebAllocation),
-            _row('Rent allocation (5%)', calculation.rentAllocation),
-            _row('Final price per piece', calculation.finalPricePerPiece, emphasized: true),
+            _row(
+              'Final price per piece',
+              calculation.finalPricePerPiece,
+              emphasized: true,
+            ),
             _row('Embroidery total', calculation.embroideryTotal),
             const Divider(height: 28),
-            _row('Designer fee (one time)', calculation.designerFee),
+            _row(
+              'Designer fee (one time)',
+              calculation.designerFee,
+            ),
             const Divider(height: 28),
             _row(
               'TOTAL ORDER PRICE',
@@ -355,6 +374,40 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             Text(
               'Effective price per piece: ₹' +
                   effectivePerPiece.toStringAsFixed(2),
+            ),
+            const Divider(height: 32),
+            Text(
+              'Business target',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            _row(
+              'Operating capacity',
+              calculation.monthlyOperatingHours,
+              suffix: ' h/month',
+            ),
+            _row(
+              'Monthly operating cost',
+              calculation.monthlyOperatingCost,
+            ),
+            _row(
+              'Monthly revenue target',
+              calculation.monthlyRevenueTarget,
+              emphasized: true,
+            ),
+            _row(
+              'Target revenue rate',
+              calculation.targetRevenuePerHour,
+              suffix: ' /h',
+              emphasized: true,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Target includes 12-month recovery of the ₹10 lakh business loan, '
+              '8% annual interest, wages, rent, EB and 15% markup. '
+              'It is shown here as a business target and is not added again '
+              'to this order.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
