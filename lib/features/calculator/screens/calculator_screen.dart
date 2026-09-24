@@ -34,11 +34,33 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   @override
   void initState() {
     super.initState();
+    _stitchesController.addListener(_updateTimePerPiece);
     _loadMonthlySettings();
+  }
+
+  void _updateTimePerPiece() {
+    final stitches = int.tryParse(_stitchesController.text.trim());
+    if (stitches == null || stitches <= 0) {
+      if (_timePerPieceController.text.isNotEmpty) {
+        _timePerPieceController.clear();
+      }
+      return;
+    }
+
+    final minutesPerPiece = stitches / _machineSpeed;
+    final value = minutesPerPiece.toStringAsFixed(1);
+
+    if (_timePerPieceController.text != value) {
+      _timePerPieceController.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _stitchesController.removeListener(_updateTimePerPiece);
     _stitchesController.dispose();
     _piecesController.dispose();
     _timePerPieceController.dispose();
@@ -270,10 +292,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _timePerPieceController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Time per piece (minutes)',
+                helperText: 'Calculated automatically at 800 stitches/min',
                 prefixIcon: Icon(Icons.timer_outlined),
               ),
             ),
