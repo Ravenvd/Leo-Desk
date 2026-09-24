@@ -124,7 +124,7 @@ void main() {
     );
     final high = PriceCalculator.calculate(
       const PriceCalculationInput(
-        stitches: 1000,
+        stitches: 2000,
         pieces: 1,
         timePerPieceMinutes: 1,
         monthlyEbBill: 0,
