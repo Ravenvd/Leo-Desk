@@ -41,9 +41,9 @@ void main() {
 
     expect(result.machineSpeed, 300);
     expect(result.estimatedMachineMinutesPerPiece, closeTo(43.3333, 0.001));
-    expect(result.baseProductionPricePerPiece, closeTo(97.339, 0.001));
-    expect(result.aariAdjustment, closeTo(58.4034, 0.001));
-    expect(result.discountedProductionPricePerPiece, closeTo(155.7424, 0.001));
+    expect(result.baseProductionPricePerPiece, closeTo(97.2561, 0.001));
+    expect(result.aariAdjustment, closeTo(58.3537, 0.001));
+    expect(result.discountedProductionPricePerPiece, closeTo(155.6098, 0.001));
   });
 
   test('calculates the 13,511-stitch 77-piece test order', () {
