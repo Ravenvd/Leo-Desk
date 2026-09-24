@@ -51,8 +51,6 @@ void main() {
         name: 'Test Customer 1',
         createdAt: now,
         updatedAt: now,
-        customerType: 'personal',
-        serviceRequired: 'embroidery',
       ),
     );
     await customerRepository.insert(
@@ -60,8 +58,6 @@ void main() {
         name: 'Test Customer 2',
         createdAt: now,
         updatedAt: now,
-        customerType: 'business',
-        serviceRequired: 'stitching',
       ),
     );
   });
