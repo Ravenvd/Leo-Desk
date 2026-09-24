@@ -12,6 +12,8 @@ class BillPdfService {
   static const businessLocation = 'Kodunkulam, Marthandam';
 
   static final _espresso = PdfColor.fromInt(0xFF5F584E);
+  static final _darkEspresso = PdfColor.fromInt(0xFF403B35);
+  static final _ivory = PdfColor.fromInt(0xFFFAF7F0);
   static final _greige = PdfColor.fromInt(0xFFD8D0C4);
   static final _taupe = PdfColor.fromInt(0xFF9A8F80);
 
@@ -34,8 +36,9 @@ class BillPdfService {
         margin: const pw.EdgeInsets.all(36),
         build: (_) => [
           pw.Container(
-            padding: const pw.EdgeInsets.only(bottom: 14),
+            padding: const pw.EdgeInsets.fromLTRB(12, 10, 12, 14),
             decoration: pw.BoxDecoration(
+              color: _ivory,
               border: pw.Border(bottom: pw.BorderSide(color: _greige, width: 1)),
             ),
             child: pw.Row(
@@ -45,27 +48,28 @@ class BillPdfService {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                  pw.Text(
-                businessName,
-                style: pw.TextStyle(
-                  fontSize: 22,
-                  fontWeight: pw.FontWeight.bold,
+                    pw.Text(
+                      businessName,
+                      style: pw.TextStyle(
+                        color: _darkEspresso,
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 3),
+                    pw.Text(
+                      'Machine Embroidery & Aari',
+                      style: pw.TextStyle(color: _taupe, fontSize: 8.5),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      businessLocation,
+                      style: const pw.TextStyle(fontSize: 8),
+                    ),
+                  ],
                 ),
-                  ),
-                  pw.SizedBox(height: 3),
-                  pw.Text(
-                    'Machine Embroidery & Aari',
-                    style: pw.TextStyle(color: _taupe, fontSize: 8.5),
-                  ),
-                  pw.SizedBox(height: 2),
-                  pw.Text(
-                    businessLocation,
-                    style: const pw.TextStyle(fontSize: 8),
-                  ),
-                ],
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
           pw.SizedBox(height: 12),
           pw.Container(height: 4, color: _espresso),
@@ -83,8 +87,14 @@ class BillPdfService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text('Bill No: ${bill.billNumber}'),
-                  pw.Text('Date: ${_date(bill.billDate)}'),
+                  pw.Text(
+                    'Bill No: ${bill.billNumber}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    'Date: ${_date(bill.billDate)}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 ],
               ),
             ],
@@ -113,13 +123,25 @@ class BillPdfService {
                   ),
                 ),
                 if (customer.phone?.trim().isNotEmpty == true)
-                  pw.Text('Phone: ${customer.phone}'),
+                  pw.Text(
+                    'Phone: ${customer.phone}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 if (customer.whatsapp?.trim().isNotEmpty == true)
-                  pw.Text('WhatsApp: ${customer.whatsapp}'),
+                  pw.Text(
+                    'WhatsApp: ${customer.whatsapp}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 if (customer.email?.trim().isNotEmpty == true)
-                  pw.Text('Email: ${customer.email}'),
+                  pw.Text(
+                    'Email: ${customer.email}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 if (customer.address?.trim().isNotEmpty == true)
-                  pw.Text('Address: ${customer.address}'),
+                  pw.Text(
+                    'Address: ${customer.address}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
               ],
             ),
           ),
@@ -181,7 +203,7 @@ class BillPdfService {
           pw.SizedBox(height: 30),
           pw.Center(
             child: pw.Text(
-              'Thank you for your business.',
+              'Thank you for choosing us to stitch your happiness.',
               style: pw.TextStyle(fontStyle: pw.FontStyle.italic, fontSize: 10),
             ),
           ),
