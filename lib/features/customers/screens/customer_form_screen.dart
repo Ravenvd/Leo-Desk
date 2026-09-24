@@ -29,9 +29,6 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _notesController;
 
-  late String _customerType;
-  late String _serviceRequired;
-
   bool _isSaving = false;
 
   @override
@@ -47,8 +44,6 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     _addressController = TextEditingController(text: customer?.address ?? '');
     _notesController = TextEditingController(text: customer?.notes ?? '');
 
-    _customerType = customer?.customerType ?? 'personal';
-    _serviceRequired = customer?.serviceRequired ?? 'embroidery';
   }
 
   @override
@@ -85,8 +80,6 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         email: _nullableValue(_emailController.text),
         address: _nullableValue(_addressController.text),
         notes: _nullableValue(_notesController.text),
-        customerType: _customerType,
-        serviceRequired: _serviceRequired,
         createdAt: existingCustomer?.createdAt ?? now,
         updatedAt: now,
       );
@@ -236,44 +229,6 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               hintText: 'Enter customer name',
               prefixIcon: Icon(Icons.person_outline_rounded),
             ),
-          ),
-          const SizedBox(height: 16),
-          _buildDropdown(
-            label: 'Customer type',
-            value: _customerType,
-            icon: Icons.badge_outlined,
-            items: const [
-              DropdownMenuItem(value: 'personal', child: Text('Personal')),
-              DropdownMenuItem(value: 'business', child: Text('Business')),
-            ],
-            onChanged: _isSaving
-                ? null
-                : (value) {
-                    if (value == null) return;
-
-                    setState(() {
-                      _customerType = value;
-                    });
-                  },
-          ),
-          const SizedBox(height: 16),
-          _buildDropdown(
-            label: 'Service required',
-            value: _serviceRequired,
-            icon: Icons.design_services_outlined,
-            items: const [
-              DropdownMenuItem(value: 'embroidery', child: Text('Embroidery')),
-              DropdownMenuItem(value: 'stitching', child: Text('Stitching')),
-            ],
-            onChanged: _isSaving
-                ? null
-                : (value) {
-                    if (value == null) return;
-
-                    setState(() {
-                      _serviceRequired = value;
-                    });
-                  },
           ),
         ],
       ),
