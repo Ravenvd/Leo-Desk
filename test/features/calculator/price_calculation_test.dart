@@ -3,28 +3,62 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:leo_desk/features/calculator/models/price_calculation.dart';
 
 void main() {
+  test('uses the standard normal embroidery pricing model', () {
+    final result = PriceCalculator.calculate(
+      const PriceCalculationInput(
+        stitches: 13000,
+        pieces: 1,
+        monthlyEbBill: 0,
+        monthlyRent: 4500,
+        deliveryWindow: DeliveryWindow.under24Hours,
+      ),
+    );
+
+    expect(result.machineSpeed, 550);
+    expect(result.machineRatePerHour, 460);
+    expect(result.estimatedMachineMinutesPerPiece, closeTo(23.63636, 0.0001));
+    expect(result.baseProductionPricePerPiece, closeTo(181.2121, 0.001));
+    expect(result.rentAllocation, 225);
+    expect(result.designerFee, 200);
+    expect(result.totalOrderPrice, closeTo(606.2121, 0.001));
+  });
+
+  test('uses 300 SPM and 60 percent surcharge for Aari', () {
+    final result = PriceCalculator.calculate(
+      const PriceCalculationInput(
+        stitches: 13000,
+        pieces: 1,
+        monthlyEbBill: 0,
+        monthlyRent: 0,
+        deliveryWindow: DeliveryWindow.under24Hours,
+        isAari: true,
+      ),
+    );
+
+    expect(result.machineSpeed, 300);
+    expect(result.estimatedMachineMinutesPerPiece, closeTo(43.3333, 0.001));
+    expect(result.baseProductionPricePerPiece, closeTo(332.2222, 0.001));
+    expect(result.aariAdjustment, closeTo(199.3333, 0.001));
+    expect(result.discountedProductionPricePerPiece, closeTo(531.5556, 0.001));
+  });
+
   test('calculates bulk discount and one-time designer fee', () {
     final result = PriceCalculator.calculate(
       const PriceCalculationInput(
         stitches: 13511,
         pieces: 77,
-        basePricePerPiece: 100,
         monthlyEbBill: 0,
-        monthlyRent: 0,
+        monthlyRent: 4500,
         deliveryWindow: DeliveryWindow.under24Hours,
       ),
     );
 
     expect(result.discountPercent, 10);
-    expect(result.discountPerPiece, 10);
-    expect(result.discountedPricePerPiece, 90);
-    expect(result.embroideryTotal, 6930);
     expect(result.designerFee, 200);
-    expect(result.totalOrderPrice, 7130);
-    expect(result.estimatedMachineMinutesPerPiece, closeTo(16.88875, 0.0001));
-    expect(result.totalMachineMinutes, closeTo(1300.43375, 0.001));
-    expect(result.requiredHoursPerDay, closeTo(21.6739, 0.001));
-    expect(result.overnightRequired, isTrue);
+    expect(result.estimatedMachineMinutesPerPiece, closeTo(24.56545, 0.0001));
+    expect(result.embroideryTotal, closeTo(12548.75, 0.01));
+    expect(result.rentAllocation, 225);
+    expect(result.totalOrderPrice, closeTo(12973.75, 0.01));
   });
 
   test('applies each bulk discount tier', () {
@@ -48,7 +82,6 @@ void main() {
         PriceCalculationInput(
           stitches: 5000,
           pieces: entry.key,
-          basePricePerPiece: 100,
           monthlyEbBill: 0,
           monthlyRent: 0,
           deliveryWindow: DeliveryWindow.under24Hours,
@@ -75,7 +108,6 @@ void main() {
         PriceCalculationInput(
           stitches: entry.key,
           pieces: 1,
-          basePricePerPiece: 100,
           monthlyEbBill: 0,
           monthlyRent: 0,
           deliveryWindow: DeliveryWindow.under24Hours,
@@ -83,27 +115,5 @@ void main() {
       );
       expect(result.designerFee, entry.value);
     }
-  });
-
-  test('Aari adds 60 percent before bulk discount', () {
-    final result = PriceCalculator.calculate(
-      const PriceCalculationInput(
-        stitches: 10000,
-        pieces: 10,
-        basePricePerPiece: 100,
-        monthlyEbBill: 0,
-        monthlyRent: 0,
-        deliveryWindow: DeliveryWindow.under24Hours,
-        isAari: true,
-      ),
-    );
-
-    expect(result.aariAdjustment, 60);
-    expect(result.discountPercent, 5);
-    expect(result.discountPerPiece, 8);
-    expect(result.discountedPricePerPiece, 152);
-    expect(result.embroideryTotal, 1520);
-    expect(result.designerFee, 200);
-    expect(result.totalOrderPrice, 1720);
   });
 }
