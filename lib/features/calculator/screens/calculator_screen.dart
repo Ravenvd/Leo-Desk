@@ -47,7 +47,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   String _currentMonthKey() {
     final now = DateTime.now();
-    return '\${now.year}-\${now.month.toString().padLeft(2, '0')}';
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
   }
 
   Future<void> _loadMonthlySettings() async {
