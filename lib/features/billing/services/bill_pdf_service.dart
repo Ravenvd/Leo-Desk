@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 
 import 'package:pdf/pdf.dart';
@@ -14,9 +12,6 @@ class BillPdfService {
   static const businessLocation = 'Kodunkulam, Marthandam';
 
   static final _espresso = PdfColor.fromInt(0xFF5F584E);
-  static final _darkEspresso = PdfColor.fromInt(0xFF403B35);
-  static final _ivory = PdfColor.fromInt(0xFFFAF7F0);
-  static final _cream = PdfColor.fromInt(0xFFF3EEE5);
   static final _greige = PdfColor.fromInt(0xFFD8D0C4);
   static final _taupe = PdfColor.fromInt(0xFF9A8F80);
 
@@ -70,6 +65,7 @@ class BillPdfService {
                 ],
               ),
             ],
+          ),
           ),
           pw.SizedBox(height: 12),
           pw.Container(height: 4, color: _espresso),
