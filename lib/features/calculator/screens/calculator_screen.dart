@@ -13,10 +13,8 @@ class CalculatorScreen extends StatefulWidget {
 class _CalculatorScreenState extends State<CalculatorScreen> {
   final _stitchesController = TextEditingController();
   final _piecesController = TextEditingController();
-  final _basePriceController = TextEditingController();
   final _timePerPieceController = TextEditingController();
 
-  static const _machineSpeed = 800.0;
 
   bool _isAari = false;
   DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
@@ -37,7 +35,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       return;
     }
 
-    final minutesPerPiece = stitches / _machineSpeed;
+    final speed = _isAari ? PriceCalculator.aariEffectiveSpm : PriceCalculator.normalEffectiveSpm;
+    final minutesPerPiece = stitches / speed;
     final value = minutesPerPiece.toStringAsFixed(1);
 
     if (_timePerPieceController.text != value) {
@@ -53,7 +52,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     _stitchesController.removeListener(_updateTimePerPiece);
     _stitchesController.dispose();
     _piecesController.dispose();
-    _basePriceController.dispose();
     _timePerPieceController.dispose();
     super.dispose();
   }
@@ -61,18 +59,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void _calculate() {
     final stitches = int.tryParse(_stitchesController.text.trim());
     final pieces = int.tryParse(_piecesController.text.trim());
-    final basePrice = double.tryParse(_basePriceController.text.trim());
-
-    if (stitches == null ||
-        stitches <= 0 ||
-        pieces == null ||
-        pieces <= 0 ||
-        basePrice == null ||
-        basePrice < 0) {
+    if (stitches == null || stitches <= 0 || pieces == null || pieces <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter valid stitches, pieces, and base price per piece.',
+            'Enter valid stitches and number of pieces.',
           ),
         ),
       );
@@ -84,12 +75,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         PriceCalculationInput(
           stitches: stitches,
           pieces: pieces,
-          basePricePerPiece: basePrice,
           monthlyEbBill: 0,
-          monthlyRent: 0,
+          monthlyRent: 4500,
           deliveryWindow: _deliveryWindow,
           isAari: _isAari,
-          machineSpeed: _machineSpeed,
         ),
       );
     });
@@ -162,23 +151,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _basePriceController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Base price per piece',
-                helperText: 'Normal price before bulk discount',
-                prefixText: '₹ ',
-                prefixIcon: Icon(Icons.currency_rupee_rounded),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
               controller: _timePerPieceController,
               readOnly: true,
               decoration: const InputDecoration(
                 labelText: 'Machine time per piece (minutes)',
-                helperText: 'Calculated automatically at 800 stitches/min',
+                helperText: 'Calculated at 550 SPM normal / 300 SPM Aari',
                 prefixIcon: Icon(Icons.timer_outlined),
               ),
             ),
@@ -207,7 +184,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Aari work'),
-              subtitle: const Text('+60% to the base embroidery price'),
+              subtitle: const Text('300 SPM + 60% Aari surcharge'),
               value: _isAari,
               onChanged: (value) => setState(() => _isAari = value),
             ),
@@ -291,7 +268,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 ),
               ),
             const Divider(height: 28),
-            _row('Base price per piece', calculation.basePricePerPiece),
+            _row('Machine rate', calculation.machineRatePerHour, suffix: ' /h'),
+            _row('Machine speed', calculation.machineSpeed, suffix: ' SPM'),
+            _row('Base production price', calculation.baseProductionPricePerPiece),
             if (calculation.aariAdjustment > 0)
               _row('Aari adjustment (+60%)', calculation.aariAdjustment),
             _row(
@@ -299,10 +278,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               -calculation.discountPerPiece,
             ),
             _row(
-              'Final price per piece',
-              calculation.discountedPricePerPiece,
-              emphasized: true,
+              'Production price after discount',
+              calculation.discountedProductionPricePerPiece,
             ),
+            _row('EB allocation (5%)', calculation.ebAllocation),
+            _row('Rent allocation (5%)', calculation.rentAllocation),
+            _row('Final price per piece', calculation.finalPricePerPiece, emphasized: true),
             _row('Embroidery total', calculation.embroideryTotal),
             const Divider(height: 28),
             _row('Designer fee (one time)', calculation.designerFee),
