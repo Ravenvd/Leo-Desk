@@ -120,7 +120,6 @@ void main() {
         monthlyEbBill: 0,
         monthlyRent: 0,
         deliveryWindow: DeliveryWindow.under24Hours,
-        ratePerThousandStitches: 21,
       ),
     );
     final high = PriceCalculator.calculate(
@@ -131,11 +130,10 @@ void main() {
         monthlyEbBill: 0,
         monthlyRent: 0,
         deliveryWindow: DeliveryWindow.under24Hours,
-        ratePerThousandStitches: 29,
       ),
     );
 
-    expect(low.finalCost, 20);
-    expect(high.finalCost, 30);
+    expect(low.finalCost, 50);
+    expect(high.finalCost, 100);
   });
 }
