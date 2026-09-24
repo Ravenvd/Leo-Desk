@@ -38,7 +38,6 @@ class PriceCalculationInput {
     required this.deliveryWindow,
     this.isAari = false,
     this.machineSpeed = 800,
-    this.ratePerThousandStitches = 40,
     this.timeSurchargePercent = 20,
     this.aariSurchargePercent = 60,
     this.ebAllocationPercent = 5,
@@ -55,7 +54,6 @@ class PriceCalculationInput {
   final DeliveryWindow deliveryWindow;
   final bool isAari;
   final double machineSpeed;
-  final double ratePerThousandStitches;
   final double timeSurchargePercent;
   final double aariSurchargePercent;
   final double ebAllocationPercent;
@@ -123,8 +121,8 @@ class PriceCalculator {
       );
     }
 
-    final stitchCharge =
-        input.stitches / 1000 * input.ratePerThousandStitches;
+    const ratePerThousandStitches = 40.0;
+    final stitchCharge = input.stitches / 1000 * ratePerThousandStitches;
     final estimatedMachineMinutes = input.stitches / input.machineSpeed;
 
     final totalWorkMinutes = input.pieces * input.timePerPieceMinutes;
