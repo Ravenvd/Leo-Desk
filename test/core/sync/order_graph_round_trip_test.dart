@@ -38,8 +38,6 @@ void main() {
       phone: '9876543210',
       createdAt: now,
       updatedAt: now,
-      customerType: 'Individual',
-      serviceRequired: 'Embroidery',
     );
   }
 
