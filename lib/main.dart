@@ -12,6 +12,7 @@ import 'core/sync/sync_manager.dart';
 import 'core/sync/sync_server.dart';
 import 'core/theme/app_theme.dart';
 import 'features/billing/repositories/bill_repository.dart';
+import 'features/calculator/screens/calculator_screen.dart';
 import 'features/billing/screens/bills_screen.dart';
 import 'features/customers/repositories/customer_repository.dart';
 import 'features/customers/screens/customers_screen.dart';
@@ -128,6 +129,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
         InvoicesScreen(),
         BillsScreen(),
         ExpensesScreen(repository: ExpenseRepository()),
+        const CalculatorScreen(),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
 
@@ -237,10 +239,16 @@ class _DesktopNavigation extends StatelessWidget {
           ),
           const Divider(),
           _NavigationItem(
-            icon: Icons.settings_rounded,
-            label: 'Settings',
+            icon: Icons.calculate_rounded,
+            label: 'Calculator',
             selected: selectedIndex == 6,
             onTap: () => onSelected(6),
+          ),
+          _NavigationItem(
+            icon: Icons.settings_rounded,
+            label: 'Settings',
+            selected: selectedIndex == 7,
+            onTap: () => onSelected(7),
           ),
         ],
       ),
@@ -296,6 +304,11 @@ class _MobileNavigation extends StatelessWidget {
           icon: Icon(Icons.money_off_outlined),
           selectedIcon: Icon(Icons.money_off_rounded),
           label: Text('Expenses'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.calculate_outlined),
+          selectedIcon: Icon(Icons.calculate_rounded),
+          label: Text('Calculator'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.settings_outlined),
