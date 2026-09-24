@@ -419,6 +419,14 @@ class DatabaseSchema {
     });
   }
 
+
+  static Future<void> upgradeToVersion12(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('ALTER TABLE customers DROP COLUMN customer_type');
+      await txn.execute('ALTER TABLE customers DROP COLUMN service_required');
+    });
+  }
+
   static Future<void> upgradeToVersion10(Database db) async {
     await db.transaction((txn) async {
       await txn.execute('''
