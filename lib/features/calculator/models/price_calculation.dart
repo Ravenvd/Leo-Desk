@@ -52,6 +52,9 @@ class PriceCalculationInput {
 
 class PriceCalculation {
   const PriceCalculation({
+    required this.pieces,
+    required this.basePricePerPiece,
+    required this.aariAdjustment,
     required this.designerFee,
     required this.discountPercent,
     required this.discountPerPiece,
@@ -64,6 +67,9 @@ class PriceCalculation {
     required this.overnightRequired,
   });
 
+  final int pieces;
+  final double basePricePerPiece;
+  final double aariAdjustment;
   final double designerFee;
   final double discountPercent;
   final double discountPerPiece;
@@ -126,11 +132,16 @@ class PriceCalculator {
       );
     }
 
+    final aariAdjustment = input.isAari
+        ? input.basePricePerPiece * 60 / 100
+        : 0.0;
+    final adjustedBasePricePerPiece =
+        input.basePricePerPiece + aariAdjustment;
     final discountPercent = _bulkDiscountPercent(input.pieces);
     final discountPerPiece =
-        input.basePricePerPiece * discountPercent / 100;
+        adjustedBasePricePerPiece * discountPercent / 100;
     final discountedPricePerPiece =
-        input.basePricePerPiece - discountPerPiece;
+        adjustedBasePricePerPiece - discountPerPiece;
     final embroideryTotal =
         discountedPricePerPiece * input.pieces;
 
@@ -146,6 +157,9 @@ class PriceCalculator {
     final overnightRequired = requiredHoursPerDay > 12;
 
     return PriceCalculation(
+      pieces: input.pieces,
+      basePricePerPiece: input.basePricePerPiece,
+      aariAdjustment: aariAdjustment,
       designerFee: designerFee,
       discountPercent: discountPercent,
       discountPerPiece: discountPerPiece,
