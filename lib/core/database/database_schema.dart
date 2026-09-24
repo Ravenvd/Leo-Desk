@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 11;
+  static const int version = 12;
 
   static const List<String> createStatements = [
     '''
@@ -17,9 +17,7 @@ class DatabaseSchema {
       address TEXT,
       notes TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      customer_type TEXT NOT NULL,
-      service_required TEXT NOT NULL
+      updated_at TEXT NOT NULL
     )
     ''',
     '''
