@@ -12,8 +12,6 @@ class Customer {
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String customerType;
-  final String serviceRequired;
 
   Customer({
     this.id,
@@ -27,8 +25,6 @@ class Customer {
     this.notes,
     required this.createdAt,
     required this.updatedAt,
-    required this.customerType,
-    required this.serviceRequired,
   }) : uuid = uuid ?? Uuid().v4();
 
   Customer copyWith({
@@ -43,8 +39,6 @@ class Customer {
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
-    String? customerType,
-    String? serviceRequired,
   }) {
     return Customer(
       id: id ?? this.id,
@@ -58,8 +52,6 @@ class Customer {
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      customerType: customerType ?? this.customerType,
-      serviceRequired: serviceRequired ?? this.serviceRequired,
     );
   }
 
@@ -76,8 +68,6 @@ class Customer {
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
-      'customer_type': customerType,
-      'service_required': serviceRequired,
     };
   }
 
@@ -94,8 +84,6 @@ class Customer {
       notes: map['notes'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
-      customerType: map['customer_type'] as String,
-      serviceRequired: map['service_required'] as String,
     );
   }
 }
