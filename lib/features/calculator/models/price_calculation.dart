@@ -1,12 +1,44 @@
+enum DeliveryWindow {
+  under24Hours,
+  from24To48Hours,
+  over48Hours,
+}
+
+extension DeliveryWindowX on DeliveryWindow {
+  int get availableDays {
+    switch (this) {
+      case DeliveryWindow.under24Hours:
+        return 1;
+      case DeliveryWindow.from24To48Hours:
+        return 2;
+      case DeliveryWindow.over48Hours:
+        return 3;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case DeliveryWindow.under24Hours:
+        return '<24 hrs';
+      case DeliveryWindow.from24To48Hours:
+        return '24–48 hrs';
+      case DeliveryWindow.over48Hours:
+        return '>48 hrs';
+    }
+  }
+}
+
 class PriceCalculationInput {
   const PriceCalculationInput({
     required this.stitches,
-    required this.ratePerThousandStitches,
+    required this.pieces,
+    required this.timePerPieceMinutes,
     required this.monthlyEbBill,
     required this.monthlyRent,
+    required this.deliveryWindow,
     this.isAari = false,
-    this.isOvernight = false,
     this.machineSpeed = 800,
+    this.ratePerThousandStitches = 40,
     this.timeSurchargePercent = 20,
     this.aariSurchargePercent = 60,
     this.ebAllocationPercent = 5,
@@ -16,12 +48,14 @@ class PriceCalculationInput {
   });
 
   final int stitches;
-  final double ratePerThousandStitches;
+  final int pieces;
+  final double timePerPieceMinutes;
   final double monthlyEbBill;
   final double monthlyRent;
+  final DeliveryWindow deliveryWindow;
   final bool isAari;
-  final bool isOvernight;
   final double machineSpeed;
+  final double ratePerThousandStitches;
   final double timeSurchargePercent;
   final double aariSurchargePercent;
   final double ebAllocationPercent;
@@ -33,7 +67,10 @@ class PriceCalculationInput {
 class PriceCalculation {
   const PriceCalculation({
     required this.stitchCharge,
-    required this.estimatedMinutes,
+    required this.estimatedMachineMinutes,
+    required this.totalWorkMinutes,
+    required this.requiredHoursPerDay,
+    required this.overnightRequired,
     required this.timeSurcharge,
     required this.aariSurcharge,
     required this.workCharge,
@@ -46,7 +83,10 @@ class PriceCalculation {
   });
 
   final double stitchCharge;
-  final double estimatedMinutes;
+  final double estimatedMachineMinutes;
+  final double totalWorkMinutes;
+  final double requiredHoursPerDay;
+  final bool overnightRequired;
   final double timeSurcharge;
   final double aariSurcharge;
   final double workCharge;
@@ -65,6 +105,16 @@ class PriceCalculator {
     if (input.stitches < 0) {
       throw ArgumentError.value(input.stitches, 'stitches', 'Cannot be negative');
     }
+    if (input.pieces <= 0) {
+      throw ArgumentError.value(input.pieces, 'pieces', 'Must be greater than zero');
+    }
+    if (input.timePerPieceMinutes <= 0) {
+      throw ArgumentError.value(
+        input.timePerPieceMinutes,
+        'timePerPieceMinutes',
+        'Must be greater than zero',
+      );
+    }
     if (input.machineSpeed <= 0) {
       throw ArgumentError.value(
         input.machineSpeed,
@@ -75,9 +125,14 @@ class PriceCalculator {
 
     final stitchCharge =
         input.stitches / 1000 * input.ratePerThousandStitches;
-    final estimatedMinutes = input.stitches / input.machineSpeed;
+    final estimatedMachineMinutes = input.stitches / input.machineSpeed;
 
-    final timeSurcharge = estimatedMinutes > 60
+    final totalWorkMinutes = input.pieces * input.timePerPieceMinutes;
+    final requiredHoursPerDay =
+        totalWorkMinutes / 60 / input.deliveryWindow.availableDays;
+    final overnightRequired = requiredHoursPerDay > 12;
+
+    final timeSurcharge = totalWorkMinutes > 60
         ? stitchCharge * input.timeSurchargePercent / 100
         : 0.0;
 
@@ -92,7 +147,7 @@ class PriceCalculator {
     final rentAllocation =
         input.monthlyRent * input.rentAllocationPercent / 100;
 
-    final overnightSurcharge = input.isOvernight
+    final overnightSurcharge = overnightRequired
         ? workCharge * input.overnightSurchargePercent / 100
         : 0.0;
 
@@ -108,7 +163,10 @@ class PriceCalculator {
 
     return PriceCalculation(
       stitchCharge: stitchCharge,
-      estimatedMinutes: estimatedMinutes,
+      estimatedMachineMinutes: estimatedMachineMinutes,
+      totalWorkMinutes: totalWorkMinutes,
+      requiredHoursPerDay: requiredHoursPerDay,
+      overnightRequired: overnightRequired,
       timeSurcharge: timeSurcharge,
       aariSurcharge: aariSurcharge,
       workCharge: workCharge,
