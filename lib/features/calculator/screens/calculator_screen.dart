@@ -157,10 +157,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
   }
 
-  Future<void> _updateMonthlySettings() async {
-    await _showMonthlySettingsDialog();
-  }
-
   void _calculate() {
     final stitches = int.tryParse(_stitchesController.text.trim());
     final pieces = int.tryParse(_piecesController.text.trim());
@@ -218,13 +214,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cost Calculator'),
-        actions: [
-          IconButton(
-            tooltip: 'Update this month’s EB and rent',
-            onPressed: _settingsLoaded ? _updateMonthlySettings : null,
-            icon: const Icon(Icons.edit_calendar_rounded),
-          ),
-        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
