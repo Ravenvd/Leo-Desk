@@ -13,10 +13,14 @@ class CalculatorScreen extends StatefulWidget {
 class _CalculatorScreenState extends State<CalculatorScreen> {
   final _stitchesController = TextEditingController();
   final _piecesController = TextEditingController();
+  final _monthlyEbController = TextEditingController();
+  final _monthlyRentController = TextEditingController(text: '4500');
   final _timePerPieceController = TextEditingController();
 
 
   bool _isAari = false;
+  double _monthlyEbBill = 0;
+  double _monthlyRent = 4500;
   DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
   PriceCalculation? _calculation;
 
@@ -24,6 +28,26 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void initState() {
     super.initState();
     _stitchesController.addListener(_updateTimePerPiece);
+    _loadMonthlyCosts();
+  }
+
+  Future<void> _loadMonthlyCosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final eb = prefs.getDouble('calculator_monthly_eb_bill') ?? 0;
+    final rent = prefs.getDouble('calculator_monthly_rent') ?? 4500;
+    if (!mounted) return;
+    setState(() {
+      _monthlyEbBill = eb;
+      _monthlyRent = rent;
+      _monthlyEbController.text = eb.toStringAsFixed(0);
+      _monthlyRentController.text = rent.toStringAsFixed(0);
+    });
+  }
+
+  Future<void> _saveMonthlyCosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('calculator_monthly_eb_bill', _monthlyEbBill);
+    await prefs.setDouble('calculator_monthly_rent', _monthlyRent);
   }
 
   void _updateTimePerPiece() {
@@ -52,6 +76,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     _stitchesController.removeListener(_updateTimePerPiece);
     _stitchesController.dispose();
     _piecesController.dispose();
+    _monthlyEbController.dispose();
+    _monthlyRentController.dispose();
     _timePerPieceController.dispose();
     super.dispose();
   }
@@ -75,8 +101,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         PriceCalculationInput(
           stitches: stitches,
           pieces: pieces,
-          monthlyEbBill: 0,
-          monthlyRent: 4500,
+          monthlyEbBill: _monthlyEbBill,
+          monthlyRent: _monthlyRent,
           deliveryWindow: _deliveryWindow,
           isAari: _isAari,
         ),
@@ -151,6 +177,34 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _monthlyEbController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Monthly EB bill',
+                prefixText: '₹ ',
+                prefixIcon: Icon(Icons.bolt_rounded),
+              ),
+              onChanged: (value) {
+                _monthlyEbBill = double.tryParse(value) ?? 0;
+                _saveMonthlyCosts();
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _monthlyRentController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Monthly rent',
+                prefixText: '₹ ',
+                prefixIcon: Icon(Icons.home_work_outlined),
+              ),
+              onChanged: (value) {
+                _monthlyRent = double.tryParse(value) ?? 0;
+                _saveMonthlyCosts();
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _timePerPieceController,
               readOnly: true,
               decoration: const InputDecoration(
@@ -186,7 +240,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               title: const Text('Aari work'),
               subtitle: const Text('300 SPM + 60% Aari surcharge'),
               value: _isAari,
-              onChanged: (value) => setState(() => _isAari = value),
+              onChanged: (value) {
+                setState(() => _isAari = value);
+                _updateTimePerPiece();
+              },
             ),
             const SizedBox(height: 8),
             const Text(
