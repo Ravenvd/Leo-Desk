@@ -50,6 +50,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -63,3 +64,14 @@ flutter:
   # included with your application. For details, see:
   # https://docs.flutter.dev/ui/widgets/material
   uses-material-design: true
+
+# Leo Desk 2.0 branding
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/images/leo_logo.png
+  adaptive_icon_background: "#F7F3EC"
+  adaptive_icon_foreground: assets/images/leo_logo.png
+  windows:
+    generate: true
+    image_path: assets/images/leo_logo.png
