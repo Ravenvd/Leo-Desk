@@ -191,16 +191,7 @@ class _DesktopNavigation extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(12, 8, 12, 24),
-            child: Column(
-              children: [
-                _LeoLogo(width: 150),
-                const SizedBox(height: 8),
-                const Text(
-                  'Leo Desk',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
+            child: _LeoLogo(width: 150),
           ),
           Expanded(
             child: ListView(
@@ -274,16 +265,7 @@ class _MobileNavigation extends StatelessWidget {
       children: const [
         Padding(
           padding: EdgeInsets.fromLTRB(28, 24, 28, 16),
-          child: Column(
-            children: [
-              _LeoLogo(width: 140),
-              const SizedBox(height: 6),
-              const Text(
-                'Leo Desk',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
+          child: _LeoLogo(width: 140),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.dashboard_outlined),
