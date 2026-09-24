@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/price_calculation.dart';
 
@@ -11,14 +12,10 @@ class CalculatorScreen extends StatefulWidget {
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
   final _stitchesController = TextEditingController();
-  final _rateController = TextEditingController();
-  final _ebController = TextEditingController();
-  final _rentController = TextEditingController();
+  final _piecesController = TextEditingController();
+  final _timePerPieceController = TextEditingController();
 
-  bool _isAari = false;
-  bool _isOvernight = false;
-  PriceCalculation? _calculation;
-
+  static const _ratePerThousandStitches = 40.0;
   static const _machineSpeed = 800.0;
   static const _timeSurchargePercent = 20.0;
   static const _aariSurchargePercent = 60.0;
@@ -27,25 +24,167 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   static const _overnightSurchargePercent = 25.0;
   static const _labourPercent = 20.0;
 
+  double _monthlyEbBill = 0;
+  double _monthlyRent = 0;
+  String? _savedMonthKey;
+  bool _settingsLoaded = false;
+  bool _isAari = false;
+  DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
+  PriceCalculation? _calculation;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMonthlySettings();
+  }
+
   @override
   void dispose() {
     _stitchesController.dispose();
-    _rateController.dispose();
-    _ebController.dispose();
-    _rentController.dispose();
+    _piecesController.dispose();
+    _timePerPieceController.dispose();
     super.dispose();
+  }
+
+  String _currentMonthKey() {
+    final now = DateTime.now();
+    return now.year.toString() +
+        '-' +
+        now.month.toString().padLeft(2, '0');
+  }
+
+  Future<void> _loadMonthlySettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final monthKey = _currentMonthKey();
+    final savedMonth = prefs.getString('calculator_settings_month');
+
+    if (!mounted) return;
+
+    setState(() {
+      _monthlyEbBill = prefs.getDouble('calculator_monthly_eb') ?? 0;
+      _monthlyRent = prefs.getDouble('calculator_monthly_rent') ?? 0;
+      _savedMonthKey = savedMonth;
+      _settingsLoaded = true;
+    });
+
+    if (savedMonth != monthKey) {
+      await _showMonthlySettingsDialog();
+    }
+  }
+
+  Future<void> _showMonthlySettingsDialog() async {
+    final ebController = TextEditingController(
+      text: _monthlyEbBill == 0 ? '' : _monthlyEbBill.toStringAsFixed(0),
+    );
+    final rentController = TextEditingController(
+      text: _monthlyRent == 0 ? '' : _monthlyRent.toStringAsFixed(0),
+    );
+
+    try {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Monthly cost setup'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter this month’s EB bill and rent. These values will be '
+                'saved and used for all calculations until next month.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: ebController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Monthly EB bill',
+                  prefixText: '₹ ',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: rentController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Monthly rent',
+                  prefixText: '₹ ',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                final eb = double.tryParse(ebController.text.trim());
+                final rent = double.tryParse(rentController.text.trim());
+
+                if (eb == null || eb < 0 || rent == null || rent < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enter valid EB and rent amounts.'),
+                    ),
+                  );
+                  return;
+                }
+
+                final monthKey = _currentMonthKey();
+                final prefs = await SharedPreferences.getInstance();
+
+                await prefs.setDouble('calculator_monthly_eb', eb);
+                await prefs.setDouble('calculator_monthly_rent', rent);
+                await prefs.setString('calculator_settings_month', monthKey);
+
+                if (!mounted) return;
+                setState(() {
+                  _monthlyEbBill = eb;
+                  _monthlyRent = rent;
+                  _savedMonthKey = monthKey;
+                });
+                if (context.mounted) Navigator.of(context).pop();
+              },
+              child: const Text('Save for this month'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      ebController.dispose();
+      rentController.dispose();
+    }
+  }
+
+  Future<void> _updateMonthlySettings() async {
+    await _showMonthlySettingsDialog();
   }
 
   void _calculate() {
     final stitches = int.tryParse(_stitchesController.text.trim());
-    final rate = double.tryParse(_rateController.text.trim());
-    final eb = double.tryParse(_ebController.text.trim()) ?? 0;
-    final rent = double.tryParse(_rentController.text.trim()) ?? 0;
+    final pieces = int.tryParse(_piecesController.text.trim());
+    final timePerPiece =
+        double.tryParse(_timePerPieceController.text.trim());
 
-    if (stitches == null || stitches <= 0 || rate == null || rate < 0) {
+    if (!_settingsLoaded || _savedMonthKey == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter a valid stitch count and stitch rate.'),
+          content: Text('Set this month’s EB bill and rent first.'),
+        ),
+      );
+      return;
+    }
+
+    if (stitches == null ||
+        stitches <= 0 ||
+        pieces == null ||
+        pieces <= 0 ||
+        timePerPiece == null ||
+        timePerPiece <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter valid stitches, pieces, and time per piece.'),
         ),
       );
       return;
@@ -55,11 +194,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       _calculation = PriceCalculator.calculate(
         PriceCalculationInput(
           stitches: stitches,
-          ratePerThousandStitches: rate,
-          monthlyEbBill: eb,
-          monthlyRent: rent,
+          pieces: pieces,
+          timePerPieceMinutes: timePerPiece,
+          monthlyEbBill: _monthlyEbBill,
+          monthlyRent: _monthlyRent,
+          deliveryWindow: _deliveryWindow,
           isAari: _isAari,
-          isOvernight: _isOvernight,
+          ratePerThousandStitches: _ratePerThousandStitches,
           machineSpeed: _machineSpeed,
           timeSurchargePercent: _timeSurchargePercent,
           aariSurchargePercent: _aariSurchargePercent,
@@ -75,7 +216,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cost Calculator')),
+      appBar: AppBar(
+        title: const Text('Cost Calculator'),
+        actions: [
+          IconButton(
+            tooltip: 'Update this month’s EB and rent',
+            onPressed: _settingsLoaded ? _updateMonthlySettings : null,
+            icon: const Icon(Icons.edit_calendar_rounded),
+          ),
+        ],
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 900;
@@ -125,33 +275,43 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _rateController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              controller: _piecesController,
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Rate per 1,000 stitches',
-                prefixText: '₹ ',
+                labelText: 'Number of pieces',
+                prefixIcon: Icon(Icons.layers_rounded),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _ebController,
+              controller: _timePerPieceController,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: 'Monthly EB bill',
-                prefixText: '₹ ',
+                labelText: 'Time per piece (minutes)',
+                prefixIcon: Icon(Icons.timer_outlined),
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _rentController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+            DropdownButtonFormField<DeliveryWindow>(
+              value: _deliveryWindow,
               decoration: const InputDecoration(
-                labelText: 'Monthly rent',
-                prefixText: '₹ ',
+                labelText: 'Delivery date',
+                prefixIcon: Icon(Icons.event_available_rounded),
               ),
+              items: DeliveryWindow.values
+                  .map(
+                    (window) => DropdownMenuItem(
+                      value: window,
+                      child: Text(window.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _deliveryWindow = value);
+                }
+              },
             ),
             const SizedBox(height: 12),
             SwitchListTile(
@@ -161,16 +321,26 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               value: _isAari,
               onChanged: (value) => setState(() => _isAari = value),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Overnight work'),
-              subtitle: const Text('+25% of work charge'),
-              value: _isOvernight,
-              onChanged: (value) => setState(() => _isOvernight = value),
-            ),
             const SizedBox(height: 8),
+            if (_settingsLoaded)
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.receipt_long_rounded),
+                  title: Text(
+                    'This month: EB ₹' +
+                        _monthlyEbBill.toStringAsFixed(0) +
+                        ' • Rent ₹' +
+                        _monthlyRent.toStringAsFixed(0),
+                  ),
+                  subtitle: const Text(
+                    'Saved for the current month • tap the calendar icon to update',
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: _calculate,
+              onPressed: _settingsLoaded ? _calculate : null,
               icon: const Icon(Icons.calculate_rounded),
               label: const Text('Calculate cost'),
             ),
@@ -181,9 +351,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              '800 stitches/min • +20% when estimated time exceeds 1 hour • '
-              'EB 5% • Rent 5% • Labour 20% • Overnight 25% • '
-              'final cost rounded to the nearest ₹50',
+              '₹40 per 1,000 stitches • 800 stitches/min • +20% when total '
+              'work time exceeds 1 hour • Aari +60% • EB 5% • Rent 5% • '
+              'Labour 20% • Overnight +25% • final cost rounded to nearest ₹50',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Overnight is automatic when the required work exceeds 12 hours '
+              'per day within the selected delivery window.',
             ),
           ],
         ),
@@ -215,8 +390,28 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
+            _row(
+              'Theoretical machine time',
+              calculation.estimatedMachineMinutes / 60,
+              suffix: ' h',
+            ),
+            _row(
+              'Maximum embroidery time',
+              calculation.totalWorkMinutes / 60,
+              suffix: ' h',
+              emphasized: true,
+            ),
+            _row(
+              'Required work per day',
+              calculation.requiredHoursPerDay,
+              suffix: ' h/day',
+            ),
+            const SizedBox(height: 4),
             Text(
-              'Estimated machine time: \${_formatMinutes(calculation.estimatedMinutes)}',
+              calculation.overnightRequired
+                  ? 'Overnight work: YES (+25%)'
+                  : 'Overnight work: NO',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const Divider(height: 28),
             _row('Stitch charge', calculation.stitchCharge),
@@ -251,6 +446,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Widget _row(
     String label,
     double value, {
+    String suffix = '',
     bool emphasized = false,
     bool large = false,
   }) {
@@ -265,16 +461,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       child: Row(
         children: [
           Expanded(child: Text(label, style: style)),
-          Text('₹\${value.toStringAsFixed(0)}', style: style),
+          Text(
+            suffix.isEmpty
+                ? '₹' + value.toStringAsFixed(0)
+                : value.toStringAsFixed(1) + suffix,
+            style: style,
+          ),
         ],
       ),
     );
-  }
-
-  String _formatMinutes(double minutes) {
-    if (minutes < 60) return '\${minutes.toStringAsFixed(1)} min';
-    final hours = minutes ~/ 60;
-    final remaining = (minutes - hours * 60).round();
-    return '\${hours}h \${remaining}m';
   }
 }
