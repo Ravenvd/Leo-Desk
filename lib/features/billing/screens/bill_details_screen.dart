@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme.dart';
 import 'package:printing/printing.dart';
 
 import '../../customers/models/customer.dart';
@@ -147,7 +149,14 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.receipt_long, size: 32),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.softGreige,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_long, color: AppColors.deepEspresso),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -155,7 +164,12 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
-                const Chip(label: Text('Paid')),
+                Chip(
+                  label: const Text('PAID'),
+                  labelStyle: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 11),
+                  backgroundColor: AppColors.softCream,
+                  side: const BorderSide(color: AppColors.success),
+                ),
               ],
             ),
             const SizedBox(height: 12),
