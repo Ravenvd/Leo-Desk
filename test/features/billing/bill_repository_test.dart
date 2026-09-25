@@ -34,8 +34,6 @@ void main() {
         name: 'Alice',
         createdAt: now,
         updatedAt: now,
-        customerType: 'personal',
-        serviceRequired: 'embroidery',
       ),
     );
 
@@ -84,8 +82,6 @@ void main() {
         name: 'Alice',
         createdAt: now,
         updatedAt: now,
-        customerType: 'personal',
-        serviceRequired: 'embroidery',
       ),
     );
 

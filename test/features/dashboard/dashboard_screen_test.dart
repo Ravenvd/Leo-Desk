@@ -37,8 +37,6 @@ void main() {
         name: 'Alice',
         createdAt: lastMonth,
         updatedAt: lastMonth,
-        customerType: 'personal',
-        serviceRequired: 'embroidery',
       ),
     );
     await database.update(
@@ -53,8 +51,6 @@ void main() {
         name: 'Bob',
         createdAt: now,
         updatedAt: now,
-        customerType: 'business',
-        serviceRequired: 'stitching',
       ),
     );
 

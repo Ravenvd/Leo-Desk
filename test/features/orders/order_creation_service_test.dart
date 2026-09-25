@@ -31,8 +31,6 @@ void main() {
         name: 'Test Customer',
         createdAt: now,
         updatedAt: now,
-        customerType: 'personal',
-        serviceRequired: 'embroidery',
       ),
     );
   });

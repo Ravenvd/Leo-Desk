@@ -82,8 +82,6 @@ void main() {
         phone: '9999999999',
         createdAt: now,
         updatedAt: now,
-        customerType: 'Individual',
-        serviceRequired: 'Embroidery',
       );
       final customerId = await clientCustomers.insert(customer);
 

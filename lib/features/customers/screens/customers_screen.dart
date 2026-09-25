@@ -345,14 +345,6 @@ class _CustomerCard extends StatelessWidget {
         customer.email ??
         'No contact information';
 
-    final customerType = customer.customerType == 'business'
-        ? 'Business'
-        : 'Personal';
-
-    final service = customer.serviceRequired == 'stitching'
-        ? 'Stitching'
-        : 'Embroidery';
-
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
@@ -384,24 +376,10 @@ class _CustomerCard extends StatelessWidget {
           children: [
             const SizedBox(height: 4),
             Text(contact),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                Chip(
-                  label: Text(customerType),
-                  visualDensity: VisualDensity.compact,
-                ),
-                Chip(
-                  label: Text(service),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
+
           ],
         ),
-        isThreeLine: true,
+        isThreeLine: false,
         onTap: onTap,
         trailing: PopupMenuButton<String>(
           tooltip: 'Customer actions',

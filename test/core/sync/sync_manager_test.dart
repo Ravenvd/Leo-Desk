@@ -59,8 +59,6 @@ void main() {
       notes: 'Test notes',
       createdAt: now,
       updatedAt: now,
-      customerType: 'Individual',
-      serviceRequired: 'Embroidery',
     );
   }
 
