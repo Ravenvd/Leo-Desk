@@ -74,7 +74,10 @@ class Customer {
   factory Customer.fromMap(Map<String, Object?> map) {
     return Customer(
       id: map['id'] as int?,
-      uuid: map['uuid'] as String,
+      // Some pre-v12/intermediate databases may contain a NULL UUID.
+      // Generate a stable new UUID rather than crashing while loading the
+      // customer. Normal v12+ rows always provide a persisted UUID.
+      uuid: map['uuid'] as String? ?? Uuid().v4(),
       syncStatus: map['sync_status'] as String? ?? 'synced',
       name: map['name'] as String,
       phone: map['phone'] as String?,
