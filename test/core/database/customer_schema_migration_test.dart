@@ -278,4 +278,36 @@ void main() {
 
     await v12Database.close();
   });
+
+  test('v12 customer migration is safe when legacy columns are already absent', () async {
+    final database = await openDatabase(
+      databasePath,
+      version: DatabaseSchema.version,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
+      onCreate: (db, version) async {
+        for (final statement in DatabaseSchema.createStatements) {
+          await db.execute(statement);
+        }
+      },
+    );
+
+    await expectLater(
+      DatabaseSchema.upgradeToVersion12(database),
+      completes,
+    );
+
+    final customerColumns = await database.rawQuery(
+      'PRAGMA table_info(customers)',
+    );
+    final columnNames = customerColumns
+        .map((column) => column['name'])
+        .toList();
+
+    expect(columnNames, isNot(contains('customer_type')));
+    expect(columnNames, isNot(contains('service_required')));
+
+    await database.close();
+  });
 }
