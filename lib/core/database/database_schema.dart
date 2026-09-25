@@ -422,8 +422,26 @@ class DatabaseSchema {
 
   static Future<void> upgradeToVersion12(Database db) async {
     await db.transaction((txn) async {
-      await txn.execute('ALTER TABLE customers DROP COLUMN customer_type');
-      await txn.execute('ALTER TABLE customers DROP COLUMN service_required');
+      final columns = await txn.rawQuery('PRAGMA table_info(customers)');
+      final columnNames = columns
+          .map((column) => column['name'] as String?)
+          .whereType<String>()
+          .toSet();
+
+      // Be tolerant of databases created by intermediate builds. Some of
+      // those databases already have the v12 customer schema even though
+      // their recorded version still triggers this migration.
+      if (columnNames.contains('customer_type')) {
+        await txn.execute(
+          'ALTER TABLE customers DROP COLUMN customer_type',
+        );
+      }
+
+      if (columnNames.contains('service_required')) {
+        await txn.execute(
+          'ALTER TABLE customers DROP COLUMN service_required',
+        );
+      }
     });
   }
 
