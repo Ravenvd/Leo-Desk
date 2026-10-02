@@ -21,6 +21,8 @@ import 'features/expenses/repositories/expense_repository.dart';
 import 'features/expenses/screens/expenses_screen.dart';
 import 'features/invoices/repositories/invoice_repository.dart';
 import 'features/invoices/screens/invoices_screen.dart';
+import 'features/inventory/repositories/asset_repository.dart';
+import 'features/inventory/screens/inventory_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 
@@ -129,6 +131,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
         InvoicesScreen(),
         BillsScreen(),
         ExpensesScreen(repository: ExpenseRepository()),
+        InventoryScreen(assetRepository: AssetRepository()),
         const CalculatorScreen(),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
@@ -234,6 +237,12 @@ class _DesktopNavigation extends StatelessWidget {
                   selected: selectedIndex == 5,
                   onTap: () => onSelected(5),
                 ),
+                _NavigationItem(
+                  icon: Icons.inventory_2_rounded,
+                  label: 'Inventory',
+                  selected: selectedIndex == 6,
+                  onTap: () => onSelected(6),
+                ),
               ],
             ),
           ),
@@ -241,14 +250,14 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.calculate_rounded,
             label: 'Calculator',
-            selected: selectedIndex == 6,
-            onTap: () => onSelected(6),
+            selected: selectedIndex == 7,
+            onTap: () => onSelected(7),
           ),
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: selectedIndex == 7,
-            onTap: () => onSelected(7),
+            selected: selectedIndex == 8,
+            onTap: () => onSelected(8),
           ),
         ],
       ),
@@ -304,6 +313,11 @@ class _MobileNavigation extends StatelessWidget {
           icon: Icon(Icons.money_off_outlined),
           selectedIcon: Icon(Icons.money_off_rounded),
           label: Text('Expenses'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.inventory_2_outlined),
+          selectedIcon: Icon(Icons.inventory_2_rounded),
+          label: Text('Inventory'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.calculate_outlined),
