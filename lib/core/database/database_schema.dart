@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 13;
+  static const int version = 14;
 
   static const List<String> createStatements = [
     '''
@@ -22,6 +22,30 @@ class DatabaseSchema {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
+    ''',
+    '''
+    CREATE TABLE maintenance_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      asset_id INTEGER NOT NULL,
+      asset_uuid TEXT NOT NULL,
+      maintenance_date TEXT NOT NULL,
+      description TEXT NOT NULL,
+      cost_paise INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+    )
+    ''',
+    '''
+    CREATE INDEX idx_maintenance_asset_id
+    ON maintenance_records(asset_id)
+    ''',
+    '''
+    CREATE INDEX idx_maintenance_date
+    ON maintenance_records(maintenance_date)
     ''',
     '''
     CREATE TABLE customers (
@@ -460,6 +484,35 @@ class DatabaseSchema {
           'ALTER TABLE customers DROP COLUMN service_required',
         );
       }
+    });
+  }
+
+  static Future<void> upgradeToVersion14(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE maintenance_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          asset_id INTEGER NOT NULL,
+          asset_uuid TEXT NOT NULL,
+          maintenance_date TEXT NOT NULL,
+          description TEXT NOT NULL,
+          cost_paise INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+        )
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_maintenance_asset_id
+        ON maintenance_records(asset_id)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_maintenance_date
+        ON maintenance_records(maintenance_date)
+      ''');
     });
   }
 
