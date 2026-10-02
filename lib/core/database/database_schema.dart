@@ -2,9 +2,27 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 12;
+  static const int version = 13;
 
   static const List<String> createStatements = [
+    '''
+    CREATE TABLE assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      asset_code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      purchase_date TEXT,
+      purchase_cost_paise INTEGER,
+      manufacturer_model TEXT,
+      serial_number TEXT,
+      warranty_information TEXT,
+      status TEXT NOT NULL DEFAULT 'Active',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
     '''
     CREATE TABLE customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,6 +460,29 @@ class DatabaseSchema {
           'ALTER TABLE customers DROP COLUMN service_required',
         );
       }
+    });
+  }
+
+  static Future<void> upgradeToVersion13(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE assets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          asset_code TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          purchase_date TEXT,
+          purchase_cost_paise INTEGER,
+          manufacturer_model TEXT,
+          serial_number TEXT,
+          warranty_information TEXT,
+          status TEXT NOT NULL DEFAULT 'Active',
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
     });
   }
 
