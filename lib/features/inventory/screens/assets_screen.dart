@@ -125,7 +125,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
     }
     return ListView.separated(
       itemCount: assets.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) => _AssetTile(asset: assets[index]),
     );
   }
