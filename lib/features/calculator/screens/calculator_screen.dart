@@ -24,7 +24,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   double _monthlyRent = 4500;
   DeliveryWindow _deliveryWindow = DeliveryWindow.under24Hours;
   PriceCalculation? _calculation;
-  double? _revenueRateDeficiencyPercent;
+  double? _revenueRateChangePercent;
 
   @override
   void initState() {
@@ -110,7 +110,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           isAari: _isAari,
         ),
       );
-      _revenueRateDeficiencyPercent = null;
+      _revenueRateChangePercent = null;
       _effectivePriceController.clear();
     });
   }
@@ -434,7 +434,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   Widget _buildRevenueRateChecker() {
     final calculation = _calculation!;
-    final deficiency = _revenueRateDeficiencyPercent;
+    final rateChange = _revenueRateChangePercent;
 
     return Card(
       child: Padding(
@@ -475,8 +475,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 final realizedRevenueRate =
                     price / (calculation.estimatedMachineMinutesPerPiece / 60);
                 setState(() {
-                  _revenueRateDeficiencyPercent =
-                      (calculation.targetRevenuePerHour - realizedRevenueRate) /
+                  _revenueRateChangePercent =
+                      (realizedRevenueRate - calculation.targetRevenuePerHour) /
                           calculation.targetRevenuePerHour *
                           100;
                 });
@@ -484,7 +484,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               icon: const Icon(Icons.compare_arrows_rounded),
               label: const Text('Check revenue rate'),
             ),
-            if (deficiency != null) ...[
+            if (rateChange != null) ...[
               const Divider(height: 28),
               _row(
                 'Your revenue rate',
@@ -492,15 +492,40 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     (calculation.estimatedMachineMinutesPerPiece / 60),
                 suffix: ' /h',
               ),
-              _row(
-                'Revenue rate deficiency',
-                deficiency.abs(),
-                suffix: '%',
-                emphasized: true,
-              ),
+              _revenueRateChangeRow(rateChange),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _revenueRateChangeRow(double changePercent) {
+    final color = changePercent > 0
+        ? Colors.green
+        : changePercent < 0
+            ? Colors.red
+            : null;
+    final sign = changePercent > 0 ? '+' : '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Change from target',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          Text(
+            '$sign${changePercent.toStringAsFixed(1)}%',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
       ),
     );
   }
