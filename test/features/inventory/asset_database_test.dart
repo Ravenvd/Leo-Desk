@@ -89,7 +89,6 @@ void main() {
 
     final firstId = await repository.insert(
       Asset(
-        assetCode: 'unused',
         name: 'Embroidery Machine',
         purchaseDate: now,
         purchaseCostPaise: 70000000,
@@ -101,7 +100,6 @@ void main() {
 
     final secondId = await repository.insert(
       Asset(
-        assetCode: 'unused',
         name: 'Thread Cutter',
         createdAt: now,
         updatedAt: now,
