@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/asset.dart';
 import '../repositories/asset_repository.dart';
+import '../models/maintenance_record.dart';
+import '../repositories/maintenance_repository.dart';
+import 'maintenance_form_screen.dart';
 import 'asset_form_screen.dart';
 
 class AssetDetailsScreen extends StatefulWidget {
@@ -20,11 +23,47 @@ class AssetDetailsScreen extends StatefulWidget {
 
 class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
   late Asset _asset;
+  final _maintenanceRepository = MaintenanceRepository();
+  List<MaintenanceRecord> _maintenance = [];
+  bool _maintenanceLoading = true;
 
   @override
   void initState() {
     super.initState();
     _asset = widget.asset;
+    _loadMaintenance();
+  }
+
+  Future<void> _loadMaintenance() async {
+    if (_asset.id == null) return;
+    setState(() => _maintenanceLoading = true);
+    final records = await _maintenanceRepository.getForAsset(_asset.id!);
+    if (mounted) setState(() { _maintenance = records; _maintenanceLoading = false; });
+  }
+
+  Future<void> _addMaintenance() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MaintenanceFormScreen(
+          repository: _maintenanceRepository,
+          asset: _asset,
+        ),
+      ),
+    );
+    if (saved == true && mounted) await _loadMaintenance();
+  }
+
+  Future<void> _editMaintenance(MaintenanceRecord record) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MaintenanceFormScreen(
+          repository: _maintenanceRepository,
+          asset: _asset,
+          record: record,
+        ),
+      ),
+    );
+    if (saved == true && mounted) await _loadMaintenance();
   }
 
   Future<void> _edit() async {
@@ -206,22 +245,44 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
                               ),
                             ),
                             OutlinedButton.icon(
-                              onPressed: null,
+                              onPressed: _addMaintenance,
                               icon: const Icon(Icons.add_rounded),
                               label: const Text('Add record'),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          'No maintenance records yet.',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Maintenance tracking will be added next.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+                        if (_maintenanceLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else if (_maintenance.isEmpty)
+                          Text(
+                            'No maintenance records yet.',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          )
+                        else
+                          ..._maintenance.map(
+                            (record) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Card(
+                                margin: EdgeInsets.zero,
+                                child: ListTile(
+                                  onTap: () => _editMaintenance(record),
+                                  leading: const CircleAvatar(
+                                    child: Icon(Icons.build_rounded),
+                                  ),
+                                  title: Text(record.description),
+                                  subtitle: Text(
+                                    '${_formatDate(record.maintenanceDate)} • '
+                                    '${_formatCurrency(record.costPaise)}'
+                                    '${record.notes == null ? '' : ' • ${record.notes}'}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right_rounded),
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
