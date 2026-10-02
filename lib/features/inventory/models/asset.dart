@@ -36,7 +36,7 @@ class Asset {
     this.id,
     String? uuid,
     this.syncStatus = syncStatusPending,
-    required this.assetCode,
+    String? assetCode,
     required this.name,
     this.purchaseDate,
     this.purchaseCostPaise,
@@ -47,7 +47,8 @@ class Asset {
     this.notes,
     required this.createdAt,
     required this.updatedAt,
-  }) : uuid = uuid ?? const Uuid().v4();
+  }) : assetCode = assetCode ?? '',
+       uuid = uuid ?? const Uuid().v4();
 
   Asset copyWith({
     int? id,
