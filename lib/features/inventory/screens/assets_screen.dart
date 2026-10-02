@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/sync/sync_events.dart';
 import '../models/asset.dart';
 import '../repositories/asset_repository.dart';
+import 'asset_form_screen.dart';
 
 class AssetsScreen extends StatefulWidget {
   const AssetsScreen({super.key, required this.repository});
@@ -29,6 +30,15 @@ class _AssetsScreenState extends State<AssetsScreen> {
   void dispose() {
     syncCompleted.removeListener(_onSyncCompleted);
     super.dispose();
+  }
+
+  Future<void> _openAddAsset() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AssetFormScreen(repository: widget.repository),
+      ),
+    );
+    if (created == true && mounted) await _loadAssets();
   }
 
   void _onSyncCompleted() {
@@ -80,7 +90,18 @@ class _AssetsScreenState extends State<AssetsScreen> {
                     ],
                   ),
                 ),
-                OutlinedButton.icon(onPressed: _loadAssets, icon: const Icon(Icons.refresh_rounded), label: const Text('Refresh')),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OutlinedButton.icon(onPressed: _loadAssets, icon: const Icon(Icons.refresh_rounded), label: const Text('Refresh')),
+                    const SizedBox(width: 12),
+                    FilledButton.icon(
+                      onPressed: _openAddAsset,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add asset'),
+                    ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -121,7 +142,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
         Text(_statusFilter == null ? 'No assets yet' : 'No assets with this status', style: Theme.of(context).textTheme.titleMedium),
         if (_statusFilter == null) ...[
           const SizedBox(height: 8),
-          const Text('Asset creation will be added in the next step.'),
+          const Text('Add your first asset to start tracking equipment.'),
         ],
       ]));
     }
