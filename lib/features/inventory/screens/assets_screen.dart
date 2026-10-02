@@ -4,6 +4,7 @@ import '../../../core/sync/sync_events.dart';
 import '../models/asset.dart';
 import '../repositories/asset_repository.dart';
 import 'asset_form_screen.dart';
+import 'asset_details_screen.dart';
 
 class AssetsScreen extends StatefulWidget {
   const AssetsScreen({super.key, required this.repository});
@@ -126,6 +127,18 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
+  Future<void> _openAssetDetails(Asset asset) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AssetDetailsScreen(
+          repository: widget.repository,
+          asset: asset,
+        ),
+      ),
+    );
+    if (mounted) await _loadAssets();
+  }
+
   Future<void> _openEditAsset(Asset asset) async {
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -164,20 +177,23 @@ class _AssetsScreenState extends State<AssetsScreen> {
       itemBuilder: (context, index) => _AssetTile(
         asset: assets[index],
         onEdit: () => _openEditAsset(assets[index]),
+        onTap: () => _openAssetDetails(assets[index]),
       ),
     );
   }
 }
 
 class _AssetTile extends StatelessWidget {
-  const _AssetTile({required this.asset, required this.onEdit});
+  const _AssetTile({required this.asset, required this.onEdit, required this.onTap});
   final Asset asset;
   final VoidCallback onEdit;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
+        onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         leading: CircleAvatar(child: Icon(_iconForStatus(asset.status))),
         title: Text(asset.name),
