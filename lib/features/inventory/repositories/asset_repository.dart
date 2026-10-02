@@ -21,7 +21,7 @@ class AssetRepository {
 
       // Asset codes are generated from SQLite's AUTOINCREMENT id so they
       // remain human-readable and are not reused after an asset is deleted.
-      map['asset_code'] = 'PENDING-' + localAsset.uuid;
+      map['asset_code'] = 'PENDING-${localAsset.uuid}';
 
       final id = await txn.insert('assets', map);
       final assetCode = _formatAssetCode(id);
@@ -206,6 +206,6 @@ class AssetRepository {
   }
 
   String _formatAssetCode(int id) {
-    return 'AST-' + id.toString().padLeft(4, '0');
+    return 'AST-${id.toString().padLeft(4, '0')}';
   }
 }
