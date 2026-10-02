@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -23,9 +25,10 @@ void main() {
     );
   }
 
-  Future<Database> createV12Database() {
-    return openDatabase(
-      inMemoryDatabasePath,
+  Future<String> createV12DatabasePath() async {
+    final path = '${Directory.systemTemp.path}/leo_desk_asset_v12_${DateTime.now().microsecondsSinceEpoch}.db';
+    final database = await openDatabase(
+      path,
       version: 12,
       onCreate: (db, version) async {
         // DatabaseSchema.createStatements represents the current v13 schema.
@@ -36,6 +39,8 @@ void main() {
         }
       },
     );
+    await database.close();
+    return path;
   }
 
   Asset makeAsset({
@@ -60,7 +65,9 @@ void main() {
   }
 
   test('v12 to v13 migration preserves existing data and adds assets', () async {
-    final database = await createV12Database();
+    final path = await createV12DatabasePath();
+    try {
+      final database = await openDatabase(path, version: 12);
 
     final customerId = await database.insert('customers', {
       'uuid': 'customer-v12',
@@ -118,10 +125,10 @@ void main() {
       'updated_at': '2026-10-01T10:00:00.000',
     });
 
-    await database.close();
+      await database.close();
 
-    final migrated = await openDatabase(
-      inMemoryDatabasePath,
+      final migrated = await openDatabase(
+        path,
       version: DatabaseSchema.version,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -172,7 +179,13 @@ void main() {
     expect(bill, hasLength(1));
     expect(bill.single['order_id'], orderId);
 
-    await migrated.close();
+      await migrated.close();
+    } finally {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
   });
 
   test('v13 assets table has the expected schema', () async {
