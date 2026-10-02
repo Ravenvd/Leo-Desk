@@ -55,9 +55,10 @@ class _AssetsScreenState extends State<AssetsScreen> {
   @override
   Widget build(BuildContext context) {
     final assets = _filteredAssets;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -98,6 +99,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
             const SizedBox(height: 20),
             Expanded(child: _buildContent(assets)),
           ],
+        ),
         ),
       ),
     );
