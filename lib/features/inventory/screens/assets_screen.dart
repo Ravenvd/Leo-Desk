@@ -126,6 +126,18 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
+  Future<void> _openEditAsset(Asset asset) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AssetFormScreen(
+          repository: widget.repository,
+          asset: asset,
+        ),
+      ),
+    );
+    if (updated == true && mounted) await _loadAssets();
+  }
+
   Widget _buildContent(List<Asset> assets) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
@@ -149,14 +161,18 @@ class _AssetsScreenState extends State<AssetsScreen> {
     return ListView.separated(
       itemCount: assets.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _AssetTile(asset: assets[index]),
+      itemBuilder: (context, index) => _AssetTile(
+        asset: assets[index],
+        onEdit: () => _openEditAsset(assets[index]),
+      ),
     );
   }
 }
 
 class _AssetTile extends StatelessWidget {
-  const _AssetTile({required this.asset});
+  const _AssetTile({required this.asset, required this.onEdit});
   final Asset asset;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +182,18 @@ class _AssetTile extends StatelessWidget {
         leading: CircleAvatar(child: Icon(_iconForStatus(asset.status))),
         title: Text(asset.name),
         subtitle: Text('${asset.assetCode} • ${asset.manufacturerModel ?? 'Manufacturer/model not specified'}'),
-        trailing: Chip(label: Text(asset.status)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Chip(label: Text(asset.status)),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Edit asset',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_rounded),
+            ),
+          ],
+        ),
       ),
     );
   }
