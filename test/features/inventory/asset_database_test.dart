@@ -302,7 +302,7 @@ void main() {
     final repository = AssetRepository(database: database);
 
     final firstId = await repository.insert(makeAsset(name: 'Z Machine'));
-    final secondId = await repository.insert(makeAsset(name: 'A Machine'));
+    await repository.insert(makeAsset(name: 'A Machine'));
 
     final first = await repository.getById(firstId);
     expect(await repository.getByUuid(first!.uuid), isNotNull);
