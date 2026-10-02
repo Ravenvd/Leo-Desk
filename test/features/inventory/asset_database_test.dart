@@ -292,8 +292,6 @@ void main() {
     final secondId = await repository.insert(makeAsset(name: 'A Machine'));
 
     final first = await repository.getById(firstId);
-    final second = await repository.getById(secondId);
-
     expect(await repository.getByUuid(first!.uuid), isNotNull);
 
     final assets = await repository.getAll();
