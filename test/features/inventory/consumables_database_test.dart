@@ -52,10 +52,7 @@ void main() {
   });
 
   test('v14 to v15 migration creates the consumables schema', () async {
-    final path = Directory.systemTemp.path +
-        '/leo_desk_consumables_v14_' +
-        DateTime.now().microsecondsSinceEpoch.toString() +
-        '.db';
+    final path = '${Directory.systemTemp.path}/leo_desk_consumables_v14_${DateTime.now().microsecondsSinceEpoch}.db';
 
     final old = await openDatabase(
       path,
