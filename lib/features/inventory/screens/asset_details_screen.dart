@@ -116,6 +116,11 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
 
     if (selected == null || selected == _asset.status || !mounted) return;
 
+    if (selected == Asset.statusCondemned) {
+      await _condemnAsset();
+      return;
+    }
+
     await _saveStatus(selected);
   }
 
