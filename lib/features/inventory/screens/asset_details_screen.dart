@@ -78,12 +78,101 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
 
     if (updated == true && mounted) {
       final refreshed = await widget.repository.getByUuid(_asset.uuid);
-      if (refreshed != null) setState(() => _asset = refreshed);
+      if (refreshed != null) {
+        setState(() => _asset = refreshed);
+      }
     }
   }
 
-  Color _statusColor(BuildContext context) {
-    switch (_asset.status) {
+  Future<void> _changeStatus() async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Change asset status'),
+        children: Asset.statuses
+            .map(
+              (status) => SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(status),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 10,
+                      color: _statusColorFor(status),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(status),
+                    if (status == _asset.status) ...[
+                      const Spacer(),
+                      const Icon(Icons.check_rounded),
+                    ],
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+
+    if (selected == null || selected == _asset.status || !mounted) return;
+
+    await _saveStatus(selected);
+  }
+
+  Future<void> _condemnAsset() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Condemn asset?'),
+        content: const Text(
+          'This marks the asset as Condemned. The asset and its maintenance '
+          'history will be preserved for records, but it will no longer be '
+          'treated as an active asset.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Condemn asset'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    await _saveStatus(Asset.statusCondemned);
+  }
+
+  Future<void> _saveStatus(String status) async {
+    try {
+      await widget.repository.update(_asset.copyWith(status: status));
+      final refreshed = await widget.repository.getByUuid(_asset.uuid);
+      if (refreshed != null && mounted) {
+        setState(() => _asset = refreshed);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Asset status changed to $status.')),
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Update asset status error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update asset status.')),
+      );
+    }
+  }
+
+  Color _statusColorFor(String status) {
+    switch (status) {
       case Asset.statusMaintenance:
         return Theme.of(context).colorScheme.tertiary;
       case Asset.statusInactive:
@@ -94,6 +183,8 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
         return Theme.of(context).colorScheme.primary;
     }
   }
+
+  Color _statusColor(BuildContext context) => _statusColorFor(_asset.status);
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'Not specified';
@@ -129,11 +220,47 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final statusColor = _statusColor(context);
+    final totalMaintenanceCostPaise = _maintenance.fold<int>(
+      0,
+      (total, record) => total + record.costPaise,
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Asset Details'),
         actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Asset actions',
+            onSelected: (value) {
+              if (value == 'status') {
+                _changeStatus();
+              } else if (value == 'condemn') {
+                _condemnAsset();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'status',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.swap_vert_rounded),
+                  title: Text('Change status'),
+                ),
+              ),
+              if (_asset.status != Asset.statusCondemned)
+                PopupMenuItem(
+                  value: 'condemn',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.block_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    title: const Text('Condemn asset'),
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             tooltip: 'Edit asset',
             onPressed: _edit,
@@ -180,13 +307,24 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
                                 style: Theme.of(context).textTheme.bodyLarge,
                               ),
                               const SizedBox(height: 14),
-                              Chip(
-                                avatar: Icon(
-                                  Icons.circle,
-                                  size: 10,
-                                  color: statusColor,
-                                ),
-                                label: Text(_asset.status),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  Chip(
+                                    avatar: Icon(
+                                      Icons.circle,
+                                      size: 10,
+                                      color: statusColor,
+                                    ),
+                                    label: Text(_asset.status),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: _changeStatus,
+                                    icon: const Icon(Icons.swap_vert_rounded),
+                                    label: const Text('Change status'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
