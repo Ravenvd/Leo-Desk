@@ -382,9 +382,20 @@ class _AssetDetailsScreenState extends State<AssetDetailsScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                'Maintenance',
-                                style: Theme.of(context).textTheme.titleLarge,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Maintenance',
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  if (!_maintenanceLoading && _maintenance.isNotEmpty)
+                                    Text(
+                                      '${_maintenance.length} record${_maintenance.length == 1 ? '' : 's'} • '
+                                      '${_formatCurrency(totalMaintenanceCostPaise)} total',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                ],
                               ),
                             ),
                             OutlinedButton.icon(
