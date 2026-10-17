@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/database/database_exporter.dart';
+
 import '../../../core/sync/sync_config.dart';
 import '../../../core/sync/sync_events.dart';
 import '../../../core/sync/sync_manager.dart';
@@ -25,6 +27,7 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
   DateTime? _lastSyncAt;
   List<String> _localAddresses = [];
   bool _isSyncing = false;
+  bool _isExporting = false;
 
   bool get _isHost => Platform.isWindows;
 
@@ -287,6 +290,22 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
                 ),
               ],
             ),
+            if (Platform.isAndroid) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isExporting || _isSyncing ? null : _exportDatabase,
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_alt_rounded),
+                label: Text(
+                  _isExporting ? 'Preparing export…' : 'Export Database',
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             if (_lastSyncAt != null)
               Text(
@@ -304,6 +323,30 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _exportDatabase() async {
+    setState(() {
+      _isExporting = true;
+      _statusMessage = null;
+    });
+
+    try {
+      await DatabaseExporter.exportToUserSelectedFile();
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = 'Database export completed.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = 'Database export failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
   }
 
   Future<void> _pullDatabase() async {
