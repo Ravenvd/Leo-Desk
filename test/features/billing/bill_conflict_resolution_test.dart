@@ -7,7 +7,6 @@ import 'package:leo_desk/features/billing/models/bill.dart';
 import 'package:leo_desk/features/billing/models/bill_item.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
-import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -24,15 +23,26 @@ void main() {
     database = await AppDatabase.openTestDatabase();
     bills = BillRepository(database: database);
     final now = DateTime.utc(2026, 10, 1);
-    final customerId = await CustomerRepository(database: database).insert(
-      Customer(
-        uuid: 'bill-conflict-customer',
-        name: 'Conflict Test Customer',
-        createdAt: now,
-        updatedAt: now,
-      ),
+    final customerId = await database.insert('customers', {
+      'uuid': 'bill-conflict-customer',
+      'sync_status': 'synced',
+      'name': 'Conflict Test Customer',
+      'phone': null,
+      'whatsapp': null,
+      'email': null,
+      'address': null,
+      'notes': null,
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    });
+    customer = Customer(
+      id: customerId,
+      uuid: 'bill-conflict-customer',
+      syncStatus: 'synced',
+      name: 'Conflict Test Customer',
+      createdAt: now,
+      updatedAt: now,
     );
-    customer = (await CustomerRepository(database: database).getById(customerId))!;
 
     await database.insert('orders', {
       'uuid': orderUuid,
