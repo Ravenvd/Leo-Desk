@@ -299,7 +299,7 @@ class ConsumableRepository {
           WHERE a.consumable_id = c.id AND a.after_quantity IS NOT NULL
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT 1
-        ), 0) <= c.reorder_level
+        ), 0) < c.reorder_level
       ORDER BY c.category COLLATE NOCASE, c.name COLLATE NOCASE
     ''', [Consumable.trackingPercentage]);
     return rows.map(Consumable.fromMap).toList();
