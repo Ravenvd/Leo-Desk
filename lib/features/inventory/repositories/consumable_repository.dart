@@ -172,11 +172,11 @@ class ConsumableRepository {
   }) async {
     if (spool.id == null) throw ArgumentError('Spool must be saved first.');
     if (spool.isEmpty) throw StateError('An empty spool cannot be updated.');
-    if (remainingPercent < 0 || remainingPercent > spool.remainingPercent) {
+    if (remainingPercent <= 0 || remainingPercent > spool.remainingPercent) {
       throw ArgumentError.value(
         remainingPercent,
         'remainingPercent',
-        'Must be between 0 and the current remaining percentage.',
+        'Must be greater than 0 and no more than the current remaining percentage.',
       );
     }
 
