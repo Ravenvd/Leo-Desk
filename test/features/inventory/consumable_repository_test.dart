@@ -238,12 +238,12 @@ void main() {
     );
     final spool = (await repository.getSpools(id)).single;
 
-    expect(
-      () => repository.updateSpoolRemaining(spool: spool, remainingPercent: 101),
+    await expectLater(
+      repository.updateSpoolRemaining(spool: spool, remainingPercent: 101),
       throwsArgumentError,
     );
-    expect(
-      () => repository.recordStockIn(
+    await expectLater(
+      repository.recordStockIn(
         consumable: saved,
         quantity: -5,
         activityType: InventoryActivity.purchase,
