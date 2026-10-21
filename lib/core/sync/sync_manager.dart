@@ -70,8 +70,9 @@ class SyncResult {
 /// 1. Push locally pending customers, bills, and expenses to the server.
 /// 2. Pull the server's customers, bills, and expenses and apply them locally.
 ///
-/// Conflict rule (applied in the repositories): a locally pending record
-/// always wins over the server copy; otherwise Windows wins.
+/// Conflict rules are entity-specific. For bills, the earliest-created bill
+/// for an order wins regardless of sync status; UUID order breaks timestamp ties.
+/// Other repositories retain their existing pending-local/Windows rules.
 class SyncManager {
   final SyncClient _client;
   final CustomerRepository _customerRepository;

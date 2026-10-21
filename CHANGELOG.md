@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 - 2026-10-17
+
+### Fixed
+- Resolve duplicate bills for the same order by keeping the earliest-created bill, with UUID as a deterministic tie-breaker.
+- Replace losing bill records and line items atomically during sync.
+- Reject bill-number collisions across different orders without deleting unrelated data.
+- Add regression tests for bill conflict resolution and line-item preservation.
+
+
 ## 1.2.0 - 2026-09-25
 
 ### Added
