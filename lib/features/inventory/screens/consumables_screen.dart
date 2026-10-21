@@ -447,7 +447,7 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
                       Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.onErrorContainer),
                       const SizedBox(width: 10),
                       Expanded(child: Text(
-                        '${_lowSpools.length} thread spool(s) below 10% and ${_lowStock.length} supply item(s) at or below reorder level.',
+                        '${_lowSpools.length} thread spool(s) below 10% and ${_lowStock.length} supply item(s) below reorder threshold.',
                         style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
                       )),
                     ]),
@@ -556,7 +556,7 @@ class _ConsumableFormDialogState extends State<_ConsumableFormDialog> {
   void initState() {
     super.initState();
     _reorder.text = _defaultReorder.toString();
-    _pack.text = _thread ? '2000' : _unit == Consumable.unitGrams ? '500' : '';
+    _pack.text = _category == Consumable.categoryEmbroideryThread ? '2000' : _category == Consumable.categoryAariThread ? '500' : _category == Consumable.categoryBobbinThread ? '1000' : _unit == Consumable.unitGrams ? '500' : '';
   }
 
   @override
@@ -759,7 +759,7 @@ class _SpoolEntryDialogState extends State<_SpoolEntryDialog> {
   @override
   void initState() {
     super.initState();
-    _length = TextEditingController(text: (widget.item.defaultPackQuantity ?? 2000).toStringAsFixed(0));
+    _length = TextEditingController(text: (widget.item.defaultPackQuantity ?? (widget.item.category == Consumable.categoryAariThread ? 500 : widget.item.category == Consumable.categoryBobbinThread ? 1000 : 2000)).toStringAsFixed(0));
   }
 
   @override
