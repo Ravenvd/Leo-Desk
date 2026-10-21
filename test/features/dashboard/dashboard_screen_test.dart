@@ -11,6 +11,7 @@ import 'package:leo_desk/features/customers/repositories/customer_repository.dar
 import 'package:leo_desk/features/dashboard/screens/dashboard_screen.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -102,6 +103,7 @@ void main() {
             billRepository: billRepository,
             expenseRepository: expenseRepository,
             invoiceRepository: invoiceRepository,
+            orderRepository: OrderRepository(database: database),
           ),
         ),
       ),

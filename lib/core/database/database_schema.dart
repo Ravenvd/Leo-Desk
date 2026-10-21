@@ -689,8 +689,10 @@ class DatabaseSchema {
 
   static Future<void> upgradeToVersion13(Database db) async {
     await db.transaction((txn) async {
+      // Some intermediate builds created the assets table without advancing
+      // user_version. Keep the migration safe for those databases.
       await txn.execute('''
-        CREATE TABLE assets (
+        CREATE TABLE IF NOT EXISTS assets (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           uuid TEXT NOT NULL UNIQUE,
           sync_status TEXT NOT NULL DEFAULT 'synced',

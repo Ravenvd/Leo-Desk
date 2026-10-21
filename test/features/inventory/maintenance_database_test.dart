@@ -17,6 +17,9 @@ void main() {
   Future<Database> database() => openDatabase(
         inMemoryDatabasePath,
         version: DatabaseSchema.version,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
         onCreate: (db, version) async {
           for (final statement in DatabaseSchema.createStatements) {
             await db.execute(statement);

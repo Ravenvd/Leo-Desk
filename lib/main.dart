@@ -22,6 +22,7 @@ import 'features/expenses/screens/expenses_screen.dart';
 import 'features/invoices/repositories/invoice_repository.dart';
 import 'features/invoices/screens/invoices_screen.dart';
 import 'features/inventory/repositories/asset_repository.dart';
+import 'features/inventory/repositories/consumable_repository.dart';
 import 'features/inventory/screens/inventory_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
@@ -131,7 +132,10 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
         InvoicesScreen(),
         BillsScreen(),
         ExpensesScreen(repository: ExpenseRepository()),
-        InventoryScreen(assetRepository: AssetRepository()),
+        InventoryScreen(
+          assetRepository: AssetRepository(),
+          consumableRepository: ConsumableRepository(),
+        ),
         const CalculatorScreen(),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];

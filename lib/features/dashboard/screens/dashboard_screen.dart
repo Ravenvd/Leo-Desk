@@ -21,12 +21,14 @@ class DashboardScreen extends StatefulWidget {
     required this.billRepository,
     required this.expenseRepository,
     required this.invoiceRepository,
+    this.orderRepository,
   });
 
   final CustomerRepository customerRepository;
   final BillRepository billRepository;
   final ExpenseRepository expenseRepository;
   final InvoiceRepository invoiceRepository;
+  final OrderRepository? orderRepository;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -77,7 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final bills = await widget.billRepository.getAll();
       final invoices = await widget.invoiceRepository.getAll();
       final expenses = await widget.expenseRepository.getAll();
-      final orders = await OrderRepository().getAll();
+      final orders = await (widget.orderRepository ?? OrderRepository()).getAll();
       final pendingCustomers = await widget.customerRepository.getPending();
       final pendingBills = await widget.billRepository.getPending();
       final pendingExpenses = await widget.expenseRepository.getPending();
