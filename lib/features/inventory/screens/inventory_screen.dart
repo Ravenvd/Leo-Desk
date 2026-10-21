@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../repositories/asset_repository.dart';
+import '../repositories/consumable_repository.dart';
 import 'assets_screen.dart';
+import 'consumables_screen.dart';
 
 class InventoryScreen extends StatelessWidget {
-  const InventoryScreen({super.key, required this.assetRepository});
+  const InventoryScreen({
+    super.key,
+    required this.assetRepository,
+    required this.consumableRepository,
+  });
 
   final AssetRepository assetRepository;
+  final ConsumableRepository consumableRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +31,7 @@ class InventoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Manage assets and consumables.',
+              'Manage equipment and day-to-day supplies.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 32),
@@ -58,9 +65,14 @@ class InventoryScreen extends StatelessWidget {
                         icon: Icons.inventory_2_rounded,
                         title: 'Consumables',
                         description:
-                            'Thread, stabiliser, beads, sequins and supplies.',
-                        enabled: false,
-                        onTap: () {},
+                            'Track thread spools, beads, sequins, stabilizers, oils and other supplies.',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ConsumablesScreen(
+                              repository: consumableRepository,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -80,21 +92,19 @@ class _InventoryCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.onTap,
-    this.enabled = true,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final VoidCallback onTap;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: enabled ? onTap : null,
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(28),
           child: Row(
@@ -111,18 +121,10 @@ class _InventoryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(description),
-                    if (!enabled) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        'Coming next',
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                    ],
                   ],
                 ),
               ),
-              if (enabled)
-                const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 18),
             ],
           ),
         ),
