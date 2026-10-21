@@ -204,7 +204,7 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
           decoration: const InputDecoration(
             labelText: 'Remaining percentage',
             suffixText: '%',
-            helperText: 'Enter a value between 0 and the current percentage.',
+            helperText: 'Enter a value above 0 and no more than the current percentage.',
           ),
         ),
         actions: [
@@ -212,7 +212,7 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
           FilledButton(
             onPressed: () {
               final parsed = double.tryParse(controller.text.trim());
-              if (parsed == null || parsed < 0 || parsed > spool.remainingPercent) return;
+              if (parsed == null || parsed <= 0 || parsed > spool.remainingPercent) return;
               Navigator.pop(context, parsed);
             },
             child: const Text('Save'),
