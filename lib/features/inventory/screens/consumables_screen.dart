@@ -590,7 +590,7 @@ class _ConsumableFormDialogState extends State<_ConsumableFormDialog> {
           child: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: Consumable.categories.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
@@ -604,7 +604,7 @@ class _ConsumableFormDialogState extends State<_ConsumableFormDialog> {
               ],
               if (_category == Consumable.categoryStabilizers)
                 DropdownButtonFormField<String>(
-                  value: _finish.text.isEmpty ? null : _finish.text,
+                  initialValue: _finish.text.isEmpty ? null : _finish.text,
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: const [
                     DropdownMenuItem(value: 'Tear-away', child: Text('Tear-away')),
