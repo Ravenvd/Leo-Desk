@@ -1314,67 +1314,88 @@ void main() {
   });
 
   test(
-    'pulls Windows consumables and activity history, then acknowledges them',
+    'pulls Windows consumables, spools and activity history by UUID',
     () async {
-    final windowsInventory = ConsumableRepository(database: serverDatabase);
-    final androidInventory = ConsumableRepository(database: clientDatabase);
-    final now = DateTime.utc(2026, 10, 30);
+      final windowsInventory = ConsumableRepository(database: serverDatabase);
+      final androidInventory = ConsumableRepository(database: clientDatabase);
+      final now = DateTime.utc(2026, 10, 30);
 
-    // Occupy a local integer ID so the synced relationship must resolve by UUID.
-    await androidInventory.insertConsumable(Consumable(
-      uuid: 'android-local-id-offset',
-      category: Consumable.categoryOils,
-      name: 'Local-only oil',
-      trackingType: Consumable.trackingQuantity,
-      stockUnit: Consumable.unitMillilitres,
-      createdAt: now,
-      updatedAt: now,
-    ));
-    await androidInventory.markSyncRecordSynced(
-      'consumables',
-      'android-local-id-offset',
-    );
+      // Occupy a local integer ID so synced relationships must resolve by UUID.
+      await androidInventory.insertConsumable(Consumable(
+        uuid: 'android-local-id-offset',
+        category: Consumable.categoryOils,
+        name: 'Local-only oil',
+        trackingType: Consumable.trackingQuantity,
+        stockUnit: Consumable.unitMillilitres,
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await androidInventory.markSyncRecordSynced(
+        'consumables',
+        'android-local-id-offset',
+      );
 
-    final beads = Consumable(
-      uuid: 'windows-beads-sync',
-      category: Consumable.categoryBeads,
-      name: 'Red cut beads',
-      trackingType: Consumable.trackingQuantity,
-      stockUnit: Consumable.unitGrams,
-      reorderLevel: 200,
-      createdAt: now,
-      updatedAt: now,
-    );
+      final beads = Consumable(
+        uuid: 'windows-beads-sync',
+        category: Consumable.categoryBeads,
+        name: 'Red cut beads',
+        trackingType: Consumable.trackingQuantity,
+        stockUnit: Consumable.unitGrams,
+        reorderLevel: 200,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final thread = Consumable(
+        uuid: 'windows-thread-sync',
+        category: Consumable.categoryEmbroideryThread,
+        name: 'Blue embroidery thread',
+        trackingType: Consumable.trackingPercentage,
+        stockUnit: Consumable.unitMetres,
+        createdAt: now,
+        updatedAt: now,
+      );
 
-    await windowsInventory.insertConsumable(beads);
-    final savedBeads = (await windowsInventory.getConsumables()).single;
-    await windowsInventory.recordStockIn(
-      consumable: savedBeads,
-      quantity: 500,
-      activityType: 'purchase',
-      notes: 'Windows opening purchase',
-    );
+      await windowsInventory.insertConsumable(beads);
+      await windowsInventory.insertConsumable(thread);
+      final savedBeads = await windowsInventory.getConsumableByUuid(beads.uuid);
+      final savedThread = await windowsInventory.getConsumableByUuid(thread.uuid);
+      await windowsInventory.recordStockIn(
+        consumable: savedBeads!,
+        quantity: 500,
+        activityType: 'purchase',
+        notes: 'Windows opening purchase',
+      );
+      await windowsInventory.addThreadSpool(
+        consumable: savedThread!,
+        approximateLengthM: 100,
+        notes: 'Windows thread spool',
+      );
 
-    final result = await syncWithRealHttpClient();
+      final result = await syncWithRealHttpClient();
 
-    expect(result.connected, isTrue);
-    expect(result.inventoryPulled, 2);
+      expect(result.connected, isTrue);
+      expect(result.inventoryPulled, 5);
 
-    final localBeads = (await androidInventory.getConsumables()).singleWhere(
-      (consumable) => consumable.uuid == beads.uuid,
-    );
-    expect(localBeads.id, isNot(1));
-    expect(localBeads.uuid, beads.uuid);
-    expect(await androidInventory.getCurrentStock(localBeads.id!), 500);
+      final localBeads = await androidInventory.getConsumableByUuid(beads.uuid);
+      expect(localBeads, isNotNull);
+      expect(localBeads!.id, isNot(1));
+      expect(await androidInventory.getCurrentStock(localBeads.id!), 500);
 
-    final windowsRecords = await windowsInventory.getAllSyncRecords();
-    expect(windowsRecords, hasLength(2));
-    expect(windowsRecords.map((record) => record['uuid']), contains(beads.uuid));
-    expect(
-      windowsRecords.every((record) => record['sync_status'] == 'synced'),
-      isTrue,
-    );
-  });
+      final localThread = await androidInventory.getConsumableByUuid(thread.uuid);
+      expect(localThread, isNotNull);
+      final localSpools = await androidInventory.getSpools(localThread!.id!);
+      expect(localSpools, hasLength(1));
+      expect(localSpools.single.consumableUuid, thread.uuid);
+      expect(localSpools.single.consumableId, localThread.id);
+
+      final windowsRecords = await windowsInventory.getAllSyncRecords();
+      expect(windowsRecords, hasLength(5));
+      expect(
+        windowsRecords.every((record) => record['sync_status'] == 'synced'),
+        isTrue,
+      );
+    },
+  );
 
   test(
     'pushes Android consumables and activity events without local IDs',
