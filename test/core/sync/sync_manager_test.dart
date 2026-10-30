@@ -17,6 +17,8 @@ import 'package:leo_desk/features/expenses/repositories/expense_repository.dart'
 import 'package:leo_desk/features/invoices/models/invoice.dart';
 import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/models/order_item.dart';
 import 'package:leo_desk/features/orders/repositories/order_item_repository.dart';
@@ -210,6 +212,8 @@ void main() {
       invoiceRepository: InvoiceRepository(database: serverDatabase),
       expenseRepository: ExpenseRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
+      assetRepository: AssetRepository(database: serverDatabase),
+      consumableRepository: ConsumableRepository(database: serverDatabase),
     );
 
     await server.start(port: 0);
@@ -234,6 +238,8 @@ void main() {
       invoiceRepository: InvoiceRepository(database: clientDatabase),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
+      assetRepository: AssetRepository(database: clientDatabase),
+      consumableRepository: ConsumableRepository(database: clientDatabase),
       saveLastSyncTime: (_) async {},
     );
   }
