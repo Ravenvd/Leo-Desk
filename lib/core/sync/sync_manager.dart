@@ -190,7 +190,7 @@ class SyncManager {
       }
     }
 
-    // --- Pull Windows assets; pending local edits remain protected ---
+    // --- Pull Windows assets; Windows is authoritative after the push attempt ---
     for (final asset in await _client.fetchAssets()) {
       if (asset.syncStatus == 'deleted_pending') {
         await _assetRepository.applyDeletionFromSync(asset.uuid);
