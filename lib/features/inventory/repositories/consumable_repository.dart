@@ -520,6 +520,15 @@ class ConsumableRepository {
     return true;
   }
 
+  Future<void> deleteAllForSyncReplacement() async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      await txn.delete('inventory_activities');
+      await txn.delete('thread_spools');
+      await txn.delete('consumables');
+    });
+  }
+
   Future<int> markSyncRecordSynced(String table, String uuid) async {
     if (!['consumables', 'thread_spools', 'inventory_activities'].contains(table)) throw ArgumentError.value(table, 'table');
     final db = await _db;
