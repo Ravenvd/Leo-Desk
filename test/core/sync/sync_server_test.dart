@@ -106,4 +106,14 @@ void main() {
     expect(fetched.single.containsKey('id'), isFalse);
     expect(fetched.single['record_type'], 'consumables');
   });
+  test('Windows allocates canonical asset codes for offline-created assets', () async {
+    final repository = AssetRepository(database: database);
+    final now = DateTime.utc(2026, 10, 30);
+    await repository.insert(Asset(uuid: 'asset-windows-existing', name: 'Existing machine', createdAt: now, updatedAt: now));
+    final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
+    final offlineAsset = Asset(uuid: 'asset-android-new', assetCode: 'AST-0001', name: 'Offline machine', createdAt: now, updatedAt: now);
+    expect(await client.sendAsset(offlineAsset), isTrue);
+    final fetched = await client.fetchAssets();
+    expect(fetched.singleWhere((asset) => asset.uuid == offlineAsset.uuid).assetCode, 'AST-0002');
+  });
 }
