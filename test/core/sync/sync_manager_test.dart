@@ -1313,7 +1313,9 @@ void main() {
     );
   });
 
-  test('pulls Windows consumables and activity history, then acknowledges them', () async {
+  test(
+    'pulls Windows consumables and activity history, then acknowledges them',
+    () async {
     final windowsInventory = ConsumableRepository(database: serverDatabase);
     final androidInventory = ConsumableRepository(database: clientDatabase);
     final now = DateTime.utc(2026, 10, 30);
@@ -1355,7 +1357,9 @@ void main() {
     );
   });
 
-  test('pushes Android consumables and activity events without local IDs', () async {
+  test(
+    'pushes Android consumables and activity events without local IDs',
+    () async {
     final androidInventory = ConsumableRepository(database: clientDatabase);
     final windowsInventory = ConsumableRepository(database: serverDatabase);
     final now = DateTime.utc(2026, 10, 30);
@@ -1393,10 +1397,15 @@ void main() {
       windowsRecords.every((record) => record['sync_status'] == 'synced'),
       isTrue,
     );
+
+    final retry = await syncWithRealHttpClient();
+    expect(retry.inventoryPushed, 0);
+    expect((await windowsInventory.getAllSyncRecords()), hasLength(2));
   });
 
-
-  test('reconciles colliding local asset codes to Windows canonical codes', () async {
+  test(
+    'reconciles colliding local asset codes to Windows canonical codes',
+    () async {
     final windowsAssets = AssetRepository(database: serverDatabase);
     final androidAssets = AssetRepository(database: clientDatabase);
     final now = DateTime.utc(2026, 10, 30);
@@ -1437,7 +1446,9 @@ void main() {
   });
 
 
-  test('Windows pending consumable edit wins over an Android conflict', () async {
+  test(
+    'Windows pending consumable edit wins over an Android conflict',
+    () async {
     final windowsInventory = ConsumableRepository(database: serverDatabase);
     final androidInventory = ConsumableRepository(database: clientDatabase);
     final now = DateTime.utc(2026, 10, 30);
