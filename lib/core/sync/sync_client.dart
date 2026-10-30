@@ -222,6 +222,9 @@ class SyncClient {
   }
 
   Future<bool> sendAsset(Asset asset) async {
+    if (asset.syncStatus == Asset.syncStatusDeletedPending) {
+      return _postJson('/api/assets/delete', {'uuid': asset.uuid}, asset.uuid);
+    }
     final map = asset.toMap()..remove('id')..remove('sync_status');
     return _postJson('/api/assets', map, asset.uuid);
   }
