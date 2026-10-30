@@ -226,6 +226,17 @@ class SyncClient {
     return _postJson('/api/assets', map, asset.uuid);
   }
 
+  Future<List<Map<String, Object?>>> fetchInventoryRecords() async {
+    final decoded = await _getJson('/api/inventory');
+    if (decoded is! List) throw const FormatException('Invalid inventory response.');
+    return decoded.map((item) => Map<String, Object?>.from(item as Map)).toList();
+  }
+
+  Future<bool> sendInventoryRecord(Map<String, Object?> record) async {
+    final uuid = record['uuid'];
+    if (uuid is! String) return false;
+    return _postJson('/api/inventory', record, uuid);
+  }
   Future<List<Customer>> fetchCustomers() async {
     final decoded = await _getJson('/api/customers');
 
