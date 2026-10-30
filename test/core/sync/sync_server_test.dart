@@ -9,6 +9,7 @@ import 'package:leo_desk/features/inventory/models/consumable.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -46,6 +47,7 @@ void main() {
       customerRepository: CustomerRepository(database: database),
       billRepository: BillRepository(database: database),
       assetRepository: AssetRepository(database: database),
+      maintenanceRepository: MaintenanceRepository(database: database),
       consumableRepository: ConsumableRepository(database: database),
       maintenanceRepository: MaintenanceRepository(database: database),
     );
