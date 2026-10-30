@@ -198,7 +198,7 @@ class SyncManager {
         acknowledgedAssets.add(asset.uuid);
         continue;
       }
-      final applied = await _assetRepository.upsertFromSync(asset);
+      final applied = await _assetRepository.upsertFromSync(asset, force: true);
       if (applied) {
         assetsPulled++;
         acknowledgedAssets.add(asset.uuid);
@@ -286,7 +286,7 @@ class SyncManager {
 
     // --- Pull Windows inventory snapshot in dependency order ---
     for (final record in await _client.fetchInventoryRecords()) {
-      final applied = await _consumableRepository.upsertSyncRecord(record);
+      final applied = await _consumableRepository.upsertSyncRecord(record, force: true);
       if (applied) inventoryPulled++;
     }
     // --- Push pending invoices ---
