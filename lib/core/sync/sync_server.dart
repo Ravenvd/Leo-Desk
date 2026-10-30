@@ -158,6 +158,18 @@ class SyncServer {
         return;
       }
 
+      if (request.method == 'POST' && request.uri.path == '/api/assets/delete') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid asset deletion data.'});
+          return;
+        }
+        final uuid = decoded['uuid'] as String;
+        await _assetRepository.markDeletedPendingByUuid(uuid);
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+
       if (request.method == 'POST' && request.uri.path == '/api/assets') {
         final decoded = await _readJsonBody(request);
         if (decoded is! Map) {
