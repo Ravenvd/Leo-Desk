@@ -91,9 +91,9 @@ class SyncResult {
 /// (the source of truth).
 ///
 /// Pending records are pushed first, then the Windows dataset is pulled.
-/// Assets and inventory use UUID-addressed relationships; local integer IDs
-/// are resolved independently on each device. Windows is authoritative when
-/// reconciling inventory records after the push attempt.
+/// Assets, maintenance records and consumable inventory use UUID-addressed
+/// relationships; local integer IDs are resolved independently on each device.
+/// Windows is authoritative when reconciling these records after the push attempt.
 class SyncManager {
   final SyncClient _client;
   final CustomerRepository _customerRepository;
