@@ -148,7 +148,7 @@ class ConsumableRepository {
           ? 'consumable_id = ?'
           : 'consumable_id = ? AND emptied_at IS NULL AND remaining_percent > 0',
       whereArgs: [consumableId],
-      orderBy: 'created_at DESC, id DESC',
+      orderBy: 'created_at DESC, uuid DESC',
     );
     return rows.map(ThreadSpool.fromMap).toList();
   }
