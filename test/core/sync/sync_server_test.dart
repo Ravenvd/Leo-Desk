@@ -118,6 +118,10 @@ void main() {
     expect(await client.sendAsset(offlineAsset), isTrue);
     final fetched = await client.fetchAssets();
     expect(fetched.singleWhere((asset) => asset.uuid == offlineAsset.uuid).assetCode, 'AST-0002');
+    final deleted = offlineAsset.copyWith(syncStatus: Asset.syncStatusDeletedPending);
+    expect(await client.sendAsset(deleted), isTrue);
+    final tombstone = (await client.fetchAssets()).singleWhere((asset) => asset.uuid == offlineAsset.uuid);
+    expect(tombstone.syncStatus, Asset.syncStatusDeletedPending);
   });
   test('syncs maintenance records through the asset UUID relationship', () async {
     final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
