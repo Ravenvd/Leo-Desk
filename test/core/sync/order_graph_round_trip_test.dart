@@ -14,6 +14,7 @@ import 'package:leo_desk/features/customers/repositories/customer_repository.dar
 import 'package:leo_desk/features/invoices/models/invoice.dart';
 import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
@@ -203,6 +204,7 @@ void main() {
       customerRepository: CustomerRepository(database: clientDatabase),
       billRepository: BillRepository(database: clientDatabase),
       invoiceRepository: InvoiceRepository(database: clientDatabase),
+      expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
       assetRepository: AssetRepository(database: clientDatabase),
       maintenanceRepository: MaintenanceRepository(database: clientDatabase),
