@@ -87,7 +87,7 @@ void main() {
       orderRepository: serverOrders,
       assetRepository: AssetRepository(database: serverDb),
       maintenanceRepository: MaintenanceRepository(database: serverDb),
-      consumableRepository: ConsumableRepository(database: serverDatabase),
+      consumableRepository: ConsumableRepository(database: serverDb),
     );
     await server.start(port: 0);
 
