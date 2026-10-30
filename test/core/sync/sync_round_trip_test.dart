@@ -304,6 +304,12 @@ void main() {
       ),
       customerRepository: clientCustomers,
       billRepository: clientBills,
+      expenseRepository: clientExpenses,
+      invoiceRepository: clientInvoices,
+      orderRepository: clientOrders,
+      assetRepository: AssetRepository(database: clientDb),
+      consumableRepository: ConsumableRepository(database: clientDb),
+      maintenanceRepository: MaintenanceRepository(database: clientDb),
     );
 
     final result = await offlineManager.sync();
