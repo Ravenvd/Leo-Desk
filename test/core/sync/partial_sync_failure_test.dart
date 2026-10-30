@@ -9,6 +9,7 @@ import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
+import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/invoices/models/invoice.dart';
 import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
@@ -136,6 +137,8 @@ void main() {
       final manager = SyncManager(
         client: client,
         customerRepository: clientCustomers,
+        billRepository: BillRepository(database: clientDatabase),
+        expenseRepository: ExpenseRepository(database: clientDatabase),
         orderRepository: clientOrders,
         invoiceRepository: clientInvoices,
         assetRepository: AssetRepository(database: clientDatabase),
