@@ -5,6 +5,7 @@ import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
+import '../../features/inventory/repositories/maintenance_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -25,6 +26,8 @@ class SyncResult {
   final int assetsPulled;
   final int inventoryPushed;
   final int inventoryPulled;
+  final int maintenancePushed;
+  final int maintenancePulled;
   final DateTime syncedAt;
 
   const SyncResult({
@@ -43,6 +46,8 @@ class SyncResult {
     this.assetsPulled = 0,
     this.inventoryPushed = 0,
     this.inventoryPulled = 0,
+    this.maintenancePushed = 0,
+    this.maintenancePulled = 0,
     required this.syncedAt,
   });
 
@@ -64,7 +69,9 @@ class SyncResult {
       assetsPushed +
       assetsPulled +
       inventoryPushed +
-      inventoryPulled;
+      inventoryPulled +
+      maintenancePushed +
+      maintenancePulled;
 
   @override
   String toString() {
@@ -72,6 +79,7 @@ class SyncResult {
     return 'Customers: $customersPushed sent, $customersPulled received · '
         'Assets: $assetsPushed sent, $assetsPulled received · '
         'Inventory: $inventoryPushed sent, $inventoryPulled received · '
+        'Maintenance: $maintenancePushed sent, $maintenancePulled received · '
         'Bills: $billsPushed sent, $billsPulled received · '
         'Invoices: $invoicesPushed sent, $invoicesPulled received · '
         'Expenses: $expensesPushed sent, $expensesPulled received · '
@@ -95,6 +103,7 @@ class SyncManager {
   final OrderRepository _orderRepository;
   final AssetRepository _assetRepository;
   final ConsumableRepository _consumableRepository;
+  final MaintenanceRepository _maintenanceRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
   Future<SyncResult>? _activeSync;
@@ -108,6 +117,7 @@ class SyncManager {
     OrderRepository? orderRepository,
     AssetRepository? assetRepository,
     ConsumableRepository? consumableRepository,
+    MaintenanceRepository? maintenanceRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
@@ -116,6 +126,7 @@ class SyncManager {
        _orderRepository = orderRepository ?? OrderRepository(),
        _assetRepository = assetRepository ?? AssetRepository(),
        _consumableRepository = consumableRepository ?? ConsumableRepository(),
+       _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
@@ -168,6 +179,8 @@ class SyncManager {
     var assetsPulled = 0;
     var inventoryPushed = 0;
     var inventoryPulled = 0;
+    var maintenancePushed = 0;
+    var maintenancePulled = 0;
 
     final acknowledgedCustomers = <String>[];
     final acknowledgedOrders = <String>[];
@@ -175,6 +188,7 @@ class SyncManager {
     final acknowledgedBills = <String>[];
     final acknowledgedExpenses = <String>[];
     final acknowledgedAssets = <String>[];
+    final acknowledgedMaintenance = <String>[];
 
     // --- Push pending assets ---
     for (final asset in await _assetRepository.getPending()) {
@@ -274,6 +288,32 @@ class SyncManager {
       }
     }
 
+    // --- Push pending maintenance records after their assets ---
+    for (final record in await _maintenanceRepository.getPendingForSync()) {
+      if (await _client.sendMaintenanceRecord(record)) {
+        if (record['sync_status'] == 'deleted_pending') {
+          await _maintenanceRepository.finalizeDeletion(record['uuid'] as String);
+        } else {
+          await _maintenanceRepository.markSynced(record['uuid'] as String);
+        }
+        maintenancePushed++;
+      }
+    }
+
+    // --- Pull Windows maintenance records after assets ---
+    for (final record in await _client.fetchMaintenanceRecords()) {
+      if (record['sync_status'] == 'deleted_pending') {
+        await _maintenanceRepository.applyDeletionFromSync(record['uuid'] as String);
+        maintenancePulled++;
+        acknowledgedMaintenance.add(record['uuid'] as String);
+        continue;
+      }
+      final applied = await _maintenanceRepository.upsertFromSync(record, force: true);
+      if (applied) {
+        maintenancePulled++;
+        acknowledgedMaintenance.add(record['uuid'] as String);
+      }
+    }
     // --- Push pending consumables, spools, then activity events ---
     for (final record in await _consumableRepository.getPendingSyncRecords()) {
       if (await _client.sendInventoryRecord(record)) {
@@ -370,7 +410,8 @@ class SyncManager {
         acknowledgedInvoices.isNotEmpty ||
         acknowledgedBills.isNotEmpty ||
         acknowledgedExpenses.isNotEmpty ||
-        acknowledgedAssets.isNotEmpty) {
+        acknowledgedAssets.isNotEmpty ||
+        acknowledgedMaintenance.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: acknowledgedCustomers,
         orderUuids: acknowledgedOrders,
@@ -378,6 +419,7 @@ class SyncManager {
         billUuids: acknowledgedBills,
         expenseUuids: acknowledgedExpenses,
         assetUuids: acknowledgedAssets,
+        maintenanceUuids: acknowledgedMaintenance,
       );
       if (!acknowledged) {
         throw StateError(
@@ -402,6 +444,8 @@ class SyncManager {
       assetsPulled: assetsPulled,
       inventoryPushed: inventoryPushed,
       inventoryPulled: inventoryPulled,
+      maintenancePushed: maintenancePushed,
+      maintenancePulled: maintenancePulled,
       syncedAt: DateTime.now(),
     );
 
@@ -429,6 +473,7 @@ class SyncManager {
     final expenses = await _client.fetchExpenses();
     final assets = await _client.fetchAssets();
     final inventoryRecords = await _client.fetchInventoryRecords();
+    final maintenanceRecords = await _client.fetchMaintenanceRecords();
 
     // Windows is authoritative for this operation. Replace every local
     // record, including unsynced local changes.
@@ -438,6 +483,7 @@ class SyncManager {
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
     await _consumableRepository.deleteAllForSyncReplacement();
+    await _maintenanceRepository.deleteAll();
     await _assetRepository.deleteAll();
 
     for (final customer in customers) {
@@ -474,6 +520,7 @@ class SyncManager {
 
     final acknowledgedExpenses = <String>[];
     final acknowledgedAssets = <String>[];
+    final acknowledgedMaintenance = <String>[];
     var expensesApplied = 0;
 
     for (final expense in expenses) {
@@ -500,9 +547,18 @@ class SyncManager {
     for (final record in inventoryRecords) {
       await _consumableRepository.upsertSyncRecord(record, force: true);
     }
+
+    for (final record in maintenanceRecords) {
+      if (record['sync_status'] == 'deleted_pending') {
+        acknowledgedMaintenance.add(record['uuid'] as String);
+        continue;
+      }
+      await _maintenanceRepository.upsertFromSync(record, force: true);
+    }
+
     // Windows tombstones are temporary. Once the replacement has completed,
     // acknowledge them so Windows can physically remove them as well.
-    if (acknowledgedExpenses.isNotEmpty || acknowledgedAssets.isNotEmpty) {
+    if (acknowledgedExpenses.isNotEmpty || acknowledgedAssets.isNotEmpty || acknowledgedMaintenance.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: const [],
         orderUuids: const [],
@@ -510,6 +566,7 @@ class SyncManager {
         billUuids: const [],
         expenseUuids: acknowledgedExpenses,
         assetUuids: acknowledgedAssets,
+        maintenanceUuids: acknowledgedMaintenance,
       );
       if (!acknowledged) {
         throw StateError(
@@ -527,6 +584,7 @@ class SyncManager {
       ordersPulled: orders.length,
       assetsPulled: assets.where((asset) => asset.syncStatus != 'deleted_pending').length,
       inventoryPulled: inventoryRecords.length,
+      maintenancePulled: maintenanceRecords.where((record) => record['sync_status'] != 'deleted_pending').length,
       syncedAt: DateTime.now(),
     );
 
