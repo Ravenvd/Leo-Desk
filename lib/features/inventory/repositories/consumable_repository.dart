@@ -507,12 +507,14 @@ class ConsumableRepository {
     }
     if (table == 'inventory_activities') {
       final spoolUuid = map['spool_uuid'] as String?;
+      map['spool_id'] = null;
       if (spoolUuid != null) {
         final spools = await db.query('thread_spools', columns: ['id'], where: 'uuid = ?', whereArgs: [spoolUuid], limit: 1);
         if (spools.isEmpty) throw StateError('Missing thread spool $spoolUuid for inventory sync.');
         map['spool_id'] = spools.first['id'];
       }
       final orderUuid = map['order_uuid'] as String?;
+      map['order_id'] = null;
       if (orderUuid != null) {
         final orders = await db.query('orders', columns: ['id'], where: 'uuid = ?', whereArgs: [orderUuid], limit: 1);
         // Order history may be outside the currently synchronized order window.
