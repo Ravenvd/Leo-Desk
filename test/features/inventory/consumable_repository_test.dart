@@ -252,4 +252,33 @@ void main() {
     expect((await repository.getSpools(id)).single.id, spoolId);
     await db.close();
   });
+  test('inventory sync exports UUID relationships and imports into different local IDs', () async {
+    final sourceDb = await openTestDb();
+    final source = ConsumableRepository(database: sourceDb);
+    final thread = item(category: Consumable.categoryEmbroideryThread, name: 'Black', trackingType: Consumable.trackingPercentage, unit: Consumable.unitMetres);
+    final sourceId = await source.insertConsumable(thread);
+    final saved = (await source.getConsumableById(sourceId))!;
+    await source.addThreadSpool(consumable: saved, approximateLengthM: 100, notes: 'Sync test');
+    final records = await source.getAllSyncRecords();
+    expect(records.map((record) => record['record_type']).toList(), ['consumables', 'thread_spools', 'inventory_activities']);
+
+    final targetDb = await openTestDb();
+    final target = ConsumableRepository(database: targetDb);
+    final dummy = item(category: Consumable.categoryBeads, name: 'Dummy', trackingType: Consumable.trackingQuantity, unit: Consumable.unitGrams);
+    await target.insertConsumable(dummy);
+    for (final record in records) {
+      expect(await target.upsertSyncRecord(record), isTrue);
+    }
+    final imported = await target.getConsumableByUuid(thread.uuid);
+    expect(imported, isNotNull);
+    expect(imported!.id, isNot(sourceId));
+    final spools = await target.getSpools(imported.id!);
+    expect(spools, hasLength(1));
+    expect(spools.single.uuid, records[1]['uuid']);
+    final history = await target.getActivityHistory(imported.id!);
+    expect(history, hasLength(1));
+    expect(history.single.spoolUuid, spools.single.uuid);
+    await sourceDb.close();
+    await targetDb.close();
+  });
 }
