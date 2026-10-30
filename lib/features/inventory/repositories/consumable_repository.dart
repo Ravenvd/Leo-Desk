@@ -446,4 +446,83 @@ class ConsumableRepository {
     if (rows.isEmpty) return 0;
     return (rows.first['after_quantity'] as num).toDouble();
   }
+  /// Returns pending inventory rows in dependency order for transport.
+  Future<List<Map<String, Object?>>> getPendingSyncRecords() async {
+    final db = await _db;
+    final result = <Map<String, Object?>>[];
+    for (final table in ['consumables', 'thread_spools', 'inventory_activities']) {
+      final rows = await db.query(table, where: 'sync_status = ?', whereArgs: ['pending'], orderBy: 'created_at ASC, uuid ASC');
+      for (final row in rows) {
+        final map = Map<String, Object?>.from(row)..remove('id');
+        if (table == 'thread_spools') map.remove('consumable_id');
+        if (table == 'inventory_activities') { map.remove('consumable_id'); map.remove('spool_id'); map.remove('order_id'); }
+        map['record_type'] = table;
+        result.add(map);
+      }
+    }
+    return result;
+  }
+
+  /// Full Windows inventory snapshot, with relationships represented by UUID.
+  Future<List<Map<String, Object?>>> getAllSyncRecords() async {
+    final db = await _db;
+    final result = <Map<String, Object?>>[];
+    for (final table in ['consumables', 'thread_spools', 'inventory_activities']) {
+      final rows = await db.query(table, orderBy: 'created_at ASC, uuid ASC');
+      for (final row in rows) {
+        final map = Map<String, Object?>.from(row)..remove('id');
+        if (table == 'thread_spools') map.remove('consumable_id');
+        if (table == 'inventory_activities') { map.remove('consumable_id'); map.remove('spool_id'); map.remove('order_id'); }
+        map['record_type'] = table;
+        result.add(map);
+      }
+    }
+    return result;
+  }
+
+  /// Applies one UUID-addressed record. Local integer IDs are always resolved
+  /// from relationship UUIDs and are never accepted from another device.
+  Future<bool> upsertSyncRecord(Map<String, Object?> incoming, {bool force = false}) async {
+    final db = await _db;
+    final map = Map<String, Object?>.from(incoming);
+    final type = map.remove('record_type') as String?;
+    if (!['consumables', 'thread_spools', 'inventory_activities'].contains(type)) throw FormatException('Unknown inventory record type: $type');
+    final uuid = map['uuid'] as String;
+    final table = type!;
+    final existing = await db.query(table, columns: ['id', 'sync_status'], where: 'uuid = ?', whereArgs: [uuid], limit: 1);
+    if (existing.isNotEmpty && !force && existing.first['sync_status'] == 'pending') return false;
+    if (table == 'thread_spools' || table == 'inventory_activities') {
+      final consumableUuid = map['consumable_uuid'] as String;
+      final consumables = await db.query('consumables', columns: ['id'], where: 'uuid = ?', whereArgs: [consumableUuid], limit: 1);
+      if (consumables.isEmpty) throw StateError('Missing consumable $consumableUuid for inventory sync.');
+      map['consumable_id'] = consumables.first['id'];
+    }
+    if (table == 'inventory_activities') {
+      final spoolUuid = map['spool_uuid'] as String?;
+      if (spoolUuid != null) {
+        final spools = await db.query('thread_spools', columns: ['id'], where: 'uuid = ?', whereArgs: [spoolUuid], limit: 1);
+        if (spools.isEmpty) throw StateError('Missing thread spool $spoolUuid for inventory sync.');
+        map['spool_id'] = spools.first['id'];
+      }
+      final orderUuid = map['order_uuid'] as String?;
+      if (orderUuid != null) {
+        final orders = await db.query('orders', columns: ['id'], where: 'uuid = ?', whereArgs: [orderUuid], limit: 1);
+        if (orders.isEmpty) throw StateError('Missing order $orderUuid for inventory sync.');
+        map['order_id'] = orders.first['id'];
+      }
+    }
+    map['sync_status'] = 'synced';
+    if (existing.isEmpty) {
+      await db.insert(table, map);
+    } else {
+      await db.update(table, map, where: 'id = ?', whereArgs: [existing.first['id']]);
+    }
+    return true;
+  }
+
+  Future<int> markSyncRecordSynced(String table, String uuid) async {
+    if (!['consumables', 'thread_spools', 'inventory_activities'].contains(table)) throw ArgumentError.value(table, 'table');
+    final db = await _db;
+    return db.update(table, {'sync_status': 'synced'}, where: 'uuid = ?', whereArgs: [uuid]);
+  }
 }
