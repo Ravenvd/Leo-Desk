@@ -204,19 +204,6 @@ class SyncManager {
         acknowledgedAssets.add(asset.uuid);
       }
     }
-    // --- Push pending consumables, spools, then activity events ---
-    for (final record in await _consumableRepository.getPendingSyncRecords()) {
-      if (await _client.sendInventoryRecord(record)) {
-        await _consumableRepository.markSyncRecordSynced(record['record_type'] as String, record['uuid'] as String);
-        inventoryPushed++;
-      }
-    }
-
-    // --- Pull Windows inventory snapshot in dependency order ---
-    for (final record in await _client.fetchInventoryRecords()) {
-      final applied = await _consumableRepository.upsertSyncRecord(record);
-      if (applied) inventoryPulled++;
-    }
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
       if (await _client.sendCustomer(customer)) {
@@ -289,6 +276,19 @@ class SyncManager {
       }
     }
 
+    // --- Push pending consumables, spools, then activity events ---
+    for (final record in await _consumableRepository.getPendingSyncRecords()) {
+      if (await _client.sendInventoryRecord(record)) {
+        await _consumableRepository.markSyncRecordSynced(record['record_type'] as String, record['uuid'] as String);
+        inventoryPushed++;
+      }
+    }
+
+    // --- Pull Windows inventory snapshot in dependency order ---
+    for (final record in await _client.fetchInventoryRecords()) {
+      final applied = await _consumableRepository.upsertSyncRecord(record);
+      if (applied) inventoryPulled++;
+    }
     // --- Push pending invoices ---
     for (final invoice in await _invoiceRepository.getPending()) {
       final items = await _invoiceRepository.getItems(invoice.id!);
