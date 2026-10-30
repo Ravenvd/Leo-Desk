@@ -42,7 +42,7 @@ class MaintenanceRepository {
       'maintenance_records',
       where: 'asset_id = ? AND sync_status != ?',
       whereArgs: [assetId, MaintenanceRecord.syncStatusDeletedPending],
-      orderBy: 'maintenance_date DESC, id DESC',
+      orderBy: 'maintenance_date DESC, uuid DESC',
     );
     return maps.map(MaintenanceRecord.fromMap).toList();
   }
