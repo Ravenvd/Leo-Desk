@@ -140,5 +140,9 @@ void main() {
     expect(fetched.single['uuid'], 'maintenance-sync-test');
     expect(fetched.single['asset_uuid'], asset.uuid);
     expect(fetched.single.containsKey('asset_id'), isFalse);
+    maintenance['sync_status'] = 'deleted_pending';
+    expect(await client.sendMaintenanceRecord(maintenance), isTrue);
+    final tombstones = await client.fetchMaintenanceRecords();
+    expect(tombstones.single['sync_status'], 'deleted_pending');
   });
 }
