@@ -82,12 +82,10 @@ class SyncResult {
 /// Two-way LAN sync between an Android client and the Windows host
 /// (the source of truth).
 ///
-/// Order of operations:
-/// 1. Push locally pending customers, bills, and expenses to the server.
-/// 2. Pull the server's customers, bills, and expenses and apply them locally.
-///
-/// Conflict rule (applied in the repositories): a locally pending record
-/// always wins over the server copy; otherwise Windows wins.
+/// Pending records are pushed first, then the Windows dataset is pulled.
+/// Assets and inventory use UUID-addressed relationships; local integer IDs
+/// are resolved independently on each device. Windows is authoritative when
+/// reconciling inventory records after the push attempt.
 class SyncManager {
   final SyncClient _client;
   final CustomerRepository _customerRepository;
