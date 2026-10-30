@@ -507,8 +507,9 @@ class ConsumableRepository {
       final orderUuid = map['order_uuid'] as String?;
       if (orderUuid != null) {
         final orders = await db.query('orders', columns: ['id'], where: 'uuid = ?', whereArgs: [orderUuid], limit: 1);
-        if (orders.isEmpty) throw StateError('Missing order $orderUuid for inventory sync.');
-        map['order_id'] = orders.first['id'];
+        // Order history may be outside the currently synchronized order window.
+        // Preserve order_uuid and leave the optional local FK unresolved.
+        map['order_id'] = orders.isEmpty ? null : orders.first['id'];
       }
     }
     map['sync_status'] = 'synced';
