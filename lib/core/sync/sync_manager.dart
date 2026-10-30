@@ -3,6 +3,7 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -19,6 +20,8 @@ class SyncResult {
   final int expensesPulled;
   final int ordersPushed;
   final int ordersPulled;
+  final int assetsPushed;
+  final int assetsPulled;
   final DateTime syncedAt;
 
   const SyncResult({
@@ -33,6 +36,8 @@ class SyncResult {
     this.expensesPulled = 0,
     this.ordersPushed = 0,
     this.ordersPulled = 0,
+    this.assetsPushed = 0,
+    this.assetsPulled = 0,
     required this.syncedAt,
   });
 
@@ -50,7 +55,9 @@ class SyncResult {
       expensesPushed +
       expensesPulled +
       ordersPushed +
-      ordersPulled;
+      ordersPulled +
+      assetsPushed +
+      assetsPulled;
 
   @override
   String toString() {
@@ -79,6 +86,7 @@ class SyncManager {
   final ExpenseRepository _expenseRepository;
   final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
+  final AssetRepository _assetRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
   Future<SyncResult>? _activeSync;
@@ -90,12 +98,14 @@ class SyncManager {
     ExpenseRepository? expenseRepository,
     InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
+    AssetRepository? assetRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
        _orderRepository = orderRepository ?? OrderRepository(),
+       _assetRepository = assetRepository ?? AssetRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
@@ -144,13 +154,32 @@ class SyncManager {
     var expensesPulled = 0;
     var ordersPushed = 0;
     var ordersPulled = 0;
+    var assetsPushed = 0;
+    var assetsPulled = 0;
 
     final acknowledgedCustomers = <String>[];
     final acknowledgedOrders = <String>[];
     final acknowledgedInvoices = <String>[];
     final acknowledgedBills = <String>[];
     final acknowledgedExpenses = <String>[];
+    final acknowledgedAssets = <String>[];
 
+    // --- Push pending assets ---
+    for (final asset in await _assetRepository.getPending()) {
+      if (await _client.sendAsset(asset)) {
+        await _assetRepository.markSynced(asset.uuid);
+        assetsPushed++;
+      }
+    }
+
+    // --- Pull Windows assets; pending local edits remain protected ---
+    for (final asset in await _client.fetchAssets()) {
+      final applied = await _assetRepository.upsertFromSync(asset);
+      if (applied) {
+        assetsPulled++;
+        acknowledgedAssets.add(asset.uuid);
+      }
+    }
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
       if (await _client.sendCustomer(customer)) {
@@ -305,13 +334,15 @@ class SyncManager {
         acknowledgedOrders.isNotEmpty ||
         acknowledgedInvoices.isNotEmpty ||
         acknowledgedBills.isNotEmpty ||
-        acknowledgedExpenses.isNotEmpty) {
+        acknowledgedExpenses.isNotEmpty ||
+        acknowledgedAssets.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: acknowledgedCustomers,
         orderUuids: acknowledgedOrders,
         invoiceUuids: acknowledgedInvoices,
         billUuids: acknowledgedBills,
         expenseUuids: acknowledgedExpenses,
+        assetUuids: acknowledgedAssets,
       );
       if (!acknowledged) {
         throw StateError(
@@ -332,6 +363,8 @@ class SyncManager {
       expensesPulled: expensesPulled,
       ordersPushed: ordersPushed,
       ordersPulled: ordersPulled,
+      assetsPushed: assetsPushed,
+      assetsPulled: assetsPulled,
       syncedAt: DateTime.now(),
     );
 
