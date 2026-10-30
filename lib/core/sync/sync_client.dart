@@ -275,6 +275,7 @@ class SyncClient {
     required List<String> expenseUuids,
     List<String> assetUuids = const [],
     List<String> maintenanceUuids = const [],
+    List<Map<String, Object?>> inventoryRecords = const [],
   }) async {
     return _postJson(
       '/api/sync/ack',
@@ -286,6 +287,7 @@ class SyncClient {
         'expenses': expenseUuids,
         'assets': assetUuids,
         'maintenance_records': maintenanceUuids,
+        'inventory_records': inventoryRecords,
       },
       'ack',
     );
