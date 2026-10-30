@@ -277,34 +277,44 @@ class ConsumableRepository {
     final db = await _db;
     final rows = await db.query(
       'inventory_activities',
-      columns: ['after_quantity'],
-      where: 'consumable_id = ? AND after_quantity IS NOT NULL',
+      columns: ['activity_type', 'quantity', 'observed_change', 'after_quantity'],
+      where: 'consumable_id = ?',
       whereArgs: [consumableId],
-      orderBy: 'created_at DESC, id DESC',
-      limit: 1,
+      orderBy: 'created_at ASC, uuid ASC',
     );
-    if (rows.isEmpty) return 0;
-    return (rows.first['after_quantity'] as num).toDouble();
+    return _calculateStock(rows);
   }
 
   Future<List<Consumable>> getLowStockConsumables() async {
     final db = await _db;
-    final rows = await db.rawQuery('''
-      SELECT c.*
-      FROM consumables c
-      WHERE c.tracking_type != ?
-        AND COALESCE((
-          SELECT a.after_quantity
-          FROM inventory_activities a
-          WHERE a.consumable_id = c.id AND a.after_quantity IS NOT NULL
-          ORDER BY a.created_at DESC, a.id DESC
-          LIMIT 1
-        ), 0) < c.reorder_level
-      ORDER BY c.category COLLATE NOCASE, c.name COLLATE NOCASE
-    ''', [Consumable.trackingPercentage]);
-    return rows.map(Consumable.fromMap).toList();
+    final rows = await db.query('consumables', where: 'tracking_type != ?', whereArgs: [Consumable.trackingPercentage], orderBy: 'category COLLATE NOCASE, name COLLATE NOCASE');
+    final lowStock = <Consumable>[];
+    for (final row in rows) {
+      final consumable = Consumable.fromMap(row);
+      if (await getCurrentStock(consumable.id!) < consumable.reorderLevel) lowStock.add(consumable);
+    }
+    return lowStock;
   }
 
+  double _calculateStock(List<Map<String, Object?>> rows) {
+    var stock = 0.0;
+    for (final row in rows) {
+      switch (row['activity_type']) {
+        case InventoryActivity.purchase:
+        case InventoryActivity.openingStock:
+          stock += (row['quantity'] as num?)?.toDouble() ?? 0;
+          break;
+        case InventoryActivity.stockAdjustment:
+          stock += (row['observed_change'] as num?)?.toDouble() ?? 0;
+          break;
+        case InventoryActivity.stockObservation:
+          final observed = row['after_quantity'];
+          if (observed != null) stock = (observed as num).toDouble();
+          break;
+      }
+    }
+    return stock < 0 && stock > -0.000001 ? 0 : stock;
+  }
   /// Adds a purchase or opening balance and records the resulting stock.
   Future<void> recordStockIn({
     required Consumable consumable,
@@ -437,14 +447,12 @@ class ConsumableRepository {
   ) async {
     final rows = await txn.query(
       'inventory_activities',
-      columns: ['after_quantity'],
-      where: 'consumable_id = ? AND after_quantity IS NOT NULL',
+      columns: ['activity_type', 'quantity', 'observed_change', 'after_quantity'],
+      where: 'consumable_id = ?',
       whereArgs: [consumableId],
-      orderBy: 'created_at DESC, id DESC',
-      limit: 1,
+      orderBy: 'created_at ASC, uuid ASC',
     );
-    if (rows.isEmpty) return 0;
-    return (rows.first['after_quantity'] as num).toDouble();
+    return _calculateStock(rows);
   }
   /// Returns pending inventory rows in dependency order for transport.
   Future<List<Map<String, Object?>>> getPendingSyncRecords() async {
