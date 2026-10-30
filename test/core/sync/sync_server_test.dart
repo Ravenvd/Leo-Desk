@@ -8,6 +8,7 @@ import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/models/consumable.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -46,6 +47,7 @@ void main() {
       billRepository: BillRepository(database: database),
       assetRepository: AssetRepository(database: database),
       consumableRepository: ConsumableRepository(database: database),
+      maintenanceRepository: MaintenanceRepository(database: database),
     );
     await server.start(port: 0);
   });
@@ -115,5 +117,27 @@ void main() {
     expect(await client.sendAsset(offlineAsset), isTrue);
     final fetched = await client.fetchAssets();
     expect(fetched.singleWhere((asset) => asset.uuid == offlineAsset.uuid).assetCode, 'AST-0002');
+  });
+  test('syncs maintenance records through the asset UUID relationship', () async {
+    final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
+    final now = DateTime.utc(2026, 10, 30);
+    final asset = Asset(uuid: 'maintenance-parent-asset', name: 'Machine', createdAt: now, updatedAt: now);
+    expect(await client.sendAsset(asset), isTrue);
+    final maintenance = <String, Object?>{
+      'uuid': 'maintenance-sync-test',
+      'sync_status': 'pending',
+      'asset_uuid': asset.uuid,
+      'maintenance_date': now.toIso8601String(),
+      'description': 'Annual servicing',
+      'cost_paise': 150000,
+      'notes': 'Sync test',
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    };
+    expect(await client.sendMaintenanceRecord(maintenance), isTrue);
+    final fetched = await client.fetchMaintenanceRecords();
+    expect(fetched.single['uuid'], 'maintenance-sync-test');
+    expect(fetched.single['asset_uuid'], asset.uuid);
+    expect(fetched.single.containsKey('asset_id'), isFalse);
   });
 }
