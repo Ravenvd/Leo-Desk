@@ -70,6 +70,8 @@ class SyncResult {
   String toString() {
     if (!connected) return 'Server not reachable';
     return 'Customers: $customersPushed sent, $customersPulled received · '
+        'Assets: $assetsPushed sent, $assetsPulled received · '
+        'Inventory: $inventoryPushed sent, $inventoryPulled received · '
         'Bills: $billsPushed sent, $billsPulled received · '
         'Invoices: $invoicesPushed sent, $invoicesPulled received · '
         'Expenses: $expensesPushed sent, $expensesPulled received · '
@@ -179,13 +181,23 @@ class SyncManager {
     // --- Push pending assets ---
     for (final asset in await _assetRepository.getPending()) {
       if (await _client.sendAsset(asset)) {
-        await _assetRepository.markSynced(asset.uuid);
+        if (asset.syncStatus == 'deleted_pending') {
+          await _assetRepository.finalizeDeletion(asset.uuid);
+        } else {
+          await _assetRepository.markSynced(asset.uuid);
+        }
         assetsPushed++;
       }
     }
 
     // --- Pull Windows assets; pending local edits remain protected ---
     for (final asset in await _client.fetchAssets()) {
+      if (asset.syncStatus == 'deleted_pending') {
+        await _assetRepository.applyDeletionFromSync(asset.uuid);
+        assetsPulled++;
+        acknowledgedAssets.add(asset.uuid);
+        continue;
+      }
       final applied = await _assetRepository.upsertFromSync(asset);
       if (applied) {
         assetsPulled++;
