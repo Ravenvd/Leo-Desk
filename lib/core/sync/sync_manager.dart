@@ -189,6 +189,7 @@ class SyncManager {
     final acknowledgedExpenses = <String>[];
     final acknowledgedAssets = <String>[];
     final acknowledgedMaintenance = <String>[];
+    final acknowledgedInventory = <Map<String, Object?>>[];
 
     // --- Push pending assets ---
     for (final asset in await _assetRepository.getPending()) {
@@ -325,7 +326,13 @@ class SyncManager {
     // --- Pull Windows inventory snapshot in dependency order ---
     for (final record in await _client.fetchInventoryRecords()) {
       final applied = await _consumableRepository.upsertSyncRecord(record, force: true);
-      if (applied) inventoryPulled++;
+      if (applied) {
+        inventoryPulled++;
+        acknowledgedInventory.add({
+          'record_type': record['record_type'],
+          'uuid': record['uuid'],
+        });
+      }
     }
     // --- Push pending invoices ---
     for (final invoice in await _invoiceRepository.getPending()) {
@@ -411,7 +418,8 @@ class SyncManager {
         acknowledgedBills.isNotEmpty ||
         acknowledgedExpenses.isNotEmpty ||
         acknowledgedAssets.isNotEmpty ||
-        acknowledgedMaintenance.isNotEmpty) {
+        acknowledgedMaintenance.isNotEmpty ||
+        acknowledgedInventory.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: acknowledgedCustomers,
         orderUuids: acknowledgedOrders,
@@ -420,6 +428,7 @@ class SyncManager {
         expenseUuids: acknowledgedExpenses,
         assetUuids: acknowledgedAssets,
         maintenanceUuids: acknowledgedMaintenance,
+        inventoryRecords: acknowledgedInventory,
       );
       if (!acknowledged) {
         throw StateError(
@@ -544,8 +553,13 @@ class SyncManager {
       await _assetRepository.upsertFromSync(asset, force: true);
     }
 
+    final acknowledgedInventory = <Map<String, Object?>>[];
     for (final record in inventoryRecords) {
       await _consumableRepository.upsertSyncRecord(record, force: true);
+      acknowledgedInventory.add({
+        'record_type': record['record_type'],
+        'uuid': record['uuid'],
+      });
     }
 
     for (final record in maintenanceRecords) {
@@ -558,7 +572,10 @@ class SyncManager {
 
     // Windows tombstones are temporary. Once the replacement has completed,
     // acknowledge them so Windows can physically remove them as well.
-    if (acknowledgedExpenses.isNotEmpty || acknowledgedAssets.isNotEmpty || acknowledgedMaintenance.isNotEmpty) {
+    if (acknowledgedExpenses.isNotEmpty ||
+        acknowledgedAssets.isNotEmpty ||
+        acknowledgedMaintenance.isNotEmpty ||
+        acknowledgedInventory.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: const [],
         orderUuids: const [],
@@ -567,6 +584,7 @@ class SyncManager {
         expenseUuids: acknowledgedExpenses,
         assetUuids: acknowledgedAssets,
         maintenanceUuids: acknowledgedMaintenance,
+        inventoryRecords: acknowledgedInventory,
       );
       if (!acknowledged) {
         throw StateError(
