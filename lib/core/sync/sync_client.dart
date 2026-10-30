@@ -7,6 +7,7 @@ import '../../features/customers/models/customer.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/invoices/models/invoice.dart';
 import '../../features/invoices/models/invoice_item.dart';
+import '../../features/inventory/models/asset.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/models/order_item.dart';
 
@@ -214,6 +215,17 @@ class SyncClient {
     }
   }
 
+  Future<List<Asset>> fetchAssets() async {
+    final decoded = await _getJson('/api/assets');
+    if (decoded is! List) throw const FormatException('Invalid assets response.');
+    return decoded.map((item) => Asset.fromMap(Map<String, Object?>.from(item as Map))).toList();
+  }
+
+  Future<bool> sendAsset(Asset asset) async {
+    final map = asset.toMap()..remove('id')..remove('sync_status');
+    return _postJson('/api/assets', map, asset.uuid);
+  }
+
   Future<List<Customer>> fetchCustomers() async {
     final decoded = await _getJson('/api/customers');
 
@@ -232,6 +244,7 @@ class SyncClient {
     required List<String> invoiceUuids,
     required List<String> billUuids,
     required List<String> expenseUuids,
+    List<String> assetUuids = const [],
   }) async {
     return _postJson(
       '/api/sync/ack',
@@ -241,6 +254,7 @@ class SyncClient {
         'invoices': invoiceUuids,
         'bills': billUuids,
         'expenses': expenseUuids,
+        'assets': assetUuids,
       },
       'ack',
     );
