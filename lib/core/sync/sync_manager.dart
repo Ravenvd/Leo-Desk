@@ -551,6 +551,7 @@ class SyncManager {
         continue;
       }
       await _assetRepository.upsertFromSync(asset, force: true);
+      acknowledgedAssets.add(asset.uuid);
     }
 
     final acknowledgedInventory = <Map<String, Object?>>[];
@@ -563,11 +564,13 @@ class SyncManager {
     }
 
     for (final record in maintenanceRecords) {
+      final uuid = record['uuid'] as String;
       if (record['sync_status'] == 'deleted_pending') {
-        acknowledgedMaintenance.add(record['uuid'] as String);
+        acknowledgedMaintenance.add(uuid);
         continue;
       }
       await _maintenanceRepository.upsertFromSync(record, force: true);
+      acknowledgedMaintenance.add(uuid);
     }
 
     // Windows tombstones are temporary. Once the replacement has completed,
