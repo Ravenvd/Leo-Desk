@@ -164,6 +164,26 @@ class AssetRepository {
     final map = asset.copyWith(syncStatus: Asset.syncStatusSynced).toMap()
       ..remove('id');
 
+    // Asset codes are allocated by Windows and may collide temporarily with
+    // a different Android-created asset's locally generated code. Free the
+    // canonical code before applying the Windows row; the displaced asset
+    // will receive its own canonical code when its UUID is pulled.
+    final codeOwner = await db.query(
+      'assets',
+      columns: ['id', 'uuid'],
+      where: 'asset_code = ? AND uuid != ?',
+      whereArgs: [asset.assetCode, asset.uuid],
+      limit: 1,
+    );
+    if (codeOwner.isNotEmpty) {
+      await db.update(
+        'assets',
+        {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
+        where: 'id = ?',
+        whereArgs: [codeOwner.first['id']],
+      );
+    }
+
     if (existing.isEmpty) {
       await db.insert('assets', map);
     } else {
