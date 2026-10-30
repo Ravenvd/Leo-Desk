@@ -429,6 +429,8 @@ class SyncManager {
     final invoices = await _client.fetchInvoices();
     final bills = await _client.fetchBills();
     final expenses = await _client.fetchExpenses();
+    final assets = await _client.fetchAssets();
+    final inventoryRecords = await _client.fetchInventoryRecords();
 
     // Windows is authoritative for this operation. Replace every local
     // record, including unsynced local changes.
@@ -437,6 +439,8 @@ class SyncManager {
     await _orderRepository.deleteAll();
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
+    await _consumableRepository.deleteAllForSyncReplacement();
+    await _assetRepository.deleteAll();
 
     for (final customer in customers) {
       await _customerRepository.upsertFromSync(
@@ -471,6 +475,7 @@ class SyncManager {
     }
 
     final acknowledgedExpenses = <String>[];
+    final acknowledgedAssets = <String>[];
     var expensesApplied = 0;
 
     for (final expense in expenses) {
@@ -486,19 +491,31 @@ class SyncManager {
       expensesApplied++;
     }
 
+    for (final asset in assets) {
+      if (asset.syncStatus == 'deleted_pending') {
+        acknowledgedAssets.add(asset.uuid);
+        continue;
+      }
+      await _assetRepository.upsertFromSync(asset, force: true);
+    }
+
+    for (final record in inventoryRecords) {
+      await _consumableRepository.upsertSyncRecord(record, force: true);
+    }
     // Windows tombstones are temporary. Once the replacement has completed,
     // acknowledge them so Windows can physically remove them as well.
-    if (acknowledgedExpenses.isNotEmpty) {
+    if (acknowledgedExpenses.isNotEmpty || acknowledgedAssets.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: const [],
         orderUuids: const [],
         invoiceUuids: const [],
         billUuids: const [],
         expenseUuids: acknowledgedExpenses,
+        assetUuids: acknowledgedAssets,
       );
       if (!acknowledged) {
         throw StateError(
-          'Windows database was pulled, but expense deletions could not be acknowledged.',
+          'Windows database was pulled, but deletions could not be acknowledged.',
         );
       }
     }
@@ -510,6 +527,8 @@ class SyncManager {
       invoicesPulled: invoices.length,
       expensesPulled: expensesApplied,
       ordersPulled: orders.length,
+      assetsPulled: assets.where((asset) => asset.syncStatus != 'deleted_pending').length,
+      inventoryPulled: inventoryRecords.length,
       syncedAt: DateTime.now(),
     );
 
