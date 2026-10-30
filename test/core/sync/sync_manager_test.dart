@@ -1319,6 +1319,22 @@ void main() {
     final windowsInventory = ConsumableRepository(database: serverDatabase);
     final androidInventory = ConsumableRepository(database: clientDatabase);
     final now = DateTime.utc(2026, 10, 30);
+
+    // Occupy a local integer ID so the synced relationship must resolve by UUID.
+    await androidInventory.insertConsumable(Consumable(
+      uuid: 'android-local-id-offset',
+      category: Consumable.categoryOils,
+      name: 'Local-only oil',
+      trackingType: Consumable.trackingQuantity,
+      stockUnit: Consumable.unitMillilitres,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await androidInventory.markSyncRecordSynced(
+      'consumables',
+      'android-local-id-offset',
+    );
+
     final beads = Consumable(
       uuid: 'windows-beads-sync',
       category: Consumable.categoryBeads,
@@ -1344,7 +1360,10 @@ void main() {
     expect(result.connected, isTrue);
     expect(result.inventoryPulled, 2);
 
-    final localBeads = (await androidInventory.getConsumables()).single;
+    final localBeads = (await androidInventory.getConsumables()).singleWhere(
+      (consumable) => consumable.uuid == beads.uuid,
+    );
+    expect(localBeads.id, isNot(1));
     expect(localBeads.uuid, beads.uuid);
     expect(await androidInventory.getCurrentStock(localBeads.id!), 500);
 
