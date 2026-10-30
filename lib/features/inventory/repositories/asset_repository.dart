@@ -168,32 +168,34 @@ class AssetRepository {
     // a different Android-created asset's locally generated code. Free the
     // canonical code before applying the Windows row; the displaced asset
     // will receive its own canonical code when its UUID is pulled.
-    final codeOwner = await db.query(
-      'assets',
-      columns: ['id', 'uuid'],
-      where: 'asset_code = ? AND uuid != ?',
-      whereArgs: [asset.assetCode, asset.uuid],
-      limit: 1,
-    );
-    if (codeOwner.isNotEmpty) {
-      await db.update(
+    await db.transaction((txn) async {
+      final codeOwner = await txn.query(
         'assets',
-        {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
-        where: 'id = ?',
-        whereArgs: [codeOwner.first['id']],
+        columns: ['id', 'uuid'],
+        where: 'asset_code = ? AND uuid != ?',
+        whereArgs: [asset.assetCode, asset.uuid],
+        limit: 1,
       );
-    }
+      if (codeOwner.isNotEmpty) {
+        await txn.update(
+          'assets',
+          {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
+          where: 'id = ?',
+          whereArgs: [codeOwner.first['id']],
+        );
+      }
 
-    if (existing.isEmpty) {
-      await db.insert('assets', map);
-    } else {
-      await db.update(
-        'assets',
-        map,
-        where: 'id = ?',
-        whereArgs: [existing.first['id']],
-      );
-    }
+      if (existing.isEmpty) {
+        await txn.insert('assets', map);
+      } else {
+        await txn.update(
+          'assets',
+          map,
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+    });
 
     return true;
   }
