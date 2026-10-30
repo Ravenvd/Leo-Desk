@@ -14,6 +14,7 @@ import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -140,6 +141,7 @@ void main() {
       consumableRepository: ConsumableRepository(database: clientDb),
         invoiceRepository: clientInvoices,
         assetRepository: AssetRepository(database: clientDatabase),
+      maintenanceRepository: MaintenanceRepository(database: clientDatabase),
         consumableRepository: ConsumableRepository(database: clientDatabase),
         saveLastSyncTime: (_) async {},
       );
@@ -151,6 +153,7 @@ void main() {
         invoiceRepository: serverInvoices,
         orderRepository: serverOrders,
       assetRepository: AssetRepository(database: serverDatabase),
+      maintenanceRepository: MaintenanceRepository(database: serverDatabase),
       consumableRepository: ConsumableRepository(database: serverDatabase),
       );
       await server.start(port: port);
