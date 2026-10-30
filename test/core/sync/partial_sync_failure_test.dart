@@ -137,8 +137,6 @@ void main() {
         client: client,
         customerRepository: clientCustomers,
         orderRepository: clientOrders,
-      assetRepository: AssetRepository(database: clientDatabase),
-      consumableRepository: ConsumableRepository(database: clientDatabase),
         invoiceRepository: clientInvoices,
         assetRepository: AssetRepository(database: clientDatabase),
       maintenanceRepository: MaintenanceRepository(database: clientDatabase),
