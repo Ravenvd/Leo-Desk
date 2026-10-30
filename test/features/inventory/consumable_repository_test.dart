@@ -281,4 +281,19 @@ void main() {
     await sourceDb.close();
     await targetDb.close();
   });
+  test('merges independent offline purchases without losing either quantity', () async {
+    final db = await openTestDb();
+    final repository = ConsumableRepository(database: db);
+    final model = item(category: Consumable.categoryBeads, name: 'Gold beads', trackingType: Consumable.trackingQuantity, unit: Consumable.unitGrams);
+    final id = await repository.insertConsumable(model);
+    final saved = (await repository.getConsumableById(id))!;
+    await repository.recordStockIn(consumable: saved, quantity: 500, activityType: InventoryActivity.openingStock);
+    await repository.recordStockIn(consumable: saved, quantity: 100, activityType: InventoryActivity.purchase);
+    final remoteEvent = InventoryActivity(uuid: 'offline-device-purchase', consumableId: id, consumableUuid: saved.uuid, activityType: InventoryActivity.purchase, quantity: 250, unit: Consumable.unitGrams, beforeQuantity: 500, afterQuantity: 750, createdAt: DateTime.now().add(const Duration(seconds: 1)), updatedAt: DateTime.now().add(const Duration(seconds: 1)));
+    final payload = remoteEvent.toMap()..remove('id')..remove('consumable_id');
+    payload['record_type'] = 'inventory_activities';
+    expect(await repository.upsertSyncRecord(payload), isTrue);
+    expect(await repository.getCurrentStock(id), 850);
+    await db.close();
+  });
 }
