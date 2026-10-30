@@ -47,7 +47,6 @@ void main() {
       customerRepository: CustomerRepository(database: database),
       billRepository: BillRepository(database: database),
       assetRepository: AssetRepository(database: database),
-      maintenanceRepository: MaintenanceRepository(database: database),
       consumableRepository: ConsumableRepository(database: database),
       maintenanceRepository: MaintenanceRepository(database: database),
     );
