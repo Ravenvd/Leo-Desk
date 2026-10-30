@@ -318,7 +318,10 @@ class SyncManager {
     // --- Push pending consumables, spools, then activity events ---
     for (final record in await _consumableRepository.getPendingSyncRecords()) {
       if (await _client.sendInventoryRecord(record)) {
-        await _consumableRepository.markSyncRecordSynced(record['record_type'] as String, record['uuid'] as String);
+        await _consumableRepository.markSyncRecordSynced(
+          record['record_type'] as String,
+          record['uuid'] as String,
+        );
         inventoryPushed++;
       }
     }
