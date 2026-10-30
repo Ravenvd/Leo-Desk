@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -11,8 +13,8 @@ void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
-  Future<Database> openTestDb() => openDatabase(
-        inMemoryDatabasePath,
+  Future<Database> openTestDb([String? path]) => openDatabase(
+        path ?? inMemoryDatabasePath,
         version: DatabaseSchema.version,
         onConfigure: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
@@ -253,7 +255,8 @@ void main() {
     await db.close();
   });
   test('inventory sync exports UUID relationships and imports into different local IDs', () async {
-    final sourceDb = await openTestDb();
+    final directory = await Directory.systemTemp.createTemp('leo_inventory_sync_');
+    final sourceDb = await openTestDb('${directory.path}/source.db');
     final source = ConsumableRepository(database: sourceDb);
     final thread = item(category: Consumable.categoryEmbroideryThread, name: 'Black', trackingType: Consumable.trackingPercentage, unit: Consumable.unitMetres);
     final sourceId = await source.insertConsumable(thread);
@@ -262,7 +265,7 @@ void main() {
     final records = await source.getAllSyncRecords();
     expect(records.map((record) => record['record_type']).toList(), ['consumables', 'thread_spools', 'inventory_activities']);
 
-    final targetDb = await openTestDb();
+    final targetDb = await openTestDb('${directory.path}/target.db');
     final target = ConsumableRepository(database: targetDb);
     final dummy = item(category: Consumable.categoryBeads, name: 'Dummy', trackingType: Consumable.trackingQuantity, unit: Consumable.unitGrams);
     await target.insertConsumable(dummy);
@@ -280,6 +283,7 @@ void main() {
     expect(history.single.spoolUuid, spools.single.uuid);
     await sourceDb.close();
     await targetDb.close();
+    await directory.delete(recursive: true);
   });
   test('merges independent offline purchases without losing either quantity', () async {
     final db = await openTestDb();
