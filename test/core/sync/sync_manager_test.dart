@@ -1437,4 +1437,45 @@ void main() {
   });
 
 
+  test('Windows pending consumable edit wins over an Android conflict', () async {
+    final windowsInventory = ConsumableRepository(database: serverDatabase);
+    final androidInventory = ConsumableRepository(database: clientDatabase);
+    final now = DateTime.utc(2026, 10, 30);
+
+    await windowsInventory.insertConsumable(Consumable(
+      uuid: 'shared-consumable-conflict',
+      category: Consumable.categoryBeads,
+      name: 'Windows version',
+      trackingType: Consumable.trackingQuantity,
+      stockUnit: Consumable.unitGrams,
+      reorderLevel: 200,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await androidInventory.insertConsumable(Consumable(
+      uuid: 'shared-consumable-conflict',
+      category: Consumable.categoryBeads,
+      name: 'Android offline edit',
+      trackingType: Consumable.trackingQuantity,
+      stockUnit: Consumable.unitGrams,
+      reorderLevel: 100,
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.inventoryPushed, 0);
+    expect(result.inventoryPulled, 1);
+
+    final local = (await androidInventory.getConsumables()).single;
+    final windows = (await windowsInventory.getConsumables()).single;
+    expect(local.name, 'Windows version');
+    expect(local.reorderLevel, 200);
+    expect(local.syncStatus, 'synced');
+    expect(windows.syncStatus, 'synced');
+  });
+
+
 }
