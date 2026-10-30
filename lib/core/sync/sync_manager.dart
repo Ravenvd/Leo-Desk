@@ -4,6 +4,7 @@ import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
+import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -22,6 +23,8 @@ class SyncResult {
   final int ordersPulled;
   final int assetsPushed;
   final int assetsPulled;
+  final int inventoryPushed;
+  final int inventoryPulled;
   final DateTime syncedAt;
 
   const SyncResult({
@@ -38,6 +41,8 @@ class SyncResult {
     this.ordersPulled = 0,
     this.assetsPushed = 0,
     this.assetsPulled = 0,
+    this.inventoryPushed = 0,
+    this.inventoryPulled = 0,
     required this.syncedAt,
   });
 
@@ -57,7 +62,9 @@ class SyncResult {
       ordersPushed +
       ordersPulled +
       assetsPushed +
-      assetsPulled;
+      assetsPulled +
+      inventoryPushed +
+      inventoryPulled;
 
   @override
   String toString() {
@@ -87,6 +94,7 @@ class SyncManager {
   final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
   final AssetRepository _assetRepository;
+  final ConsumableRepository _consumableRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
   Future<SyncResult>? _activeSync;
@@ -99,6 +107,7 @@ class SyncManager {
     InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
     AssetRepository? assetRepository,
+    ConsumableRepository? consumableRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
@@ -106,6 +115,7 @@ class SyncManager {
        _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
        _orderRepository = orderRepository ?? OrderRepository(),
        _assetRepository = assetRepository ?? AssetRepository(),
+       _consumableRepository = consumableRepository ?? ConsumableRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
@@ -156,6 +166,8 @@ class SyncManager {
     var ordersPulled = 0;
     var assetsPushed = 0;
     var assetsPulled = 0;
+    var inventoryPushed = 0;
+    var inventoryPulled = 0;
 
     final acknowledgedCustomers = <String>[];
     final acknowledgedOrders = <String>[];
@@ -179,6 +191,19 @@ class SyncManager {
         assetsPulled++;
         acknowledgedAssets.add(asset.uuid);
       }
+    }
+    // --- Push pending consumables, spools, then activity events ---
+    for (final record in await _consumableRepository.getPendingSyncRecords()) {
+      if (await _client.sendInventoryRecord(record)) {
+        await _consumableRepository.markSyncRecordSynced(record['record_type'] as String, record['uuid'] as String);
+        inventoryPushed++;
+      }
+    }
+
+    // --- Pull Windows inventory snapshot in dependency order ---
+    for (final record in await _client.fetchInventoryRecords()) {
+      final applied = await _consumableRepository.upsertSyncRecord(record);
+      if (applied) inventoryPulled++;
     }
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
@@ -365,6 +390,8 @@ class SyncManager {
       ordersPulled: ordersPulled,
       assetsPushed: assetsPushed,
       assetsPulled: assetsPulled,
+      inventoryPushed: inventoryPushed,
+      inventoryPulled: inventoryPulled,
       syncedAt: DateTime.now(),
     );
 
