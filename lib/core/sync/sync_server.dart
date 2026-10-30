@@ -10,6 +10,7 @@ import '../../features/invoices/repositories/invoice_repository.dart';
 import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
+import '../../features/inventory/repositories/maintenance_repository.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
@@ -27,6 +28,7 @@ class SyncServer {
   final OrderRepository _orderRepository;
   final AssetRepository _assetRepository;
   final ConsumableRepository _consumableRepository;
+  final MaintenanceRepository _maintenanceRepository;
   final String token;
 
   SyncServer({
@@ -37,6 +39,7 @@ class SyncServer {
     OrderRepository? orderRepository,
     AssetRepository? assetRepository,
     ConsumableRepository? consumableRepository,
+    MaintenanceRepository? maintenanceRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
@@ -44,7 +47,8 @@ class SyncServer {
        _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
        _orderRepository = orderRepository ?? OrderRepository(),
        _assetRepository = assetRepository ?? AssetRepository(),
-       _consumableRepository = consumableRepository ?? ConsumableRepository();
+       _consumableRepository = consumableRepository ?? ConsumableRepository(),
+       _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository();
 
   bool get isRunning => _server != null;
 
@@ -115,6 +119,9 @@ class SyncServer {
         for (final uuid in uuids('assets')) {
           await _assetRepository.acknowledgeSyncedOrDeleted(uuid);
         }
+        for (final uuid in uuids('maintenance_records')) {
+          await _maintenanceRepository.acknowledgeSyncedOrDeleted(uuid);
+        }
 
         await _sendJson(request.response, 200, {
           'status': 'ok',
@@ -123,6 +130,39 @@ class SyncServer {
         return;
       }
 
+      if (request.method == 'GET' && request.uri.path == '/api/maintenance') {
+        await _sendJson(request.response, 200, await _maintenanceRepository.getAllForSync());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/maintenance/delete') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid maintenance deletion data.'});
+          return;
+        }
+        final uuid = decoded['uuid'] as String;
+        await _maintenanceRepository.markDeletedPendingByUuid(uuid);
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/maintenance') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid maintenance record.'});
+          return;
+        }
+        final record = Map<String, Object?>.from(decoded);
+        final uuid = record['uuid'] as String;
+        final applied = await _maintenanceRepository.upsertFromSync(record);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Maintenance record has a pending Windows edit.', 'uuid': uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
       if (request.method == 'GET' && request.uri.path == '/api/inventory') {
         final records = await _consumableRepository.getAllSyncRecords();
         await _sendJson(request.response, 200, records);
