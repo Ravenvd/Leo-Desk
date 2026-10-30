@@ -122,6 +122,17 @@ class SyncServer {
         for (final uuid in uuids('maintenance_records')) {
           await _maintenanceRepository.acknowledgeSyncedOrDeleted(uuid);
         }
+        final inventoryRecords = decoded['inventory_records'];
+        if (inventoryRecords is List) {
+          for (final item in inventoryRecords) {
+            if (item is! Map) continue;
+            final table = item['record_type'];
+            final uuid = item['uuid'];
+            if (table is String && uuid is String) {
+              await _consumableRepository.markSyncRecordSynced(table, uuid);
+            }
+          }
+        }
 
         await _sendJson(request.response, 200, {
           'status': 'ok',
