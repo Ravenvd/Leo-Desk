@@ -129,6 +129,13 @@ class AssetRepository {
     );
   }
 
+  Future<int> markDeletedPendingByUuid(String uuid) async {
+    final db = await _db;
+    return db.update('assets', {'sync_status': Asset.syncStatusDeletedPending, 'updated_at': DateTime.now().toIso8601String()}, where: 'uuid = ?', whereArgs: [uuid]);
+  }
+
+  Future<int> applyDeletionFromSync(String uuid) => finalizeDeletion(uuid);
+
   Future<int> finalizeDeletion(String uuid) async {
     final db = await _db;
     return db.delete('assets', where: 'uuid = ?', whereArgs: [uuid]);
