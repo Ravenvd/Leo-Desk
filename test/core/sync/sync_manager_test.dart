@@ -17,6 +17,7 @@ import 'package:leo_desk/features/expenses/repositories/expense_repository.dart'
 import 'package:leo_desk/features/invoices/models/invoice.dart';
 import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/models/consumable.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
@@ -1391,6 +1392,47 @@ void main() {
     expect(
       windowsRecords.every((record) => record['sync_status'] == 'synced'),
       isTrue,
+    );
+  });
+
+
+  test('reconciles colliding local asset codes to Windows canonical codes', () async {
+    final windowsAssets = AssetRepository(database: serverDatabase);
+    final androidAssets = AssetRepository(database: clientDatabase);
+    final now = DateTime.utc(2026, 10, 30);
+
+    final windowsAsset = Asset(
+      uuid: 'windows-canonical-asset',
+      name: 'Windows machine',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await windowsAssets.insert(windowsAsset);
+    await windowsAssets.markSynced(windowsAsset.uuid);
+
+    final androidAsset = Asset(
+      uuid: 'android-offline-asset',
+      name: 'Android machine',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await androidAssets.insert(androidAsset);
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.assetsPushed, 1);
+    expect(result.assetsPulled, 2);
+
+    final localAssets = await androidAssets.getAll();
+    expect(localAssets, hasLength(2));
+    expect(
+      localAssets.singleWhere((asset) => asset.uuid == windowsAsset.uuid).assetCode,
+      'AST-0001',
+    );
+    expect(
+      localAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
+      'AST-0002',
     );
   });
 
