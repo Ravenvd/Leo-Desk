@@ -7,6 +7,8 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/models/asset.dart';
+import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
@@ -22,6 +24,7 @@ class SyncServer {
   final ExpenseRepository _expenseRepository;
   final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
+  final AssetRepository _assetRepository;
   final String token;
 
   SyncServer({
@@ -30,12 +33,14 @@ class SyncServer {
     ExpenseRepository? expenseRepository,
     InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
+    AssetRepository? assetRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
-       _orderRepository = orderRepository ?? OrderRepository();
+       _orderRepository = orderRepository ?? OrderRepository(),
+       _assetRepository = assetRepository ?? AssetRepository();
 
   bool get isRunning => _server != null;
 
@@ -103,6 +108,9 @@ class SyncServer {
         for (final uuid in uuids('expenses')) {
           await _expenseRepository.acknowledgeSyncedOrDeleted(uuid);
         }
+        for (final uuid in uuids('assets')) {
+          await _assetRepository.acknowledgeSyncedOrDeleted(uuid);
+        }
 
         await _sendJson(request.response, 200, {
           'status': 'ok',
@@ -111,6 +119,30 @@ class SyncServer {
         return;
       }
 
+      if (request.method == 'GET' && request.uri.path == '/api/assets') {
+        final assets = await _assetRepository.getAllForSync();
+        await _sendJson(request.response, 200, assets.map((asset) {
+          final map = asset.toMap()..remove('id');
+          return map;
+        }).toList());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/assets') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {'error': 'Invalid asset data.'});
+          return;
+        }
+        final asset = Asset.fromMap(Map<String, Object?>.from(decoded));
+        final applied = await _assetRepository.upsertFromSync(asset);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Asset could not be applied.', 'uuid': asset.uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': asset.uuid});
+        return;
+      }
       if (request.method == 'GET' && request.uri.path == '/api/customers') {
         final customers = await _customerRepository.getAll();
 
