@@ -150,7 +150,7 @@ class MaintenanceRepository {
     if (assets.isEmpty) throw StateError('Missing live asset $assetUuid for maintenance sync.');
     map['asset_id'] = assets.first['id'];
     final existing = await db.query('maintenance_records', columns: ['id', 'sync_status'], where: 'uuid = ?', whereArgs: [uuid], limit: 1);
-    if (existing.isNotEmpty && !force && existing.first['sync_status'] == MaintenanceRecord.syncStatusPending) return false;
+    if (existing.isNotEmpty && !force && (existing.first['sync_status'] == MaintenanceRecord.syncStatusPending || existing.first['sync_status'] == MaintenanceRecord.syncStatusDeletedPending)) return false;
     map['sync_status'] = MaintenanceRecord.syncStatusSynced;
     if (existing.isEmpty) {
       await db.insert('maintenance_records', map);
