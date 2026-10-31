@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.1 - 2026-10-31
+
+### Added
+- Windows startup password lockscreen, with automatic relocking after five minutes of inactivity.
+- Responsive lockscreen layout for smaller application windows.
+- Expanded the Android–Windows order sync window from 10 to 100 records in each direction.
+
+### Fixed
+- Stabilize sync round-trip test setup by ensuring server repositories use the isolated test database.
+- Improve lockscreen and inactivity-lock widget test reliability.
+
 ## 1.3.0 - 2026-10-31
 
 ### Added
