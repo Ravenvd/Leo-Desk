@@ -727,7 +727,7 @@ class _AttendanceDialogState extends State<_AttendanceDialog> {
                     if (time != null) setState(() => _checkOut = time);
                   },
                 ),
-                const Text('Overtime is calculated automatically after 4:00 PM at ₹37.50/hour.'),
+                const Text('Overtime is calculated automatically for time worked before 10:00 AM and after 4:00 PM at ₹37.50/hour.'),
                 const SizedBox(height: 12),
                 TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes')),
               ],
