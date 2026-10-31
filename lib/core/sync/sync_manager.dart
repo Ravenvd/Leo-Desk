@@ -7,6 +7,7 @@ import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/inventory/repositories/maintenance_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
+import '../../features/staff/repositories/staff_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
 
@@ -28,6 +29,8 @@ class SyncResult {
   final int inventoryPulled;
   final int maintenancePushed;
   final int maintenancePulled;
+  final int staffRecordsPushed;
+  final int staffRecordsPulled;
   final DateTime syncedAt;
 
   const SyncResult({
@@ -48,6 +51,8 @@ class SyncResult {
     this.inventoryPulled = 0,
     this.maintenancePushed = 0,
     this.maintenancePulled = 0,
+    this.staffRecordsPushed = 0,
+    this.staffRecordsPulled = 0,
     required this.syncedAt,
   });
 
@@ -71,7 +76,9 @@ class SyncResult {
       inventoryPushed +
       inventoryPulled +
       maintenancePushed +
-      maintenancePulled;
+      maintenancePulled +
+      staffRecordsPushed +
+      staffRecordsPulled;
 
   @override
   String toString() {
@@ -79,7 +86,7 @@ class SyncResult {
     return 'Customers: $customersPushed sent, $customersPulled received · '
         'Assets: $assetsPushed sent, $assetsPulled received · '
         'Inventory: $inventoryPushed sent, $inventoryPulled received · '
-        'Maintenance: $maintenancePushed sent, $maintenancePulled received · '
+        'Maintenance: $maintenancePushed sent, $maintenancePulled received · '\n        'Staff: $staffRecordsPushed sent, $staffRecordsPulled received · '
         'Bills: $billsPushed sent, $billsPulled received · '
         'Invoices: $invoicesPushed sent, $invoicesPulled received · '
         'Expenses: $expensesPushed sent, $expensesPulled received · '
@@ -108,6 +115,7 @@ class SyncManager {
   final AssetRepository _assetRepository;
   final ConsumableRepository _consumableRepository;
   final MaintenanceRepository _maintenanceRepository;
+  final StaffRepository _staffRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
   Future<SyncResult>? _activeSync;
@@ -122,6 +130,7 @@ class SyncManager {
     AssetRepository? assetRepository,
     ConsumableRepository? consumableRepository,
     MaintenanceRepository? maintenanceRepository,
+    StaffRepository? staffRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
@@ -131,6 +140,7 @@ class SyncManager {
        _assetRepository = assetRepository ?? AssetRepository(),
        _consumableRepository = consumableRepository ?? ConsumableRepository(),
        _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository(),
+       _staffRepository = staffRepository ?? StaffRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
@@ -185,6 +195,8 @@ class SyncManager {
     var inventoryPulled = 0;
     var maintenancePushed = 0;
     var maintenancePulled = 0;
+    var staffRecordsPushed = 0;
+    var staffRecordsPulled = 0;
 
     final acknowledgedCustomers = <String>[];
     final acknowledgedOrders = <String>[];
@@ -193,7 +205,28 @@ class SyncManager {
     final acknowledgedExpenses = <String>[];
     final acknowledgedAssets = <String>[];
     final acknowledgedMaintenance = <String>[];
+    final acknowledgedStaff = staffRecords.map((r) => r['uuid'] as String).toList();
+    final acknowledgedStaffAttendance = staffAttendanceRecords.map((r) => r['uuid'] as String).toList();
+    final acknowledgedStaffPayments = staffPaymentRecords.map((r) => r['uuid'] as String).toList();
     final acknowledgedInventory = <Map<String, Object?>>[];
+    final acknowledgedStaff = <String>[];
+    final acknowledgedStaffAttendance = <String>[];
+    final acknowledgedStaffPayments = <String>[];
+
+    // --- Push and pull staff profiles before their dependent records ---
+    for (final staff in await _staffRepository.getPendingStaff()) {
+      if (await _client.sendStaffRecord('staff', staff.toMap())) {
+        await _staffRepository.markSynced('staff', staff.uuid);
+        staffRecordsPushed++;
+      }
+    }
+    for (final record in await _client.fetchStaffRecords('staff')) {
+      final applied = await _staffRepository.upsertStaffFromSync(record, force: true);
+      if (applied) {
+        staffRecordsPulled++;
+        acknowledgedStaff.add(record['uuid'] as String);
+      }
+    }
 
     // --- Push pending assets ---
     for (final asset in await _assetRepository.getPending()) {
@@ -419,6 +452,35 @@ class SyncManager {
       }
     }
 
+    // --- Staff attendance and payments depend on staff profiles ---
+    for (final attendance in await _staffRepository.getPendingAttendance()) {
+      if (await _client.sendStaffRecord('staff_attendance', attendance.toMap())) {
+        await _staffRepository.markSynced('staff_attendance', attendance.uuid);
+        staffRecordsPushed++;
+      }
+    }
+    for (final record in await _client.fetchStaffRecords('staff_attendance')) {
+      final applied = await _staffRepository.upsertAttendanceFromSync(record, force: true);
+      if (applied) {
+        staffRecordsPulled++;
+        acknowledgedStaffAttendance.add(record['uuid'] as String);
+      }
+    }
+
+    for (final payment in await _staffRepository.getPendingPayments()) {
+      if (await _client.sendStaffRecord('staff_payments', payment.toMap())) {
+        await _staffRepository.markSynced('staff_payments', payment.uuid);
+        staffRecordsPushed++;
+      }
+    }
+    for (final record in await _client.fetchStaffRecords('staff_payments')) {
+      final applied = await _staffRepository.upsertPaymentFromSync(record, force: true);
+      if (applied) {
+        staffRecordsPulled++;
+        acknowledgedStaffPayments.add(record['uuid'] as String);
+      }
+    }
+
     if (acknowledgedCustomers.isNotEmpty ||
         acknowledgedOrders.isNotEmpty ||
         acknowledgedInvoices.isNotEmpty ||
@@ -426,7 +488,10 @@ class SyncManager {
         acknowledgedExpenses.isNotEmpty ||
         acknowledgedAssets.isNotEmpty ||
         acknowledgedMaintenance.isNotEmpty ||
-        acknowledgedInventory.isNotEmpty) {
+        acknowledgedInventory.isNotEmpty ||
+        acknowledgedStaff.isNotEmpty ||
+        acknowledgedStaffAttendance.isNotEmpty ||
+        acknowledgedStaffPayments.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: acknowledgedCustomers,
         orderUuids: acknowledgedOrders,
@@ -436,6 +501,9 @@ class SyncManager {
         assetUuids: acknowledgedAssets,
         maintenanceUuids: acknowledgedMaintenance,
         inventoryRecords: acknowledgedInventory,
+        staffUuids: acknowledgedStaff,
+        staffAttendanceUuids: acknowledgedStaffAttendance,
+        staffPaymentUuids: acknowledgedStaffPayments,
       );
       if (!acknowledged) {
         throw StateError(
@@ -462,6 +530,8 @@ class SyncManager {
       inventoryPulled: inventoryPulled,
       maintenancePushed: maintenancePushed,
       maintenancePulled: maintenancePulled,
+      staffRecordsPushed: staffRecordsPushed,
+      staffRecordsPulled: staffRecordsPulled,
       syncedAt: DateTime.now(),
     );
 
@@ -490,6 +560,9 @@ class SyncManager {
     final assets = await _client.fetchAssets();
     final inventoryRecords = await _client.fetchInventoryRecords();
     final maintenanceRecords = await _client.fetchMaintenanceRecords();
+    final staffRecords = await _client.fetchStaffRecords('staff');
+    final staffAttendanceRecords = await _client.fetchStaffRecords('staff_attendance');
+    final staffPaymentRecords = await _client.fetchStaffRecords('staff_payments');
 
     // Windows is authoritative for this operation. Replace every local
     // record, including unsynced local changes.
@@ -501,6 +574,7 @@ class SyncManager {
     await _consumableRepository.deleteAllForSyncReplacement();
     await _maintenanceRepository.deleteAll();
     await _assetRepository.deleteAll();
+    await _staffRepository.deleteAllForSyncReplacement();
 
     for (final customer in customers) {
       await _customerRepository.upsertFromSync(
@@ -570,6 +644,16 @@ class SyncManager {
       });
     }
 
+    for (final record in staffRecords) {
+      await _staffRepository.upsertStaffFromSync(record, force: true);
+    }
+    for (final record in staffAttendanceRecords) {
+      await _staffRepository.upsertAttendanceFromSync(record, force: true);
+    }
+    for (final record in staffPaymentRecords) {
+      await _staffRepository.upsertPaymentFromSync(record, force: true);
+    }
+
     for (final record in maintenanceRecords) {
       final uuid = record['uuid'] as String;
       if (record['sync_status'] == 'deleted_pending') {
@@ -585,7 +669,10 @@ class SyncManager {
     if (acknowledgedExpenses.isNotEmpty ||
         acknowledgedAssets.isNotEmpty ||
         acknowledgedMaintenance.isNotEmpty ||
-        acknowledgedInventory.isNotEmpty) {
+        acknowledgedInventory.isNotEmpty ||
+        acknowledgedStaff.isNotEmpty ||
+        acknowledgedStaffAttendance.isNotEmpty ||
+        acknowledgedStaffPayments.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: const [],
         orderUuids: const [],
@@ -595,6 +682,9 @@ class SyncManager {
         assetUuids: acknowledgedAssets,
         maintenanceUuids: acknowledgedMaintenance,
         inventoryRecords: acknowledgedInventory,
+        staffUuids: acknowledgedStaff,
+        staffAttendanceUuids: acknowledgedStaffAttendance,
+        staffPaymentUuids: acknowledgedStaffPayments,
       );
       if (!acknowledged) {
         throw StateError(
@@ -613,6 +703,7 @@ class SyncManager {
       assetsPulled: assets.where((asset) => asset.syncStatus != 'deleted_pending').length,
       inventoryPulled: inventoryRecords.length,
       maintenancePulled: maintenanceRecords.where((record) => record['sync_status'] != 'deleted_pending').length,
+      staffRecordsPulled: staffRecords.length + staffAttendanceRecords.length + staffPaymentRecords.length,
       syncedAt: DateTime.now(),
     );
 
