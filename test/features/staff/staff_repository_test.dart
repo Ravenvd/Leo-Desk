@@ -92,5 +92,17 @@ void main() {
     expect(payments, hasLength(1));
     expect(payments.single.amountPaise, 5000);
     expect(payments.single.notes, 'Advance');
+
+    final expenses = await db.query(
+      'expenses',
+      where: 'staff_payment_uuid = ?',
+      whereArgs: [payment.uuid],
+    );
+    expect(expenses, hasLength(1));
+    expect(expenses.single['category'], 'Salaries');
+    expect(expenses.single['description'], 'Salary – Test staff');
+    expect(expenses.single['amount_paise'], 5000);
+    expect(expenses.single['expense_date'], '2026-10-31');
+    expect(expenses.single['notes'], 'Advance');
   });
 }
