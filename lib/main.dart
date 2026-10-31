@@ -250,6 +250,12 @@ class _DesktopNavigation extends StatelessWidget {
                   selected: selectedIndex == 6,
                   onTap: () => onSelected(6),
                 ),
+                _NavigationItem(
+                  icon: Icons.people_alt_rounded,
+                  label: 'Staff Manager',
+                  selected: selectedIndex == 7,
+                  onTap: () => onSelected(7),
+                ),
               ],
             ),
           ),
@@ -257,8 +263,8 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.calculate_rounded,
             label: 'Calculator',
-            selected: selectedIndex == 7,
-            onTap: () => onSelected(7),
+            selected: selectedIndex == 8,
+            onTap: () => onSelected(8),
           ),
           _NavigationItem(
             icon: Icons.settings_rounded,
