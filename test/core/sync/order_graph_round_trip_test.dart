@@ -179,6 +179,7 @@ void main() {
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
       billRepository: BillRepository(database: serverDatabase),
+      expenseRepository: ExpenseRepository(database: serverDatabase),
       invoiceRepository: InvoiceRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
       assetRepository: AssetRepository(database: serverDatabase),
