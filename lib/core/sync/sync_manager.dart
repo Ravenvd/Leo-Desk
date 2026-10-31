@@ -279,7 +279,7 @@ class SyncManager {
       for (final customer in localCustomers) customer.uuid: customer.id!,
     };
 
-    final recentLocalOrders = await _orderRepository.getRecent(limit: 10);
+    final recentLocalOrders = await _orderRepository.getRecent(limit: 100);
     for (final order in recentLocalOrders) {
       if (order.syncStatus != 'pending') continue;
 
@@ -312,7 +312,7 @@ class SyncManager {
     // UUID is the identity; order number is only a reconciled attribute.
     for (final syncOrder in await _client.fetchOrders(
       customerIdsByUuid: customerIdsByUuid,
-      limit: 10,
+      limit: 100,
     )) {
       final applied = await _orderRepository.upsertFromSync(
         syncOrder.order,
