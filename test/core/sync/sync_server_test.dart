@@ -4,6 +4,7 @@ import 'package:leo_desk/core/sync/sync_client.dart';
 import 'package:leo_desk/core/sync/sync_config.dart';
 import 'package:leo_desk/core/sync/sync_server.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
+import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/models/consumable.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
@@ -46,6 +47,7 @@ void main() {
     server = SyncServer(
       customerRepository: CustomerRepository(database: database),
       billRepository: BillRepository(database: database),
+      expenseRepository: ExpenseRepository(database: database),
       assetRepository: AssetRepository(database: database),
       consumableRepository: ConsumableRepository(database: database),
       maintenanceRepository: MaintenanceRepository(database: database),
