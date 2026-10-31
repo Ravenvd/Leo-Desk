@@ -11,7 +11,6 @@ import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/models/maintenance_record.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/models/order_item.dart';
-import '../../features/staff/models/staff.dart';
 
 /// An invoice bundled with its line items, as transferred over sync.
 class SyncInvoice {
