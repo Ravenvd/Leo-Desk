@@ -37,13 +37,7 @@ void main() {
     );
 
     await tester.pump(const Duration(minutes: 4));
-    await tester.sendEventToBinding(
-      const PointerHoverEvent(
-        pointer: 1,
-        position: Offset(20, 20),
-      ),
-    );
-    await tester.pump();
+    await tester.hover(find.text('App content'));
 
     await tester.pump(const Duration(minutes: 4, seconds: 59));
     expect(locked, isFalse);
