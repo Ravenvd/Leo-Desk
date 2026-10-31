@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 16;
+  static const int version = 17;
 
   static const List<String> createStatements = [
     '''
@@ -250,6 +250,7 @@ class DatabaseSchema {
       description TEXT NOT NULL,
       amount_paise INTEGER NOT NULL DEFAULT 0,
       notes TEXT,
+      staff_payment_uuid TEXT UNIQUE,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
@@ -816,6 +817,16 @@ class DatabaseSchema {
         ON invoice_items(invoice_id)
       ''');
     });
+  }
+
+  static Future<void> upgradeToVersion17(Database db) async {
+    await db.execute(
+      'ALTER TABLE expenses ADD COLUMN staff_payment_uuid TEXT',
+    );
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_expenses_staff_payment_uuid
+      ON expenses(staff_payment_uuid)
+    ''');
   }
 
   static Future<void> upgradeToVersion16(Database db) async {
