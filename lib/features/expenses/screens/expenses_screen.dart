@@ -36,6 +36,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   Future<void> _deleteExpense(Expense expense) async {
+    if (expense.staffPaymentUuid != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Salary expenses are linked to payroll payments and cannot be deleted here.'),
+        ),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -108,11 +116,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         _formatAmount(expense.amountPaise),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      IconButton(
-                        tooltip: 'Delete',
-                        onPressed: () => _deleteExpense(expense),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
+                      if (expense.staffPaymentUuid == null)
+                        IconButton(
+                          tooltip: 'Delete',
+                          onPressed: () => _deleteExpense(expense),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
                     ],
                   ),
                 ),
