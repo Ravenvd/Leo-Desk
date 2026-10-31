@@ -9,7 +9,6 @@ import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
-import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/invoices/models/invoice.dart';
 import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
