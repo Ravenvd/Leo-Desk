@@ -268,7 +268,7 @@ class _StaffManagerScreenState extends State<StaffManagerScreen> {
     final end = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([
-        widget.repository.getStaff(includeInactive: false),
+        widget.repository.getStaff(),
         widget.repository.getAttendanceForPeriod(start, end),
         widget.repository.getPaymentsForPeriod(start, end),
       ]),
