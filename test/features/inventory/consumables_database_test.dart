@@ -52,7 +52,8 @@ void main() {
   });
 
   test('v14 to v15 migration creates the consumables schema', () async {
-    final path = '${Directory.systemTemp.path}/leo_desk_consumables_v14_${DateTime.now().microsecondsSinceEpoch}.db';
+    final path =
+        '${Directory.systemTemp.path}/leo_desk_consumables_v14_${DateTime.now().microsecondsSinceEpoch}.db';
 
     final old = await openDatabase(
       path,
@@ -70,8 +71,9 @@ void main() {
     );
     await old.close();
 
+    Database? migrated;
     try {
-      final db = await openDatabase(
+      migrated = await openDatabase(
         path,
         version: DatabaseSchema.version,
         onUpgrade: (db, oldVersion, newVersion) async {
@@ -81,8 +83,8 @@ void main() {
         },
       );
 
-      expect(await db.getVersion(), 15);
-      final tables = await db.rawQuery(
+      expect(await migrated.getVersion(), 15);
+      final tables = await migrated.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
       );
       final names = tables.map((row) => row['name']).toSet();
@@ -91,9 +93,12 @@ void main() {
         'thread_spools',
         'inventory_activities',
       ]));
-
-      await db.close();
     } finally {
+      // Close SQLite before deleting the database file. This must also happen
+      // when an assertion or migration operation throws, otherwise Windows
+      // keeps the file locked and the cleanup error hides the real failure.
+      await migrated?.close();
+
       final file = File(path);
       if (await file.exists()) {
         await file.delete();
