@@ -349,8 +349,9 @@ class _StaffManagerScreenState extends State<StaffManagerScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  child: Wrap(
+                    spacing: 24,
+                    runSpacing: 12,
                     children: [
                       _PayrollMetric(label: 'Total earned', value: _money(grandEarned)),
                       _PayrollMetric(label: 'Paid', value: _money(grandPaid)),
