@@ -66,8 +66,10 @@ void main() {
 
   test('v12 to v13 migration preserves existing data and adds assets', () async {
     final path = await createV12DatabasePath();
+    Database? sourceDatabase;
+    Database? migrated;
     try {
-      final database = await openDatabase(path, version: 12);
+      final database = sourceDatabase = await openDatabase(path, version: 12);
 
     final customerId = await database.insert('customers', {
       'uuid': 'customer-v12',
@@ -126,10 +128,11 @@ void main() {
     });
 
       await database.close();
+      sourceDatabase = null;
 
-      final migrated = await openDatabase(
+      final migratedDatabase = migrated = await openDatabase(
         path,
-      version: DatabaseSchema.version,
+      version: 13,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -140,14 +143,14 @@ void main() {
       },
     );
 
-    expect(await migrated.getVersion(), 13);
+    expect(await migratedDatabase.getVersion(), 13);
 
-    final tables = await migrated.rawQuery(
+    final tables = await migratedDatabase.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'assets'",
     );
     expect(tables, hasLength(1));
 
-    final customer = await migrated.query(
+    final customer = await migratedDatabase.query(
       'customers',
       where: 'uuid = ?',
       whereArgs: ['customer-v12'],
@@ -155,7 +158,7 @@ void main() {
     expect(customer, hasLength(1));
     expect(customer.single['name'], 'Migration Customer');
 
-    final order = await migrated.query(
+    final order = await migratedDatabase.query(
       'orders',
       where: 'uuid = ?',
       whereArgs: ['order-v12'],
@@ -163,7 +166,7 @@ void main() {
     expect(order, hasLength(1));
     expect(order.single['customer_id'], customerId);
 
-    final invoice = await migrated.query(
+    final invoice = await migratedDatabase.query(
       'invoices',
       where: 'uuid = ?',
       whereArgs: ['invoice-v12'],
@@ -171,7 +174,7 @@ void main() {
     expect(invoice, hasLength(1));
     expect(invoice.single['order_id'], orderId);
 
-    final bill = await migrated.query(
+    final bill = await migratedDatabase.query(
       'bills',
       where: 'uuid = ?',
       whereArgs: ['bill-v12'],
@@ -179,8 +182,9 @@ void main() {
     expect(bill, hasLength(1));
     expect(bill.single['order_id'], orderId);
 
-      await migrated.close();
     } finally {
+      await migrated?.close();
+      await sourceDatabase?.close();
       final file = File(path);
       if (await file.exists()) {
         await file.delete();
