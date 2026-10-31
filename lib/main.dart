@@ -22,6 +22,7 @@ import 'features/expenses/screens/expenses_screen.dart';
 import 'features/invoices/repositories/invoice_repository.dart';
 import 'features/invoices/screens/invoices_screen.dart';
 import 'features/lock_screen/startup_lock_screen.dart';
+import 'features/lock_screen/inactivity_lock.dart';
 import 'features/inventory/repositories/asset_repository.dart';
 import 'features/inventory/repositories/consumable_repository.dart';
 import 'features/inventory/screens/inventory_screen.dart';
@@ -147,21 +148,25 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            return constraints.maxWidth >= 800
-                ? _buildDesktopLayout()
-                : _buildMobileLayout();
-          },
-        ),
-        if (_isLocked)
-          StartupLockScreen(
-            onUnlock: () => setState(() => _isLocked = false),
+    return InactivityLock(
+      enabled: Platform.isWindows && !_isLocked,
+      onTimeout: () => setState(() => _isLocked = true),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return constraints.maxWidth >= 800
+                  ? _buildDesktopLayout()
+                  : _buildMobileLayout();
+            },
           ),
-      ],
+          if (_isLocked)
+            StartupLockScreen(
+              onUnlock: () => setState(() => _isLocked = false),
+            ),
+        ],
+      ),
     );
   }
 
