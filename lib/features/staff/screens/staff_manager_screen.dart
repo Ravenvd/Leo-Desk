@@ -167,7 +167,7 @@ class _StaffManagerScreenState extends State<StaffManagerScreen> {
                             leading: CircleAvatar(
                               child: Text(member.name.isEmpty
                                   ? '?'
-                                  : member.name.characters.first.toUpperCase()),
+                                  : member.name.substring(0, 1).toUpperCase()),
                             ),
                             title: Text(member.name),
                             subtitle: Text([
