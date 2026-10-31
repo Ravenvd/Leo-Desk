@@ -11,6 +11,7 @@ import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/models/maintenance_record.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/models/order_item.dart';
+import '../../features/staff/models/staff.dart';
 
 /// An invoice bundled with its line items, as transferred over sync.
 class SyncInvoice {
@@ -255,6 +256,34 @@ class SyncClient {
     if (uuid is! String) return false;
     return _postJson('/api/inventory', record, uuid);
   }
+  Future<List<Map<String, Object?>>> fetchStaffRecords(String table) async {
+    final paths = {
+      'staff': '/api/staff',
+      'staff_attendance': '/api/staff/attendance',
+      'staff_payments': '/api/staff/payments',
+    };
+    final path = paths[table];
+    if (path == null) throw ArgumentError.value(table, 'table');
+    final decoded = await _getJson(path);
+    if (decoded is! List) throw FormatException('Invalid $table response.');
+    return decoded.map((item) => Map<String, Object?>.from(item as Map)).toList();
+  }
+
+  Future<bool> sendStaffRecord(String table, Map<String, Object?> record) async {
+    final paths = {
+      'staff': '/api/staff',
+      'staff_attendance': '/api/staff/attendance',
+      'staff_payments': '/api/staff/payments',
+    };
+    final path = paths[table];
+    final uuid = record['uuid'];
+    if (path == null || uuid is! String) return false;
+    final payload = Map<String, Object?>.from(record)
+      ..remove('id')
+      ..remove('sync_status');
+    return _postJson(path, payload, uuid);
+  }
+
   Future<List<Customer>> fetchCustomers() async {
     final decoded = await _getJson('/api/customers');
 
@@ -276,6 +305,9 @@ class SyncClient {
     List<String> assetUuids = const [],
     List<String> maintenanceUuids = const [],
     List<Map<String, Object?>> inventoryRecords = const [],
+    List<String> staffUuids = const [],
+    List<String> staffAttendanceUuids = const [],
+    List<String> staffPaymentUuids = const [],
   }) async {
     return _postJson(
       '/api/sync/ack',
@@ -288,6 +320,9 @@ class SyncClient {
         'assets': assetUuids,
         'maintenance_records': maintenanceUuids,
         'inventory_records': inventoryRecords,
+        'staff': staffUuids,
+        'staff_attendance': staffAttendanceUuids,
+        'staff_payments': staffPaymentUuids,
       },
       'ack',
     );
