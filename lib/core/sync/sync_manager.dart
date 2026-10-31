@@ -94,6 +94,10 @@ class SyncResult {
 /// Assets, maintenance records and consumable inventory use UUID-addressed
 /// relationships; local integer IDs are resolved independently on each device.
 /// Windows is authoritative when reconciling these records after the push attempt.
+///
+/// Conflict rules are entity-specific. For bills, the earliest-created bill
+/// for an order wins regardless of sync status; UUID order breaks timestamp ties.
+/// Other repositories retain their existing pending-local/Windows rules.
 class SyncManager {
   final SyncClient _client;
   final CustomerRepository _customerRepository;
