@@ -4,7 +4,8 @@ import 'package:uuid/uuid.dart';
 class DatabaseSchema {
   static const int version = 16;
 
-  static const List<String> createStatements = [\n    '''
+  static const List<String> createStatements = [
+    '''
     CREATE TABLE staff (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       uuid TEXT NOT NULL UNIQUE,
