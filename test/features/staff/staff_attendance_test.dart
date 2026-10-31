@@ -28,7 +28,7 @@ void main() {
     expect(attendance(status: StaffAttendance.leave).baseWagePaise, 0);
   });
 
-  test('overtime starts only after 4 PM', () {
+  test('overtime counts work before 10 AM and after 4 PM', () {
     expect(
       attendance(status: StaffAttendance.fullDay, checkOut: '16:00').overtimeMinutes,
       0,
@@ -38,8 +38,32 @@ void main() {
       0,
     );
     expect(
+      attendance(
+        status: StaffAttendance.fullDay,
+        checkIn: '07:00',
+        checkOut: '16:00',
+      ).overtimeMinutes,
+      180,
+    );
+    expect(
+      attendance(
+        status: StaffAttendance.fullDay,
+        checkIn: '09:30',
+        checkOut: '16:30',
+      ).overtimeMinutes,
+      60,
+    );
+    expect(
       attendance(status: StaffAttendance.fullDay, checkOut: '17:30').overtimeMinutes,
       90,
+    );
+    expect(
+      attendance(
+        status: StaffAttendance.fullDay,
+        checkIn: '07:00',
+        checkOut: '09:00',
+      ).overtimeMinutes,
+      120,
     );
     expect(
       attendance(
@@ -54,10 +78,12 @@ void main() {
   test('overtime is paid at ₹37.50 per hour and added to base wage', () {
     final record = attendance(
       status: StaffAttendance.fullDay,
+      checkIn: '09:00',
       checkOut: '17:30',
     );
-    expect(record.overtimePayPaise, 5625);
-    expect(record.totalPayPaise, 20625);
+    expect(record.overtimeMinutes, 90 + 60);
+    expect(record.overtimePayPaise, 9375);
+    expect(record.totalPayPaise, 24375);
   });
 
   test('half-day overtime is calculated separately from half-day wage', () {
