@@ -26,6 +26,8 @@ import 'features/inventory/repositories/consumable_repository.dart';
 import 'features/inventory/screens/inventory_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
+import 'features/staff/repositories/staff_repository.dart';
+import 'features/staff/screens/staff_manager_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -136,6 +138,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           assetRepository: AssetRepository(),
           consumableRepository: ConsumableRepository(),
         ),
+        StaffManagerScreen(repository: StaffRepository()),
         const CalculatorScreen(),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
@@ -247,6 +250,12 @@ class _DesktopNavigation extends StatelessWidget {
                   selected: selectedIndex == 6,
                   onTap: () => onSelected(6),
                 ),
+                _NavigationItem(
+                  icon: Icons.people_alt_rounded,
+                  label: 'Staff Manager',
+                  selected: selectedIndex == 7,
+                  onTap: () => onSelected(7),
+                ),
               ],
             ),
           ),
@@ -254,14 +263,14 @@ class _DesktopNavigation extends StatelessWidget {
           _NavigationItem(
             icon: Icons.calculate_rounded,
             label: 'Calculator',
-            selected: selectedIndex == 7,
-            onTap: () => onSelected(7),
+            selected: selectedIndex == 8,
+            onTap: () => onSelected(8),
           ),
           _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: selectedIndex == 8,
-            onTap: () => onSelected(8),
+            selected: selectedIndex == 9,
+            onTap: () => onSelected(9),
           ),
         ],
       ),
@@ -322,6 +331,11 @@ class _MobileNavigation extends StatelessWidget {
           icon: Icon(Icons.inventory_2_outlined),
           selectedIcon: Icon(Icons.inventory_2_rounded),
           label: Text('Inventory'),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(Icons.people_alt_outlined),
+          selectedIcon: Icon(Icons.people_alt_rounded),
+          label: Text('Staff Manager'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.calculate_outlined),

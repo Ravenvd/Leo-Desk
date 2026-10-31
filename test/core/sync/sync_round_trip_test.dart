@@ -17,6 +17,8 @@ import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
+import 'package:leo_desk/features/staff/models/staff.dart';
+import 'package:leo_desk/features/staff/repositories/staff_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
 
@@ -55,6 +57,8 @@ void main() {
   late ExpenseRepository clientExpenses;
   late InvoiceRepository clientInvoices;
   late OrderRepository clientOrders;
+  late StaffRepository serverStaff;
+  late StaffRepository clientStaff;
   late SyncServer server;
   late SyncManager manager;
   late Directory tempDir;
@@ -78,6 +82,8 @@ void main() {
     clientExpenses = ExpenseRepository(database: clientDb);
     clientInvoices = InvoiceRepository(database: clientDb);
     clientOrders = OrderRepository(database: clientDb);
+    serverStaff = StaffRepository(database: serverDb);
+    clientStaff = StaffRepository(database: clientDb);
 
     server = SyncServer(
       customerRepository: serverCustomers,
@@ -88,6 +94,7 @@ void main() {
       assetRepository: AssetRepository(database: serverDb),
       maintenanceRepository: MaintenanceRepository(database: serverDb),
       consumableRepository: ConsumableRepository(database: serverDb),
+      staffRepository: serverStaff,
     );
     await server.start(port: 0);
 
@@ -101,6 +108,7 @@ void main() {
       assetRepository: AssetRepository(database: clientDb),
       maintenanceRepository: MaintenanceRepository(database: clientDb),
       consumableRepository: ConsumableRepository(database: clientDb),
+      staffRepository: clientStaff,
     );
   });
 
@@ -109,6 +117,56 @@ void main() {
     await serverDb.close();
     await clientDb.close();
     tempDir.deleteSync(recursive: true);
+  });
+
+  test('syncs staff, attendance and payroll payments between devices', () async {
+    final now = DateTime(2026, 10, 31);
+    final staff = StaffMember(
+      name: 'Malar',
+      role: 'Embroidery operator',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await clientStaff.insertStaff(staff);
+    await clientStaff.saveAttendance(StaffAttendance(
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.fullDay,
+      checkIn: '10:00',
+      checkOut: '17:00',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await clientStaff.recordPayment(StaffPayment(
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      periodStart: DateTime(2026, 10, 1),
+      periodEnd: DateTime(2026, 10, 31),
+      paymentDate: now,
+      amountPaise: 5000,
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final result = await manager.sync();
+    expect(result.connected, isTrue);
+
+    final remoteStaff = await serverStaff.getStaffByUuid(staff.uuid);
+    expect(remoteStaff, isNotNull);
+    expect(remoteStaff!.name, 'Malar');
+
+    final remoteAttendance = await serverStaff.getAttendanceForDate(now);
+    expect(remoteAttendance, hasLength(1));
+    expect(remoteAttendance.single.totalPayPaise, 18750);
+
+    final remotePayments = await serverStaff.getPaymentsForPeriod(
+      DateTime(2026, 10, 1),
+      DateTime(2026, 10, 31),
+    );
+    expect(remotePayments, hasLength(1));
+    expect(remotePayments.single.amountPaise, 5000);
   });
 
   test('pushes pending customers and bills, then marks them synced', () async {
@@ -310,6 +368,7 @@ void main() {
       assetRepository: AssetRepository(database: clientDb),
       consumableRepository: ConsumableRepository(database: clientDb),
       maintenanceRepository: MaintenanceRepository(database: clientDb),
+      staffRepository: clientStaff,
     );
 
     final result = await offlineManager.sync();

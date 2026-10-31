@@ -13,6 +13,7 @@ import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/inventory/repositories/maintenance_repository.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/repositories/order_repository.dart';
+import '../../features/staff/repositories/staff_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
 
@@ -29,6 +30,7 @@ class SyncServer {
   final AssetRepository _assetRepository;
   final ConsumableRepository _consumableRepository;
   final MaintenanceRepository _maintenanceRepository;
+  final StaffRepository _staffRepository;
   final String token;
 
   SyncServer({
@@ -40,6 +42,7 @@ class SyncServer {
     AssetRepository? assetRepository,
     ConsumableRepository? consumableRepository,
     MaintenanceRepository? maintenanceRepository,
+    StaffRepository? staffRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
@@ -48,7 +51,8 @@ class SyncServer {
        _orderRepository = orderRepository ?? OrderRepository(),
        _assetRepository = assetRepository ?? AssetRepository(),
        _consumableRepository = consumableRepository ?? ConsumableRepository(),
-       _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository();
+       _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository(),
+       _staffRepository = staffRepository ?? StaffRepository();
 
   bool get isRunning => _server != null;
 
@@ -122,6 +126,15 @@ class SyncServer {
         for (final uuid in uuids('maintenance_records')) {
           await _maintenanceRepository.acknowledgeSyncedOrDeleted(uuid);
         }
+        for (final uuid in uuids('staff')) {
+          await _staffRepository.markSynced('staff', uuid);
+        }
+        for (final uuid in uuids('staff_attendance')) {
+          await _staffRepository.markSynced('staff_attendance', uuid);
+        }
+        for (final uuid in uuids('staff_payments')) {
+          await _staffRepository.markSynced('staff_payments', uuid);
+        }
         final inventoryRecords = decoded['inventory_records'];
         if (inventoryRecords is List) {
           for (final item in inventoryRecords) {
@@ -138,6 +151,81 @@ class SyncServer {
           'status': 'ok',
           'uuid': 'ack',
         });
+        return;
+      }
+
+      if (request.method == 'GET' && request.uri.path == '/api/staff') {
+        final records = await _staffRepository.getAllStaffForSync();
+        await _sendJson(request.response, 200, records.map((record) {
+          return Map<String, Object?>.from(record)..remove('id');
+        }).toList());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/staff') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid staff record.'});
+          return;
+        }
+        final record = Map<String, Object?>.from(decoded);
+        final uuid = record['uuid'] as String;
+        final applied = await _staffRepository.upsertStaffFromSync(record);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Staff record has a pending Windows edit.', 'uuid': uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+
+      if (request.method == 'GET' && request.uri.path == '/api/staff/attendance') {
+        final records = await _staffRepository.getAllAttendanceForSync();
+        await _sendJson(request.response, 200, records.map((record) {
+          return Map<String, Object?>.from(record)..remove('id');
+        }).toList());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/staff/attendance') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid staff attendance record.'});
+          return;
+        }
+        final record = Map<String, Object?>.from(decoded);
+        final uuid = record['uuid'] as String;
+        final applied = await _staffRepository.upsertAttendanceFromSync(record);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Staff attendance could not be applied.', 'uuid': uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+
+      if (request.method == 'GET' && request.uri.path == '/api/staff/payments') {
+        final records = await _staffRepository.getAllPaymentsForSync();
+        await _sendJson(request.response, 200, records.map((record) {
+          return Map<String, Object?>.from(record)..remove('id');
+        }).toList());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/staff/payments') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid staff payment record.'});
+          return;
+        }
+        final record = Map<String, Object?>.from(decoded);
+        final uuid = record['uuid'] as String;
+        final applied = await _staffRepository.upsertPaymentFromSync(record);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Staff payment could not be applied.', 'uuid': uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
         return;
       }
 
