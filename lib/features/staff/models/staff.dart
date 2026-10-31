@@ -120,7 +120,21 @@ class StaffAttendance {
     final minute = int.tryParse(parts[1]);
     if (hour == null || minute == null) return 0;
     final checkoutMinutes = hour * 60 + minute;
-    return (checkoutMinutes - 16 * 60).clamp(0, 24 * 60).toInt();
+    var overtimeStartMinutes = 16 * 60;
+    if (checkIn != null) {
+      final checkInParts = checkIn!.split(':');
+      if (checkInParts.length == 2) {
+        final checkInHour = int.tryParse(checkInParts[0]);
+        final checkInMinute = int.tryParse(checkInParts[1]);
+        if (checkInHour != null && checkInMinute != null) {
+          final checkInTotal = checkInHour * 60 + checkInMinute;
+          if (checkInTotal > overtimeStartMinutes) {
+            overtimeStartMinutes = checkInTotal;
+          }
+        }
+      }
+    }
+    return (checkoutMinutes - overtimeStartMinutes).clamp(0, 24 * 60).toInt();
   }
 
   int get overtimePayPaise =>
