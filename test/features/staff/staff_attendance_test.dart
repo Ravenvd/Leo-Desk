@@ -29,7 +29,8 @@ void main() {
   test('overtime starts only after 4 PM', () {
     expect(attendance(status: StaffAttendance.fullDay, checkOut: '16:00').overtimeMinutes, 0);
     expect(attendance(status: StaffAttendance.fullDay, checkOut: '15:30').overtimeMinutes, 0);
-    expect(attendance(status: StaffAttendance.fullDay, checkOut: '17:30').overtimeMinutes, 90);\n    final lateArrival = StaffAttendance(\n      staffId: 1,\n      staffUuid: 'staff-1',\n      attendanceDate: now,\n      status: StaffAttendance.fullDay,\n      checkIn: '17:00',\n      checkOut: '18:00',\n      createdAt: now,\n      updatedAt: now,\n    );\n    expect(lateArrival.overtimeMinutes, 60);
+    expect(attendance(status: StaffAttendance.fullDay, checkOut: '17:30').overtimeMinutes, 90);
+    final lateArrival = StaffAttendance(\n      staffId: 1,\n      staffUuid: 'staff-1',\n      attendanceDate: now,\n      status: StaffAttendance.fullDay,\n      checkIn: '17:00',\n      checkOut: '18:00',\n      createdAt: now,\n      updatedAt: now,\n    );\n    expect(lateArrival.overtimeMinutes, 60);
   });
 
   test('overtime is paid at ₹37.50 per hour and added to base wage', () {
