@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Staff Manager with staff profiles, manual full-day/half-day/absent/leave attendance, check-in/check-out records, and automatic overtime pay after 4 PM.
+- Monthly payroll summaries with separate earned, paid, and outstanding balances, plus payment history.
+- Staff, attendance, and payroll payment records included in Android–Windows LAN sync.
+
+
 ## 1.3.1 - 2026-10-17
 
 ### Fixed
