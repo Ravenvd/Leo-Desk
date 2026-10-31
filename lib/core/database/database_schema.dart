@@ -2,9 +2,69 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 15;
+  static const int version = 16;
 
-  static const List<String> createStatements = [
+  static const List<String> createStatements = [\n    '''
+    CREATE TABLE staff (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      name TEXT NOT NULL,
+      phone TEXT,
+      role TEXT,
+      joined_on TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE staff_attendance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      staff_id INTEGER NOT NULL,
+      staff_uuid TEXT NOT NULL,
+      attendance_date TEXT NOT NULL,
+      status TEXT NOT NULL,
+      check_in TEXT,
+      check_out TEXT,
+      notes TEXT,
+      base_wage_paise INTEGER NOT NULL DEFAULT 0,
+      overtime_rate_paise_per_hour INTEGER NOT NULL DEFAULT 3750,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(staff_uuid, attendance_date),
+      FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
+    )
+    ''',
+    '''
+    CREATE TABLE staff_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      staff_id INTEGER NOT NULL,
+      staff_uuid TEXT NOT NULL,
+      period_start TEXT NOT NULL,
+      period_end TEXT NOT NULL,
+      payment_date TEXT NOT NULL,
+      amount_paise INTEGER NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE RESTRICT
+    )
+    ''',
+    '''
+    CREATE INDEX idx_staff_attendance_date
+    ON staff_attendance(attendance_date)
+    ''',
+    '''
+    CREATE INDEX idx_staff_payments_period
+    ON staff_payments(staff_uuid, period_start, period_end)
+    ''',
+
     '''
     CREATE TABLE assets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
