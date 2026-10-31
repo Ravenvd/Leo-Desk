@@ -232,13 +232,25 @@ class StaffRepository {
       limit: 1,
     );
     if (staff.isEmpty) return false;
-    final existing = await db.query(
+    var existing = await db.query(
       'staff_attendance',
-      columns: ['id', 'sync_status'],
+      columns: ['id', 'uuid', 'sync_status'],
       where: 'uuid = ?',
       whereArgs: [record['uuid']],
       limit: 1,
     );
+    // One attendance row per staff member per date. If two devices create
+    // the same date offline, reconcile by the natural key instead of failing
+    // the SQLite UNIQUE constraint.
+    if (existing.isEmpty) {
+      existing = await db.query(
+        'staff_attendance',
+        columns: ['id', 'uuid', 'sync_status'],
+        where: 'staff_uuid = ? AND attendance_date = ?',
+        whereArgs: [record['staff_uuid'], record['attendance_date']],
+        limit: 1,
+      );
+    }
     if (existing.isNotEmpty &&
         !force &&
         existing.first['sync_status'] == StaffMember.syncStatusPending) {
