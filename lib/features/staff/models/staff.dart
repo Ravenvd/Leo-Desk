@@ -114,27 +114,46 @@ class StaffAttendance {
   int get overtimeMinutes {
     if (status != fullDay && status != halfDay) return 0;
     if (checkOut == null) return 0;
-    final parts = checkOut!.split(':');
-    if (parts.length != 2) return 0;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) return 0;
-    final checkoutMinutes = hour * 60 + minute;
-    var overtimeStartMinutes = 16 * 60;
-    if (checkIn != null) {
-      final checkInParts = checkIn!.split(':');
-      if (checkInParts.length == 2) {
-        final checkInHour = int.tryParse(checkInParts[0]);
-        final checkInMinute = int.tryParse(checkInParts[1]);
-        if (checkInHour != null && checkInMinute != null) {
-          final checkInTotal = checkInHour * 60 + checkInMinute;
-          if (checkInTotal > overtimeStartMinutes) {
-            overtimeStartMinutes = checkInTotal;
-          }
-        }
+
+    int? parseMinutes(String? value) {
+      if (value == null) return null;
+      final parts = value.split(':');
+      if (parts.length != 2) return null;
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour == null || minute == null ||
+          hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        return null;
       }
+      return hour * 60 + minute;
     }
-    return (checkoutMinutes - overtimeStartMinutes).clamp(0, 24 * 60).toInt();
+
+    final checkInMinutes = parseMinutes(checkIn);
+    final checkOutMinutes = parseMinutes(checkOut);
+    if (checkOutMinutes == null) return 0;
+
+    // The regular shift is 10:00 AM–4:00 PM. Count time worked before
+    // 10:00 AM and after 4:00 PM as overtime.
+    var total = 0;
+
+    if (checkInMinutes != null && checkInMinutes < 10 * 60) {
+      final morningEnd = checkOutMinutes < 10 * 60
+          ? checkOutMinutes
+          : 10 * 60;
+      total += (morningEnd - checkInMinutes).clamp(0, 24 * 60).toInt();
+    }
+
+    if (checkOutMinutes > 16 * 60) {
+      final eveningStart = checkInMinutes != null &&
+              checkInMinutes > 16 * 60
+          ? checkInMinutes
+          : 16 * 60;
+      total += (checkOutMinutes - eveningStart)
+          .clamp(0, 24 * 60)
+          .toInt();
+    }
+
+    return total;
   }
 
   int get overtimePayPaise =>
