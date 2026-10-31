@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:leo_desk/features/lock_screen/inactivity_lock.dart';
@@ -37,7 +38,7 @@ void main() {
     );
 
     await tester.pump(const Duration(minutes: 4));
-    tester.binding.handlePointerEvent(
+    tester.sendEventToBinding(
       const PointerMoveEvent(
         pointer: 1,
         position: Offset(20, 20),
