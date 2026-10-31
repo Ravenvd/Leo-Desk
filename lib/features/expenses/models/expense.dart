@@ -20,6 +20,7 @@ class Expense {
   final String description;
   final int amountPaise;
   final String? notes;
+  final String? staffPaymentUuid;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -32,6 +33,7 @@ class Expense {
     required this.description,
     required this.amountPaise,
     this.notes,
+    this.staffPaymentUuid,
     required this.createdAt,
     required this.updatedAt,
   }) : uuid = uuid ?? const Uuid().v4();
@@ -45,6 +47,7 @@ class Expense {
     String? description,
     int? amountPaise,
     String? notes,
+    String? staffPaymentUuid,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -57,6 +60,7 @@ class Expense {
       description: description ?? this.description,
       amountPaise: amountPaise ?? this.amountPaise,
       notes: notes ?? this.notes,
+      staffPaymentUuid: staffPaymentUuid ?? this.staffPaymentUuid,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -72,6 +76,7 @@ class Expense {
       'description': description,
       'amount_paise': amountPaise,
       'notes': notes,
+      'staff_payment_uuid': staffPaymentUuid,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -87,6 +92,7 @@ class Expense {
       description: map['description'] as String,
       amountPaise: map['amount_paise'] as int,
       notes: map['notes'] as String?,
+      staffPaymentUuid: map['staff_payment_uuid'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
