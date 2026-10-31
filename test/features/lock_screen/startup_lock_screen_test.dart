@@ -34,6 +34,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), '2818');
     await tester.tap(find.text('Unlock'));
+    await tester.pump();
 
     expect(unlocked, isTrue);
   });
