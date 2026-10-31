@@ -37,7 +37,7 @@ void main() {
     );
 
     await tester.pump(const Duration(minutes: 4));
-    await tester.hover(find.text('App content'));
+    await tester.tap(find.text('App content'));
 
     await tester.pump(const Duration(minutes: 4, seconds: 59));
     expect(locked, isFalse);
