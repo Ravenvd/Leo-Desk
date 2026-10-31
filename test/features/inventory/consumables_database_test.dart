@@ -70,10 +70,13 @@ void main() {
     );
     await old.close();
 
+    Database? migratedDb;
     try {
-      final db = await openDatabase(
+      migratedDb = await openDatabase(
         path,
-        version: DatabaseSchema.version,
+        // This test specifically verifies the v14 -> v15 migration, even
+        // though the application's current schema version is newer.
+        version: 15,
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 15) {
             await DatabaseSchema.upgradeToVersion15(db);
@@ -81,8 +84,8 @@ void main() {
         },
       );
 
-      expect(await db.getVersion(), 15);
-      final tables = await db.rawQuery(
+      expect(await migratedDb.getVersion(), 15);
+      final tables = await migratedDb.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
       );
       final names = tables.map((row) => row['name']).toSet();
@@ -91,9 +94,10 @@ void main() {
         'thread_spools',
         'inventory_activities',
       ]));
-
-      await db.close();
     } finally {
+      // Always release the SQLite file handle before deleting it. This is
+      // especially important on Windows, where an open handle blocks deletion.
+      await migratedDb?.close();
       final file = File(path);
       if (await file.exists()) {
         await file.delete();
