@@ -44,7 +44,7 @@ class _StartupLockScreenState extends State<StartupLockScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final logoWidth = (screenWidth * 0.52).clamp(280.0, 620.0);
+    final logoWidth = (screenWidth * 0.52).clamp(280.0, 620.0).toDouble();
 
     return Material(
       color: AppColors.warmIvory,
