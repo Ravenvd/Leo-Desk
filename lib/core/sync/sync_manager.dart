@@ -205,9 +205,6 @@ class SyncManager {
     final acknowledgedExpenses = <String>[];
     final acknowledgedAssets = <String>[];
     final acknowledgedMaintenance = <String>[];
-    final acknowledgedStaff = staffRecords.map((r) => r['uuid'] as String).toList();
-    final acknowledgedStaffAttendance = staffAttendanceRecords.map((r) => r['uuid'] as String).toList();
-    final acknowledgedStaffPayments = staffPaymentRecords.map((r) => r['uuid'] as String).toList();
     final acknowledgedInventory = <Map<String, Object?>>[];
     final acknowledgedStaff = <String>[];
     final acknowledgedStaffAttendance = <String>[];
@@ -611,6 +608,10 @@ class SyncManager {
     final acknowledgedExpenses = <String>[];
     final acknowledgedAssets = <String>[];
     final acknowledgedMaintenance = <String>[];
+    final acknowledgedStaff = staffRecords.map((r) => r['uuid'] as String).toList();
+    final acknowledgedStaffAttendance = staffAttendanceRecords.map((r) => r['uuid'] as String).toList();
+    final acknowledgedStaffPayments = staffPaymentRecords.map((r) => r['uuid'] as String).toList();
+
     var expensesApplied = 0;
 
     for (final expense in expenses) {
