@@ -17,6 +17,7 @@ import 'package:leo_desk/features/inventory/repositories/consumable_repository.d
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
+import 'package:leo_desk/features/staff/repositories/staff_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class FailingInvoiceSyncClient extends SyncClient {
@@ -143,6 +144,7 @@ void main() {
         assetRepository: AssetRepository(database: clientDatabase),
       maintenanceRepository: MaintenanceRepository(database: clientDatabase),
         consumableRepository: ConsumableRepository(database: clientDatabase),
+        staffRepository: StaffRepository(database: clientDatabase),
         saveLastSyncTime: (_) async {},
       );
 
@@ -155,6 +157,7 @@ void main() {
       assetRepository: AssetRepository(database: serverDatabase),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),
       consumableRepository: ConsumableRepository(database: serverDatabase),
+      staffRepository: StaffRepository(database: serverDatabase),
       );
       await server.start(port: port);
 
