@@ -1015,7 +1015,7 @@ void main() {
     expect(localBillItems.single.billId, localBills.single.id);
   });
 
-  test('pulls an older order when it is among the 10 most recently updated', () async {
+  test('pulls an older order when it is among the 100 most recently updated', () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
@@ -1041,7 +1041,7 @@ void main() {
     await serverOrders.insert(target);
     await serverOrders.markSynced(target.uuid);
 
-    for (var i = 2; i <= 11; i++) {
+    for (var i = 2; i <= 101; i++) {
       final order = makeOrder(
         uuid: 'older-window-order-$i',
         customerId: serverCustomer.id!,
@@ -1055,10 +1055,10 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.ordersPulled, 10);
+    expect(result.ordersPulled, 100);
 
     final localOrders = await clientOrders.getAll();
-    expect(localOrders, hasLength(10));
+    expect(localOrders, hasLength(100));
     final pulledTarget = localOrders.singleWhere((order) => order.uuid == target.uuid);
     expect(pulledTarget.updatedAt, target.updatedAt);
   });

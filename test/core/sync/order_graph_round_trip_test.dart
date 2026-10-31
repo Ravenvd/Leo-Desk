@@ -219,7 +219,7 @@ void main() {
     return manager.sync();
   }
 
-  test('pulls exactly the 10 newest orders at the 10th/11th boundary',
+  test('pulls exactly the 100 newest orders at the 100th/101st boundary',
       () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
@@ -234,7 +234,7 @@ void main() {
 
     final serverCustomer = (await serverCustomers.getAll()).single;
 
-    for (var rank = 1; rank <= 11; rank++) {
+    for (var rank = 1; rank <= 101; rank++) {
       final order = makeOrder(
         uuid: 'ten-order-boundary-$rank',
         customerId: serverCustomer.id!,
@@ -250,12 +250,12 @@ void main() {
     final result = await sync();
 
     expect(result.connected, isTrue);
-    expect(result.ordersPulled, 10);
+    expect(result.ordersPulled, 100);
 
     final localOrders = await clientOrders.getAll();
-    expect(localOrders, hasLength(10));
+    expect(localOrders, hasLength(100));
 
-    for (var rank = 1; rank <= 10; rank++) {
+    for (var rank = 1; rank <= 100; rank++) {
       expect(
         localOrders.any((order) => order.uuid == 'ten-order-boundary-$rank'),
         isTrue,
@@ -263,7 +263,7 @@ void main() {
     }
 
     expect(
-      localOrders.any((order) => order.uuid == 'ten-order-boundary-11'),
+      localOrders.any((order) => order.uuid == 'ten-order-boundary-101'),
       isFalse,
     );
   });
