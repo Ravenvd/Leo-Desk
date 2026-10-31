@@ -70,6 +70,15 @@ class AppDatabase {
         if (oldVersion < 12) {
           await DatabaseSchema.upgradeToVersion12(db);
         }
+        if (oldVersion < 13) {
+          await DatabaseSchema.upgradeToVersion13(db);
+        }
+        if (oldVersion < 14) {
+          await DatabaseSchema.upgradeToVersion14(db);
+        }
+        if (oldVersion < 15) {
+          await DatabaseSchema.upgradeToVersion15(db);
+        }
       },
     );
   }

@@ -17,6 +17,11 @@ import 'package:leo_desk/features/expenses/repositories/expense_repository.dart'
 import 'package:leo_desk/features/invoices/models/invoice.dart';
 import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/inventory/models/asset.dart';
+import 'package:leo_desk/features/inventory/models/consumable.dart';
+import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/models/order_item.dart';
 import 'package:leo_desk/features/orders/repositories/order_item_repository.dart';
@@ -210,6 +215,9 @@ void main() {
       invoiceRepository: InvoiceRepository(database: serverDatabase),
       expenseRepository: ExpenseRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
+      assetRepository: AssetRepository(database: serverDatabase),
+      maintenanceRepository: MaintenanceRepository(database: serverDatabase),
+      consumableRepository: ConsumableRepository(database: serverDatabase),
     );
 
     await server.start(port: 0);
@@ -234,6 +242,9 @@ void main() {
       invoiceRepository: InvoiceRepository(database: clientDatabase),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
+      assetRepository: AssetRepository(database: clientDatabase),
+      maintenanceRepository: MaintenanceRepository(database: clientDatabase),
+      consumableRepository: ConsumableRepository(database: clientDatabase),
       saveLastSyncTime: (_) async {},
     );
   }
@@ -1301,5 +1312,221 @@ void main() {
       hasLength(1),
     );
   });
+
+  test(
+    'pulls Windows consumables, spools and activity history by UUID',
+    () async {
+      final windowsInventory = ConsumableRepository(database: serverDatabase);
+      final androidInventory = ConsumableRepository(database: clientDatabase);
+      final now = DateTime.utc(2026, 10, 30);
+
+      // Occupy a local integer ID so synced relationships must resolve by UUID.
+      await androidInventory.insertConsumable(Consumable(
+        uuid: 'android-local-id-offset',
+        category: Consumable.categoryOils,
+        name: 'Local-only oil',
+        trackingType: Consumable.trackingQuantity,
+        stockUnit: Consumable.unitMillilitres,
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await androidInventory.markSyncRecordSynced(
+        'consumables',
+        'android-local-id-offset',
+      );
+
+      final beads = Consumable(
+        uuid: 'windows-beads-sync',
+        category: Consumable.categoryBeads,
+        name: 'Red cut beads',
+        trackingType: Consumable.trackingQuantity,
+        stockUnit: Consumable.unitGrams,
+        reorderLevel: 200,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final thread = Consumable(
+        uuid: 'windows-thread-sync',
+        category: Consumable.categoryEmbroideryThread,
+        name: 'Blue embroidery thread',
+        trackingType: Consumable.trackingPercentage,
+        stockUnit: Consumable.unitMetres,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await windowsInventory.insertConsumable(beads);
+      await windowsInventory.insertConsumable(thread);
+      final savedBeads = await windowsInventory.getConsumableByUuid(beads.uuid);
+      final savedThread = await windowsInventory.getConsumableByUuid(thread.uuid);
+      await windowsInventory.recordStockIn(
+        consumable: savedBeads!,
+        quantity: 500,
+        activityType: 'purchase',
+        notes: 'Windows opening purchase',
+      );
+      await windowsInventory.addThreadSpool(
+        consumable: savedThread!,
+        approximateLengthM: 100,
+        notes: 'Windows thread spool',
+      );
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.inventoryPulled, 5);
+
+      final localBeads = await androidInventory.getConsumableByUuid(beads.uuid);
+      expect(localBeads, isNotNull);
+      expect(localBeads!.id, isNot(1));
+      expect(await androidInventory.getCurrentStock(localBeads.id!), 500);
+
+      final localThread = await androidInventory.getConsumableByUuid(thread.uuid);
+      expect(localThread, isNotNull);
+      final localSpools = await androidInventory.getSpools(localThread!.id!);
+      expect(localSpools, hasLength(1));
+      expect(localSpools.single.consumableUuid, thread.uuid);
+      expect(localSpools.single.consumableId, localThread.id);
+
+      final windowsRecords = await windowsInventory.getAllSyncRecords();
+      expect(windowsRecords, hasLength(5));
+      expect(
+        windowsRecords.every((record) => record['sync_status'] == 'synced'),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'pushes Android consumables and activity events without local IDs',
+    () async {
+    final androidInventory = ConsumableRepository(database: clientDatabase);
+    final windowsInventory = ConsumableRepository(database: serverDatabase);
+    final now = DateTime.utc(2026, 10, 30);
+    final oil = Consumable(
+      uuid: 'android-oil-sync',
+      category: Consumable.categoryOils,
+      name: 'Thread oil',
+      trackingType: Consumable.trackingQuantity,
+      stockUnit: Consumable.unitMillilitres,
+      reorderLevel: 100,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await androidInventory.insertConsumable(oil);
+    final savedOil = (await androidInventory.getConsumables()).single;
+    await androidInventory.recordStockIn(
+      consumable: savedOil,
+      quantity: 250,
+      activityType: 'purchase',
+    );
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.inventoryPushed, 2);
+
+    final windowsOil = (await windowsInventory.getConsumables()).single;
+    expect(windowsOil.uuid, oil.uuid);
+    expect(await windowsInventory.getCurrentStock(windowsOil.id!), 250);
+
+    final windowsRecords = await windowsInventory.getAllSyncRecords();
+    expect(windowsRecords, hasLength(2));
+    expect(
+      windowsRecords.every((record) => record['sync_status'] == 'synced'),
+      isTrue,
+    );
+
+    final retry = await syncWithRealHttpClient();
+    expect(retry.inventoryPushed, 0);
+    expect((await windowsInventory.getAllSyncRecords()), hasLength(2));
+  });
+
+  test(
+    'reconciles colliding local asset codes to Windows canonical codes',
+    () async {
+    final windowsAssets = AssetRepository(database: serverDatabase);
+    final androidAssets = AssetRepository(database: clientDatabase);
+    final now = DateTime.utc(2026, 10, 30);
+
+    final windowsAsset = Asset(
+      uuid: 'windows-canonical-asset',
+      name: 'Windows machine',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await windowsAssets.insert(windowsAsset);
+    await windowsAssets.markSynced(windowsAsset.uuid);
+
+    final androidAsset = Asset(
+      uuid: 'android-offline-asset',
+      name: 'Android machine',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await androidAssets.insert(androidAsset);
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.assetsPushed, 1);
+    expect(result.assetsPulled, 2);
+
+    final localAssets = await androidAssets.getAll();
+    expect(localAssets, hasLength(2));
+    expect(
+      localAssets.singleWhere((asset) => asset.uuid == windowsAsset.uuid).assetCode,
+      'AST-0001',
+    );
+    expect(
+      localAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
+      'AST-0002',
+    );
+  });
+
+
+  test(
+    'Windows pending consumable edit wins over an Android conflict',
+    () async {
+    final windowsInventory = ConsumableRepository(database: serverDatabase);
+    final androidInventory = ConsumableRepository(database: clientDatabase);
+    final now = DateTime.utc(2026, 10, 30);
+
+    await windowsInventory.insertConsumable(Consumable(
+      uuid: 'shared-consumable-conflict',
+      category: Consumable.categoryBeads,
+      name: 'Windows version',
+      trackingType: Consumable.trackingQuantity,
+      stockUnit: Consumable.unitGrams,
+      reorderLevel: 200,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await androidInventory.insertConsumable(Consumable(
+      uuid: 'shared-consumable-conflict',
+      category: Consumable.categoryBeads,
+      name: 'Android offline edit',
+      trackingType: Consumable.trackingQuantity,
+      stockUnit: Consumable.unitGrams,
+      reorderLevel: 100,
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.inventoryPushed, 0);
+    expect(result.inventoryPulled, 1);
+
+    final local = (await androidInventory.getConsumables()).single;
+    final windows = (await windowsInventory.getConsumables()).single;
+    expect(local.name, 'Windows version');
+    expect(local.reorderLevel, 200);
+    expect(local.syncStatus, 'synced');
+    expect(windows.syncStatus, 'synced');
+  });
+
 
 }

@@ -7,6 +7,10 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/models/asset.dart';
+import '../../features/inventory/repositories/asset_repository.dart';
+import '../../features/inventory/repositories/consumable_repository.dart';
+import '../../features/inventory/repositories/maintenance_repository.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
@@ -22,6 +26,9 @@ class SyncServer {
   final ExpenseRepository _expenseRepository;
   final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
+  final AssetRepository _assetRepository;
+  final ConsumableRepository _consumableRepository;
+  final MaintenanceRepository _maintenanceRepository;
   final String token;
 
   SyncServer({
@@ -30,12 +37,18 @@ class SyncServer {
     ExpenseRepository? expenseRepository,
     InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
+    AssetRepository? assetRepository,
+    ConsumableRepository? consumableRepository,
+    MaintenanceRepository? maintenanceRepository,
     this.token = SyncConfig.defaultToken,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
-       _orderRepository = orderRepository ?? OrderRepository();
+       _orderRepository = orderRepository ?? OrderRepository(),
+       _assetRepository = assetRepository ?? AssetRepository(),
+       _consumableRepository = consumableRepository ?? ConsumableRepository(),
+       _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository();
 
   bool get isRunning => _server != null;
 
@@ -103,6 +116,23 @@ class SyncServer {
         for (final uuid in uuids('expenses')) {
           await _expenseRepository.acknowledgeSyncedOrDeleted(uuid);
         }
+        for (final uuid in uuids('assets')) {
+          await _assetRepository.acknowledgeSyncedOrDeleted(uuid);
+        }
+        for (final uuid in uuids('maintenance_records')) {
+          await _maintenanceRepository.acknowledgeSyncedOrDeleted(uuid);
+        }
+        final inventoryRecords = decoded['inventory_records'];
+        if (inventoryRecords is List) {
+          for (final item in inventoryRecords) {
+            if (item is! Map) continue;
+            final table = item['record_type'];
+            final uuid = item['uuid'];
+            if (table is String && uuid is String) {
+              await _consumableRepository.markSyncRecordSynced(table, uuid);
+            }
+          }
+        }
 
         await _sendJson(request.response, 200, {
           'status': 'ok',
@@ -111,6 +141,110 @@ class SyncServer {
         return;
       }
 
+      if (request.method == 'GET' && request.uri.path == '/api/maintenance') {
+        await _sendJson(request.response, 200, await _maintenanceRepository.getAllForSync());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/maintenance/delete') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid maintenance deletion data.'});
+          return;
+        }
+        final uuid = decoded['uuid'] as String;
+        await _maintenanceRepository.markDeletedPendingByUuid(uuid);
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/maintenance') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid maintenance record.'});
+          return;
+        }
+        final record = Map<String, Object?>.from(decoded);
+        final uuid = record['uuid'] as String;
+        final applied = await _maintenanceRepository.upsertFromSync(record);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Maintenance record has a pending Windows edit.', 'uuid': uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+      if (request.method == 'GET' && request.uri.path == '/api/inventory') {
+        final records = await _consumableRepository.getAllSyncRecords();
+        await _sendJson(request.response, 200, records);
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/inventory') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {'error': 'Invalid inventory record.'});
+          return;
+        }
+        final record = Map<String, Object?>.from(decoded);
+        final uuid = record['uuid'];
+        if (uuid is! String) {
+          await _sendJson(request.response, 400, {'error': 'Inventory UUID is required.'});
+          return;
+        }
+        final applied = await _consumableRepository.upsertSyncRecord(record);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Inventory record has a pending Windows edit.', 'uuid': uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+      if (request.method == 'GET' && request.uri.path == '/api/assets') {
+        final assets = await _assetRepository.getAllForSync();
+        await _sendJson(request.response, 200, assets.map((asset) {
+          final map = asset.toMap()..remove('id');
+          return map;
+        }).toList());
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/assets/delete') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map || decoded['uuid'] is! String) {
+          await _sendJson(request.response, 400, {'error': 'Invalid asset deletion data.'});
+          return;
+        }
+        final uuid = decoded['uuid'] as String;
+        await _assetRepository.markDeletedPendingByUuid(uuid);
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        return;
+      }
+
+      if (request.method == 'POST' && request.uri.path == '/api/assets') {
+        final decoded = await _readJsonBody(request);
+        if (decoded is! Map) {
+          await _sendJson(request.response, 400, {'error': 'Invalid asset data.'});
+          return;
+        }
+        var asset = Asset.fromMap(Map<String, Object?>.from(decoded));
+        final existingAsset = await _assetRepository.getByUuid(asset.uuid);
+        if (existingAsset != null) {
+          // The Windows-generated asset code is canonical for this UUID.
+          asset = asset.copyWith(assetCode: existingAsset.assetCode);
+        } else {
+          // Asset codes are local-ID-derived on each device. Allocate a
+          // Windows code before inserting an offline-created Android asset.
+          asset = asset.copyWith(assetCode: _nextAvailableAssetCode(await _assetRepository.getAllForSync()));
+        }
+        final applied = await _assetRepository.upsertFromSync(asset);
+        if (!applied) {
+          await _sendJson(request.response, 409, {'error': 'Asset could not be applied.', 'uuid': asset.uuid});
+          return;
+        }
+        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': asset.uuid});
+        return;
+      }
       if (request.method == 'GET' && request.uri.path == '/api/customers') {
         final customers = await _customerRepository.getAll();
 
@@ -455,6 +589,16 @@ class SyncServer {
         'error': 'Internal server error',
       });
     }
+  }
+
+  String _nextAvailableAssetCode(List<Asset> assets) {
+    var highest = 0;
+    for (final asset in assets) {
+      if (!asset.assetCode.startsWith('AST-')) continue;
+      final number = int.tryParse(asset.assetCode.substring(4));
+      if (number != null && number > highest) highest = number;
+    }
+    return 'AST-${(highest + 1).toString().padLeft(4, '0')}';
   }
 
   String _nextAvailableOrderNumber(List<Order> orders) {

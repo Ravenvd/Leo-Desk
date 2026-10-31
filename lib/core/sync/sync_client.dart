@@ -7,6 +7,8 @@ import '../../features/customers/models/customer.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/invoices/models/invoice.dart';
 import '../../features/invoices/models/invoice_item.dart';
+import '../../features/inventory/models/asset.dart';
+import '../../features/inventory/models/maintenance_record.dart';
 import '../../features/orders/models/order.dart';
 import '../../features/orders/models/order_item.dart';
 
@@ -214,6 +216,45 @@ class SyncClient {
     }
   }
 
+  Future<List<Map<String, Object?>>> fetchMaintenanceRecords() async {
+    final decoded = await _getJson('/api/maintenance');
+    if (decoded is! List) throw const FormatException('Invalid maintenance response.');
+    return decoded.map((item) => Map<String, Object?>.from(item as Map)).toList();
+  }
+
+  Future<bool> sendMaintenanceRecord(Map<String, Object?> record) async {
+    final uuid = record['uuid'];
+    if (uuid is! String) return false;
+    if (record['sync_status'] == MaintenanceRecord.syncStatusDeletedPending) {
+      return _postJson('/api/maintenance/delete', {'uuid': uuid}, uuid);
+    }
+    return _postJson('/api/maintenance', record, uuid);
+  }
+  Future<List<Asset>> fetchAssets() async {
+    final decoded = await _getJson('/api/assets');
+    if (decoded is! List) throw const FormatException('Invalid assets response.');
+    return decoded.map((item) => Asset.fromMap(Map<String, Object?>.from(item as Map))).toList();
+  }
+
+  Future<bool> sendAsset(Asset asset) async {
+    if (asset.syncStatus == Asset.syncStatusDeletedPending) {
+      return _postJson('/api/assets/delete', {'uuid': asset.uuid}, asset.uuid);
+    }
+    final map = asset.toMap()..remove('id')..remove('sync_status');
+    return _postJson('/api/assets', map, asset.uuid);
+  }
+
+  Future<List<Map<String, Object?>>> fetchInventoryRecords() async {
+    final decoded = await _getJson('/api/inventory');
+    if (decoded is! List) throw const FormatException('Invalid inventory response.');
+    return decoded.map((item) => Map<String, Object?>.from(item as Map)).toList();
+  }
+
+  Future<bool> sendInventoryRecord(Map<String, Object?> record) async {
+    final uuid = record['uuid'];
+    if (uuid is! String) return false;
+    return _postJson('/api/inventory', record, uuid);
+  }
   Future<List<Customer>> fetchCustomers() async {
     final decoded = await _getJson('/api/customers');
 
@@ -232,6 +273,9 @@ class SyncClient {
     required List<String> invoiceUuids,
     required List<String> billUuids,
     required List<String> expenseUuids,
+    List<String> assetUuids = const [],
+    List<String> maintenanceUuids = const [],
+    List<Map<String, Object?>> inventoryRecords = const [],
   }) async {
     return _postJson(
       '/api/sync/ack',
@@ -241,6 +285,9 @@ class SyncClient {
         'invoices': invoiceUuids,
         'bills': billUuids,
         'expenses': expenseUuids,
+        'assets': assetUuids,
+        'maintenance_records': maintenanceUuids,
+        'inventory_records': inventoryRecords,
       },
       'ack',
     );

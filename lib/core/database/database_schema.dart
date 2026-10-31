@@ -2,9 +2,134 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 class DatabaseSchema {
-  static const int version = 12;
+  static const int version = 15;
 
   static const List<String> createStatements = [
+    '''
+    CREATE TABLE assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      asset_code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      purchase_date TEXT,
+      purchase_cost_paise INTEGER,
+      manufacturer_model TEXT,
+      serial_number TEXT,
+      warranty_information TEXT,
+      status TEXT NOT NULL DEFAULT 'Active',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE maintenance_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      asset_id INTEGER NOT NULL,
+      asset_uuid TEXT NOT NULL,
+      maintenance_date TEXT NOT NULL,
+      description TEXT NOT NULL,
+      cost_paise INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+    )
+    ''',
+    '''
+    CREATE INDEX idx_maintenance_asset_id
+    ON maintenance_records(asset_id)
+    ''',
+    '''
+    CREATE INDEX idx_maintenance_date
+    ON maintenance_records(maintenance_date)
+    ''',
+    '''
+    CREATE TABLE consumables (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      category TEXT NOT NULL,
+      name TEXT NOT NULL,
+      size TEXT,
+      finish TEXT,
+      colour TEXT,
+      tracking_type TEXT NOT NULL,
+      stock_unit TEXT NOT NULL,
+      reorder_level REAL NOT NULL DEFAULT 0,
+      default_pack_quantity REAL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE thread_spools (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      consumable_id INTEGER NOT NULL,
+      consumable_uuid TEXT NOT NULL,
+      approximate_length_m REAL NOT NULL,
+      remaining_percent REAL NOT NULL DEFAULT 100,
+      purchase_date TEXT,
+      purchase_cost_paise INTEGER,
+      emptied_at TEXT,
+      estimated_wastage_percent REAL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (consumable_id) REFERENCES consumables(id) ON DELETE CASCADE
+    )
+    ''',
+    '''
+    CREATE TABLE inventory_activities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sync_status TEXT NOT NULL DEFAULT 'synced',
+      consumable_id INTEGER NOT NULL,
+      consumable_uuid TEXT NOT NULL,
+      spool_id INTEGER,
+      spool_uuid TEXT,
+      order_id INTEGER,
+      order_uuid TEXT,
+      activity_type TEXT NOT NULL,
+      quantity REAL,
+      unit TEXT,
+      before_quantity REAL,
+      after_quantity REAL,
+      observed_change REAL,
+      total_cost_paise INTEGER,
+      estimated_wastage_percent REAL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (consumable_id) REFERENCES consumables(id) ON DELETE CASCADE,
+      FOREIGN KEY (spool_id) REFERENCES thread_spools(id) ON DELETE SET NULL,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+    )
+    ''',
+    '''
+    CREATE INDEX idx_consumables_category
+    ON consumables(category)
+    ''',
+    '''
+    CREATE INDEX idx_thread_spools_consumable_id
+    ON thread_spools(consumable_id)
+    ''',
+    '''
+    CREATE INDEX idx_inventory_activities_consumable_id
+    ON inventory_activities(consumable_id)
+    ''',
+    '''
+    CREATE INDEX idx_inventory_activities_spool_id
+    ON inventory_activities(spool_id)
+    ''',
+    '''
+    CREATE INDEX idx_inventory_activities_order_id
+    ON inventory_activities(order_id)
+    ''',
     '''
     CREATE TABLE customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,6 +567,148 @@ class DatabaseSchema {
           'ALTER TABLE customers DROP COLUMN service_required',
         );
       }
+    });
+  }
+
+  static Future<void> upgradeToVersion14(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE maintenance_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          asset_id INTEGER NOT NULL,
+          asset_uuid TEXT NOT NULL,
+          maintenance_date TEXT NOT NULL,
+          description TEXT NOT NULL,
+          cost_paise INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+        )
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_maintenance_asset_id
+        ON maintenance_records(asset_id)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_maintenance_date
+        ON maintenance_records(maintenance_date)
+      ''');
+    });
+  }
+
+  static Future<void> upgradeToVersion15(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE consumables (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          category TEXT NOT NULL,
+          name TEXT NOT NULL,
+          size TEXT,
+          finish TEXT,
+          colour TEXT,
+          tracking_type TEXT NOT NULL,
+          stock_unit TEXT NOT NULL,
+          reorder_level REAL NOT NULL DEFAULT 0,
+          default_pack_quantity REAL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      await txn.execute('''
+        CREATE TABLE thread_spools (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          consumable_id INTEGER NOT NULL,
+          consumable_uuid TEXT NOT NULL,
+          approximate_length_m REAL NOT NULL,
+          remaining_percent REAL NOT NULL DEFAULT 100,
+          purchase_date TEXT,
+          purchase_cost_paise INTEGER,
+          emptied_at TEXT,
+          estimated_wastage_percent REAL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (consumable_id) REFERENCES consumables(id) ON DELETE CASCADE
+        )
+      ''');
+      await txn.execute('''
+        CREATE TABLE inventory_activities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          consumable_id INTEGER NOT NULL,
+          consumable_uuid TEXT NOT NULL,
+          spool_id INTEGER,
+          spool_uuid TEXT,
+          order_id INTEGER,
+          order_uuid TEXT,
+          activity_type TEXT NOT NULL,
+          quantity REAL,
+          unit TEXT,
+          before_quantity REAL,
+          after_quantity REAL,
+          observed_change REAL,
+          total_cost_paise INTEGER,
+          estimated_wastage_percent REAL,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (consumable_id) REFERENCES consumables(id) ON DELETE CASCADE,
+          FOREIGN KEY (spool_id) REFERENCES thread_spools(id) ON DELETE SET NULL,
+          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+        )
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_consumables_category
+        ON consumables(category)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_thread_spools_consumable_id
+        ON thread_spools(consumable_id)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_inventory_activities_consumable_id
+        ON inventory_activities(consumable_id)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_inventory_activities_spool_id
+        ON inventory_activities(spool_id)
+      ''');
+      await txn.execute('''
+        CREATE INDEX idx_inventory_activities_order_id
+        ON inventory_activities(order_id)
+      ''');
+    });
+  }
+
+  static Future<void> upgradeToVersion13(Database db) async {
+    await db.transaction((txn) async {
+      // Some intermediate builds created the assets table without advancing
+      // user_version. Keep the migration safe for those databases.
+      await txn.execute('''
+        CREATE TABLE IF NOT EXISTS assets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          sync_status TEXT NOT NULL DEFAULT 'synced',
+          asset_code TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          purchase_date TEXT,
+          purchase_cost_paise INTEGER,
+          manufacturer_model TEXT,
+          serial_number TEXT,
+          warranty_information TEXT,
+          status TEXT NOT NULL DEFAULT 'Active',
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
     });
   }
 

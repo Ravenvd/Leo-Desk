@@ -13,6 +13,9 @@ import 'package:leo_desk/features/billing/models/bill_item.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
+import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
@@ -82,6 +85,9 @@ void main() {
       expenseRepository: serverExpenses,
       invoiceRepository: serverInvoices,
       orderRepository: serverOrders,
+      assetRepository: AssetRepository(database: serverDb),
+      maintenanceRepository: MaintenanceRepository(database: serverDb),
+      consumableRepository: ConsumableRepository(database: serverDb),
     );
     await server.start(port: 0);
 
@@ -92,6 +98,9 @@ void main() {
       expenseRepository: clientExpenses,
       invoiceRepository: clientInvoices,
       orderRepository: clientOrders,
+      assetRepository: AssetRepository(database: clientDb),
+      maintenanceRepository: MaintenanceRepository(database: clientDb),
+      consumableRepository: ConsumableRepository(database: clientDb),
     );
   });
 
@@ -295,6 +304,12 @@ void main() {
       ),
       customerRepository: clientCustomers,
       billRepository: clientBills,
+      expenseRepository: clientExpenses,
+      invoiceRepository: clientInvoices,
+      orderRepository: clientOrders,
+      assetRepository: AssetRepository(database: clientDb),
+      consumableRepository: ConsumableRepository(database: clientDb),
+      maintenanceRepository: MaintenanceRepository(database: clientDb),
     );
 
     final result = await offlineManager.sync();

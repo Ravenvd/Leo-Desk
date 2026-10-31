@@ -3,6 +3,9 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/repositories/asset_repository.dart';
+import '../../features/inventory/repositories/consumable_repository.dart';
+import '../../features/inventory/repositories/maintenance_repository.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import 'sync_client.dart';
 import 'sync_config.dart';
@@ -19,6 +22,12 @@ class SyncResult {
   final int expensesPulled;
   final int ordersPushed;
   final int ordersPulled;
+  final int assetsPushed;
+  final int assetsPulled;
+  final int inventoryPushed;
+  final int inventoryPulled;
+  final int maintenancePushed;
+  final int maintenancePulled;
   final DateTime syncedAt;
 
   const SyncResult({
@@ -33,6 +42,12 @@ class SyncResult {
     this.expensesPulled = 0,
     this.ordersPushed = 0,
     this.ordersPulled = 0,
+    this.assetsPushed = 0,
+    this.assetsPulled = 0,
+    this.inventoryPushed = 0,
+    this.inventoryPulled = 0,
+    this.maintenancePushed = 0,
+    this.maintenancePulled = 0,
     required this.syncedAt,
   });
 
@@ -50,12 +65,21 @@ class SyncResult {
       expensesPushed +
       expensesPulled +
       ordersPushed +
-      ordersPulled;
+      ordersPulled +
+      assetsPushed +
+      assetsPulled +
+      inventoryPushed +
+      inventoryPulled +
+      maintenancePushed +
+      maintenancePulled;
 
   @override
   String toString() {
     if (!connected) return 'Server not reachable';
     return 'Customers: $customersPushed sent, $customersPulled received · '
+        'Assets: $assetsPushed sent, $assetsPulled received · '
+        'Inventory: $inventoryPushed sent, $inventoryPulled received · '
+        'Maintenance: $maintenancePushed sent, $maintenancePulled received · '
         'Bills: $billsPushed sent, $billsPulled received · '
         'Invoices: $invoicesPushed sent, $invoicesPulled received · '
         'Expenses: $expensesPushed sent, $expensesPulled received · '
@@ -66,9 +90,10 @@ class SyncResult {
 /// Two-way LAN sync between an Android client and the Windows host
 /// (the source of truth).
 ///
-/// Order of operations:
-/// 1. Push locally pending customers, bills, and expenses to the server.
-/// 2. Pull the server's customers, bills, and expenses and apply them locally.
+/// Pending records are pushed first, then the Windows dataset is pulled.
+/// Assets, maintenance records and consumable inventory use UUID-addressed
+/// relationships; local integer IDs are resolved independently on each device.
+/// Windows is authoritative when reconciling these records after the push attempt.
 ///
 /// Conflict rules are entity-specific. For bills, the earliest-created bill
 /// for an order wins regardless of sync status; UUID order breaks timestamp ties.
@@ -80,6 +105,9 @@ class SyncManager {
   final ExpenseRepository _expenseRepository;
   final InvoiceRepository _invoiceRepository;
   final OrderRepository _orderRepository;
+  final AssetRepository _assetRepository;
+  final ConsumableRepository _consumableRepository;
+  final MaintenanceRepository _maintenanceRepository;
   final Future<void> Function(DateTime) _saveLastSyncTime;
 
   Future<SyncResult>? _activeSync;
@@ -91,12 +119,18 @@ class SyncManager {
     ExpenseRepository? expenseRepository,
     InvoiceRepository? invoiceRepository,
     OrderRepository? orderRepository,
+    AssetRepository? assetRepository,
+    ConsumableRepository? consumableRepository,
+    MaintenanceRepository? maintenanceRepository,
     Future<void> Function(DateTime)? saveLastSyncTime,
   }) : _customerRepository = customerRepository ?? CustomerRepository(),
        _billRepository = billRepository ?? BillRepository(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _invoiceRepository = invoiceRepository ?? InvoiceRepository(),
        _orderRepository = orderRepository ?? OrderRepository(),
+       _assetRepository = assetRepository ?? AssetRepository(),
+       _consumableRepository = consumableRepository ?? ConsumableRepository(),
+       _maintenanceRepository = maintenanceRepository ?? MaintenanceRepository(),
        _saveLastSyncTime = saveLastSyncTime ?? SyncConfig.saveLastSyncTime;
 
   factory SyncManager.fromConfig(SyncConfig config) {
@@ -145,13 +179,48 @@ class SyncManager {
     var expensesPulled = 0;
     var ordersPushed = 0;
     var ordersPulled = 0;
+    var assetsPushed = 0;
+    var assetsPulled = 0;
+    var inventoryPushed = 0;
+    var inventoryPulled = 0;
+    var maintenancePushed = 0;
+    var maintenancePulled = 0;
 
     final acknowledgedCustomers = <String>[];
     final acknowledgedOrders = <String>[];
     final acknowledgedInvoices = <String>[];
     final acknowledgedBills = <String>[];
     final acknowledgedExpenses = <String>[];
+    final acknowledgedAssets = <String>[];
+    final acknowledgedMaintenance = <String>[];
+    final acknowledgedInventory = <Map<String, Object?>>[];
 
+    // --- Push pending assets ---
+    for (final asset in await _assetRepository.getPending()) {
+      if (await _client.sendAsset(asset)) {
+        if (asset.syncStatus == 'deleted_pending') {
+          await _assetRepository.finalizeDeletion(asset.uuid);
+        } else {
+          await _assetRepository.markSynced(asset.uuid);
+        }
+        assetsPushed++;
+      }
+    }
+
+    // --- Pull Windows assets; Windows is authoritative after the push attempt ---
+    for (final asset in await _client.fetchAssets()) {
+      if (asset.syncStatus == 'deleted_pending') {
+        await _assetRepository.applyDeletionFromSync(asset.uuid);
+        assetsPulled++;
+        acknowledgedAssets.add(asset.uuid);
+        continue;
+      }
+      final applied = await _assetRepository.upsertFromSync(asset, force: true);
+      if (applied) {
+        assetsPulled++;
+        acknowledgedAssets.add(asset.uuid);
+      }
+    }
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
       if (await _client.sendCustomer(customer)) {
@@ -224,6 +293,54 @@ class SyncManager {
       }
     }
 
+    // --- Push pending maintenance records after their assets ---
+    for (final record in await _maintenanceRepository.getPendingForSync()) {
+      if (await _client.sendMaintenanceRecord(record)) {
+        if (record['sync_status'] == 'deleted_pending') {
+          await _maintenanceRepository.finalizeDeletion(record['uuid'] as String);
+        } else {
+          await _maintenanceRepository.markSynced(record['uuid'] as String);
+        }
+        maintenancePushed++;
+      }
+    }
+
+    // --- Pull Windows maintenance records after assets ---
+    for (final record in await _client.fetchMaintenanceRecords()) {
+      if (record['sync_status'] == 'deleted_pending') {
+        await _maintenanceRepository.applyDeletionFromSync(record['uuid'] as String);
+        maintenancePulled++;
+        acknowledgedMaintenance.add(record['uuid'] as String);
+        continue;
+      }
+      final applied = await _maintenanceRepository.upsertFromSync(record, force: true);
+      if (applied) {
+        maintenancePulled++;
+        acknowledgedMaintenance.add(record['uuid'] as String);
+      }
+    }
+    // --- Push pending consumables, spools, then activity events ---
+    for (final record in await _consumableRepository.getPendingSyncRecords()) {
+      if (await _client.sendInventoryRecord(record)) {
+        await _consumableRepository.markSyncRecordSynced(
+          record['record_type'] as String,
+          record['uuid'] as String,
+        );
+        inventoryPushed++;
+      }
+    }
+
+    // --- Pull Windows inventory snapshot in dependency order ---
+    for (final record in await _client.fetchInventoryRecords()) {
+      final applied = await _consumableRepository.upsertSyncRecord(record, force: true);
+      if (applied) {
+        inventoryPulled++;
+        acknowledgedInventory.add({
+          'record_type': record['record_type'],
+          'uuid': record['uuid'],
+        });
+      }
+    }
     // --- Push pending invoices ---
     for (final invoice in await _invoiceRepository.getPending()) {
       final items = await _invoiceRepository.getItems(invoice.id!);
@@ -306,13 +423,19 @@ class SyncManager {
         acknowledgedOrders.isNotEmpty ||
         acknowledgedInvoices.isNotEmpty ||
         acknowledgedBills.isNotEmpty ||
-        acknowledgedExpenses.isNotEmpty) {
+        acknowledgedExpenses.isNotEmpty ||
+        acknowledgedAssets.isNotEmpty ||
+        acknowledgedMaintenance.isNotEmpty ||
+        acknowledgedInventory.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: acknowledgedCustomers,
         orderUuids: acknowledgedOrders,
         invoiceUuids: acknowledgedInvoices,
         billUuids: acknowledgedBills,
         expenseUuids: acknowledgedExpenses,
+        assetUuids: acknowledgedAssets,
+        maintenanceUuids: acknowledgedMaintenance,
+        inventoryRecords: acknowledgedInventory,
       );
       if (!acknowledged) {
         throw StateError(
@@ -333,6 +456,12 @@ class SyncManager {
       expensesPulled: expensesPulled,
       ordersPushed: ordersPushed,
       ordersPulled: ordersPulled,
+      assetsPushed: assetsPushed,
+      assetsPulled: assetsPulled,
+      inventoryPushed: inventoryPushed,
+      inventoryPulled: inventoryPulled,
+      maintenancePushed: maintenancePushed,
+      maintenancePulled: maintenancePulled,
       syncedAt: DateTime.now(),
     );
 
@@ -358,6 +487,9 @@ class SyncManager {
     final invoices = await _client.fetchInvoices();
     final bills = await _client.fetchBills();
     final expenses = await _client.fetchExpenses();
+    final assets = await _client.fetchAssets();
+    final inventoryRecords = await _client.fetchInventoryRecords();
+    final maintenanceRecords = await _client.fetchMaintenanceRecords();
 
     // Windows is authoritative for this operation. Replace every local
     // record, including unsynced local changes.
@@ -366,6 +498,9 @@ class SyncManager {
     await _orderRepository.deleteAll();
     await _customerRepository.deleteAll();
     await _expenseRepository.deleteAll();
+    await _consumableRepository.deleteAllForSyncReplacement();
+    await _maintenanceRepository.deleteAll();
+    await _assetRepository.deleteAll();
 
     for (final customer in customers) {
       await _customerRepository.upsertFromSync(
@@ -400,6 +535,8 @@ class SyncManager {
     }
 
     final acknowledgedExpenses = <String>[];
+    final acknowledgedAssets = <String>[];
+    final acknowledgedMaintenance = <String>[];
     var expensesApplied = 0;
 
     for (final expense in expenses) {
@@ -415,19 +552,53 @@ class SyncManager {
       expensesApplied++;
     }
 
+    for (final asset in assets) {
+      if (asset.syncStatus == 'deleted_pending') {
+        acknowledgedAssets.add(asset.uuid);
+        continue;
+      }
+      await _assetRepository.upsertFromSync(asset, force: true);
+      acknowledgedAssets.add(asset.uuid);
+    }
+
+    final acknowledgedInventory = <Map<String, Object?>>[];
+    for (final record in inventoryRecords) {
+      await _consumableRepository.upsertSyncRecord(record, force: true);
+      acknowledgedInventory.add({
+        'record_type': record['record_type'],
+        'uuid': record['uuid'],
+      });
+    }
+
+    for (final record in maintenanceRecords) {
+      final uuid = record['uuid'] as String;
+      if (record['sync_status'] == 'deleted_pending') {
+        acknowledgedMaintenance.add(uuid);
+        continue;
+      }
+      await _maintenanceRepository.upsertFromSync(record, force: true);
+      acknowledgedMaintenance.add(uuid);
+    }
+
     // Windows tombstones are temporary. Once the replacement has completed,
     // acknowledge them so Windows can physically remove them as well.
-    if (acknowledgedExpenses.isNotEmpty) {
+    if (acknowledgedExpenses.isNotEmpty ||
+        acknowledgedAssets.isNotEmpty ||
+        acknowledgedMaintenance.isNotEmpty ||
+        acknowledgedInventory.isNotEmpty) {
       final acknowledged = await _client.acknowledgePulled(
         customerUuids: const [],
         orderUuids: const [],
         invoiceUuids: const [],
         billUuids: const [],
         expenseUuids: acknowledgedExpenses,
+        assetUuids: acknowledgedAssets,
+        maintenanceUuids: acknowledgedMaintenance,
+        inventoryRecords: acknowledgedInventory,
       );
       if (!acknowledged) {
         throw StateError(
-          'Windows database was pulled, but expense deletions could not be acknowledged.',
+          'Windows database was pulled, but deletions could not be acknowledged.',
         );
       }
     }
@@ -439,6 +610,9 @@ class SyncManager {
       invoicesPulled: invoices.length,
       expensesPulled: expensesApplied,
       ordersPulled: orders.length,
+      assetsPulled: assets.where((asset) => asset.syncStatus != 'deleted_pending').length,
+      inventoryPulled: inventoryRecords.length,
+      maintenancePulled: maintenanceRecords.where((record) => record['sync_status'] != 'deleted_pending').length,
       syncedAt: DateTime.now(),
     );
 
