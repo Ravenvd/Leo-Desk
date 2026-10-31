@@ -120,7 +120,7 @@ class StaffAttendance {
     final minute = int.tryParse(parts[1]);
     if (hour == null || minute == null) return 0;
     final checkoutMinutes = hour * 60 + minute;
-    return (checkoutMinutes - 16 * 60).clamp(0, 24 * 60);
+    return (checkoutMinutes - 16 * 60).clamp(0, 24 * 60).toInt();
   }
 
   int get overtimePayPaise =>
