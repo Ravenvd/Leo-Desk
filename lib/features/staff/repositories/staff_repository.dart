@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../expenses/models/expense.dart';
 import '../models/staff.dart';
 
 class StaffRepository {
@@ -128,12 +129,40 @@ class StaffRepository {
     return rows.map(StaffPayment.fromMap).toList();
   }
 
+  /// Records payroll and its matching Salaries expense atomically.
+  /// The payment UUID links the two records so sync and reporting can
+  /// identify the expense without relying on its description.
   Future<int> recordPayment(StaffPayment payment) async {
     final db = await _db;
-    return db.insert(
-      'staff_payments',
-      payment.toMap()..remove('id'),
-    );
+    return db.transaction((txn) async {
+      final paymentId = await txn.insert(
+        'staff_payments',
+        payment.toMap()..remove('id'),
+      );
+      final staffRows = await txn.query(
+        'staff',
+        columns: ['name'],
+        where: 'uuid = ?',
+        whereArgs: [payment.staffUuid],
+        limit: 1,
+      );
+      final staffName = staffRows.isEmpty
+          ? 'Staff member'
+          : staffRows.first['name'] as String;
+      final now = DateTime.now();
+      final expense = Expense(
+        expenseDate: payment.paymentDate,
+        category: 'Salaries',
+        description: 'Salary – $staffName',
+        amountPaise: payment.amountPaise,
+        notes: payment.notes,
+        staffPaymentUuid: payment.uuid,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await txn.insert('expenses', expense.toMap()..remove('id'));
+      return paymentId;
+    });
   }
 
   Future<List<StaffMember>> getPendingStaff() async {
