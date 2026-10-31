@@ -102,7 +102,7 @@ void main() {
     expect(expenses.single['category'], 'Salaries');
     expect(expenses.single['description'], 'Salary – Test staff');
     expect(expenses.single['amount_paise'], 5000);
-    expect(expenses.single['expense_date'], '2026-10-31');
+    expect(expenses.single['expense_date'], now.toIso8601String());
     expect(expenses.single['notes'], 'Advance');
   });
 }
