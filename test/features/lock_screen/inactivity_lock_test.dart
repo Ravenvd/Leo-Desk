@@ -37,7 +37,7 @@ void main() {
     );
 
     await tester.pump(const Duration(minutes: 4));
-    tester.sendEventToBinding(
+    await tester.sendEventToBinding(
       const PointerMoveEvent(
         pointer: 1,
         position: Offset(20, 20),
