@@ -71,7 +71,7 @@ class StaffAttendance {
 
   static const int fullDayWagePaise = 15000;
   static const int halfDayWagePaise = 7500;
-  static const int overtimeRatePaisePerHour = 3750;
+  static const int defaultOvertimeRatePaisePerHour = 3750;
 
   final int? id;
   final String uuid;
@@ -100,7 +100,7 @@ class StaffAttendance {
     this.checkOut,
     this.notes,
     int? baseWagePaise,
-    this.overtimeRatePaisePerHour = overtimeRatePaisePerHour,
+    this.overtimeRatePaisePerHour = defaultOvertimeRatePaisePerHour,
     required this.createdAt,
     required this.updatedAt,
   })  : uuid = uuid ?? const Uuid().v4(),
@@ -159,7 +159,7 @@ class StaffAttendance {
         notes: map['notes'] as String?,
         baseWagePaise: map['base_wage_paise'] as int? ?? 0,
         overtimeRatePaisePerHour:
-            map['overtime_rate_paise_per_hour'] as int? ?? overtimeRatePaisePerHour,
+            map['overtime_rate_paise_per_hour'] as int? ?? defaultOvertimeRatePaisePerHour,
         createdAt: DateTime.parse(map['created_at'] as String),
         updatedAt: DateTime.parse(map['updated_at'] as String),
       );
