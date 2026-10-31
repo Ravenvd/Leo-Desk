@@ -15,6 +15,8 @@ void main() {
     );
 
     await tester.enterText(find.byType(TextField), '1234');
+    await tester.ensureVisible(find.text('Unlock'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Unlock'));
     await tester.pump();
 
@@ -33,6 +35,8 @@ void main() {
     );
 
     await tester.enterText(find.byType(TextField), '2818');
+    await tester.ensureVisible(find.text('Unlock'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Unlock'));
     await tester.pump();
 
