@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class StitchEstimatorScreen extends StatefulWidget {
   const StitchEstimatorScreen({super.key});
@@ -13,6 +14,10 @@ class StitchEstimatorScreen extends StatefulWidget {
 
 class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
   static const _supportedExtensions = ['png', 'jpg', 'jpeg', 'bmp'];
+  static const double _initialWidthMm = 100;
+
+  final TextEditingController _widthController = TextEditingController();
+  final TextEditingController _heightController = TextEditingController();
 
   Uint8List? _artworkBytes;
   String? _fileName;
@@ -20,6 +25,17 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
   int? _imageHeight;
   int? _fileSize;
   bool _isImporting = false;
+  bool _lockAspectRatio = true;
+
+  double? get _aspectRatio {
+    if (_imageWidth == null || _imageHeight == null || _imageHeight == 0) {
+      return null;
+    }
+    return _imageWidth! / _imageHeight!;
+  }
+
+  double? get _physicalWidthMm => double.tryParse(_widthController.text);
+  double? get _physicalHeightMm => double.tryParse(_heightController.text);
 
   Future<void> _importArtwork() async {
     if (_isImporting) return;
@@ -55,6 +71,9 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
         _imageWidth = width;
         _imageHeight = height;
         _fileSize = file.size;
+        _widthController.text = _formatMillimetres(_initialWidthMm);
+        _heightController.text =
+            _formatMillimetres(_initialWidthMm * height / width);
       });
     } on FormatException catch (error) {
       if (mounted) _showError(error.message);
@@ -66,6 +85,32 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
     }
   }
 
+  void _updateWidth(String value) {
+    final width = double.tryParse(value);
+    final ratio = _aspectRatio;
+    if (!_lockAspectRatio || width == null || width <= 0 || ratio == null) {
+      setState(() {});
+      return;
+    }
+
+    _heightController.text = _formatMillimetres(width / ratio);
+    setState(() {});
+  }
+
+  void _updateHeight(String value) {
+    final height = double.tryParse(value);
+    final ratio = _aspectRatio;
+    if (!_lockAspectRatio || height == null || height <= 0 || ratio == null) {
+      setState(() {});
+      return;
+    }
+
+    _widthController.text = _formatMillimetres(height * ratio);
+    setState(() {});
+  }
+
+  String _formatMillimetres(double value) => value.toStringAsFixed(1);
+
   void _clearArtwork() {
     setState(() {
       _artworkBytes = null;
@@ -73,6 +118,8 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
       _imageWidth = null;
       _imageHeight = null;
       _fileSize = null;
+      _widthController.clear();
+      _heightController.clear();
     });
   }
 
@@ -87,6 +134,13 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+  @override
+  void dispose() {
+    _widthController.dispose();
+    _heightController.dispose();
+    super.dispose();
   }
 
   @override
@@ -126,7 +180,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Start by importing the artwork you want to estimate.',
+                'Import artwork and set its intended embroidery size.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
@@ -229,7 +283,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
         ] else ...[
           Row(
             children: [
@@ -241,8 +295,10 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
+        _buildPhysicalSizePanel(compact),
+        const SizedBox(height: 12),
         Expanded(
           child: Container(
             decoration: BoxDecoration(
@@ -275,6 +331,101 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+
+  Widget _buildPhysicalSizePanel(bool compact) {
+    final width = _physicalWidthMm;
+    final height = _physicalHeightMm;
+    final validSize = width != null &&
+        height != null &&
+        width > 0 &&
+        height > 0 &&
+        width.isFinite &&
+        height.isFinite;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Embroidery size',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Set the real-world size you want the finished design to be. '
+              'The initial width is a 100 mm starting value.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: compact ? 125 : 150,
+                  child: TextField(
+                    controller: _widthController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Width (mm)',
+                      isDense: true,
+                      suffixText: 'mm',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: _updateWidth,
+                  ),
+                ),
+                SizedBox(
+                  width: compact ? 125 : 150,
+                  child: TextField(
+                    controller: _heightController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Height (mm)',
+                      isDense: true,
+                      suffixText: 'mm',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: _updateHeight,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Checkbox(
+                      value: _lockAspectRatio,
+                      onChanged: (value) {
+                        setState(() => _lockAspectRatio = value ?? false);
+                      },
+                    ),
+                    const Text('Keep proportions'),
+                  ],
+                ),
+              ],
+            ),
+            if (!validSize)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Enter a width and height greater than zero.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
