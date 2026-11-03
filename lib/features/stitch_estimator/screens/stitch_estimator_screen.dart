@@ -13,7 +13,8 @@ class StitchEstimatorScreen extends StatefulWidget {
 
 class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
   static const _supportedExtensions = ['png', 'jpg', 'jpeg', 'bmp'];
-  static const double _initialWidthMm = 100;
+  static const double _initialWidthInches = 4.0;
+  static const double _millimetresPerInch = 25.4;
 
   final TextEditingController _widthController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
@@ -33,8 +34,14 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
     return _imageWidth! / _imageHeight!;
   }
 
-  double? get _physicalWidthMm => double.tryParse(_widthController.text);
-  double? get _physicalHeightMm => double.tryParse(_heightController.text);
+  double? get _physicalWidthInches => double.tryParse(_widthController.text);
+  double? get _physicalHeightInches => double.tryParse(_heightController.text);
+
+  // Keep the estimator's internal physical dimensions in millimetres.
+  double? get _physicalWidthMm =>
+      _physicalWidthInches == null ? null : _physicalWidthInches! * _millimetresPerInch;
+  double? get _physicalHeightMm =>
+      _physicalHeightInches == null ? null : _physicalHeightInches! * _millimetresPerInch;
 
   Future<void> _importArtwork() async {
     if (_isImporting) return;
@@ -70,9 +77,9 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
         _imageWidth = width;
         _imageHeight = height;
         _fileSize = file.size;
-        _widthController.text = _formatMillimetres(_initialWidthMm);
+        _widthController.text = _formatInches(_initialWidthInches);
         _heightController.text =
-            _formatMillimetres(_initialWidthMm * height / width);
+            _formatInches(_initialWidthInches * height / width);
       });
     } on FormatException catch (error) {
       if (mounted) _showError(error.message);
@@ -92,7 +99,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
       return;
     }
 
-    _heightController.text = _formatMillimetres(width / ratio);
+    _heightController.text = _formatInches(width / ratio);
     setState(() {});
   }
 
@@ -104,11 +111,11 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
       return;
     }
 
-    _widthController.text = _formatMillimetres(height * ratio);
+    _widthController.text = _formatInches(height * ratio);
     setState(() {});
   }
 
-  String _formatMillimetres(double value) => value.toStringAsFixed(1);
+  String _formatInches(double value) => value.toStringAsFixed(2);
 
   void _clearArtwork() {
     setState(() {
@@ -334,8 +341,8 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
   }
 
   Widget _buildPhysicalSizePanel(bool compact) {
-    final width = _physicalWidthMm;
-    final height = _physicalHeightMm;
+    final width = _physicalWidthInches;
+    final height = _physicalHeightInches;
     final validSize = width != null &&
         height != null &&
         width > 0 &&
@@ -357,7 +364,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
             const SizedBox(height: 4),
             Text(
               'Set the real-world size you want the finished design to be. '
-              'The initial width is a 100 mm starting value.',
+              'The initial width is 4 inches.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -375,9 +382,9 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
                     decoration: const InputDecoration(
-                      labelText: 'Width (mm)',
+                      labelText: 'Width (in)',
                       isDense: true,
-                      suffixText: 'mm',
+                      suffixText: 'in',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: _updateWidth,
@@ -392,7 +399,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
                     decoration: const InputDecoration(
-                      labelText: 'Height (mm)',
+                      labelText: 'Height (in)',
                       isDense: true,
                       suffixText: 'mm',
                       border: OutlineInputBorder(),
