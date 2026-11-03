@@ -30,6 +30,7 @@ import 'features/orders/screens/orders_screen.dart';
 import 'features/sync/screens/sync_settings_screen.dart';
 import 'features/staff/repositories/staff_repository.dart';
 import 'features/staff/screens/staff_manager_screen.dart';
+import 'features/stitch_estimator/screens/stitch_estimator_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -142,11 +143,7 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
           consumableRepository: ConsumableRepository(),
         ),
         const CalculatorScreen(),
-        const _ComingSoonScreen(
-          title: 'Stitch Estimator',
-          description: 'Artwork-based stitch and thread estimation will be available here.',
-          icon: Icons.auto_awesome_rounded,
-        ),
+        const StitchEstimatorScreen(),
         StaffManagerScreen(repository: StaffRepository()),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
