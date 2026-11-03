@@ -413,42 +413,6 @@ class _GroupDestination extends StatelessWidget {
   }
 }
 
-class _ComingSoonScreen extends StatelessWidget {
-  const _ComingSoonScreen({
-    required this.title,
-    required this.description,
-    required this.icon,
-  });
-
-  final String title;
-  final String description;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 52, color: colors.primary),
-              const SizedBox(height: 20),
-              Text(title, style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              Text(description, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              Chip(label: const Text('Coming soon')),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _LeoLogo extends StatelessWidget {
   const _LeoLogo({required this.width});
