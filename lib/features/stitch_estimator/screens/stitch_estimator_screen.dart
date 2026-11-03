@@ -26,7 +26,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
     setState(() => _isImporting = true);
 
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: _supportedExtensions,
         allowMultiple: false,
@@ -259,7 +259,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
                   _artworkBytes!,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
-                  errorBuilder: (_, __, ___) => const Padding(
+                  errorBuilder: (_, _, _) => const Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('This image could not be displayed.'),
                   ),
