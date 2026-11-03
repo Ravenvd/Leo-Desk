@@ -574,7 +574,9 @@ class _ArtworkCropDialog extends StatefulWidget {
 
 class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
   Rect? _selection;
+  Rect? _dragOrigin;
   Offset? _dragStart;
+  String _dragMode = 'new';
   bool _isCropping = false;
 
   Rect _fittedImageRect(Size size) {
@@ -605,12 +607,43 @@ class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
     );
   }
 
-  void _startSelection(DragStartDetails details, Rect imageRect) {
+  Map<String, Offset> _handlePositions(Rect rect) => {
+        'topLeft': rect.topLeft,
+        'top': Offset(rect.center.dx, rect.top),
+        'topRight': rect.topRight,
+        'right': Offset(rect.right, rect.center.dy),
+        'bottomRight': rect.bottomRight,
+        'bottom': Offset(rect.center.dx, rect.bottom),
+        'bottomLeft': rect.bottomLeft,
+        'left': Offset(rect.left, rect.center.dy),
+      };
+
+  void _startSelection(
+    DragStartDetails details,
+    Rect imageRect,
+    Rect? selectedRect,
+  ) {
     final point = _normalisedPoint(details.localPosition, imageRect);
     if (point == null) return;
+
+    var mode = 'new';
+    if (selectedRect != null) {
+      for (final entry in _handlePositions(selectedRect).entries) {
+        if ((details.localPosition - entry.value).distance <= 22) {
+          mode = entry.key;
+          break;
+        }
+      }
+      if (mode == 'new' && selectedRect.contains(details.localPosition)) {
+        mode = 'move';
+      }
+    }
+
     setState(() {
       _dragStart = point;
-      _selection = Rect.fromPoints(point, point);
+      _dragOrigin = _selection;
+      _dragMode = mode;
+      if (mode == 'new') _selection = Rect.fromPoints(point, point);
     });
   }
 
@@ -625,11 +658,73 @@ class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
       imageRect,
     );
     if (point == null) return;
-    setState(() => _selection = Rect.fromPoints(start, point));
+
+    const minimumSize = 0.01;
+    final origin = _dragOrigin;
+    Rect next;
+    switch (_dragMode) {
+      case 'move':
+        if (origin == null) return;
+        final dx = point.dx - start.dx;
+        final dy = point.dy - start.dy;
+        final left = (origin.left + dx).clamp(0.0, 1.0 - origin.width);
+        final top = (origin.top + dy).clamp(0.0, 1.0 - origin.height);
+        next = Rect.fromLTWH(left, top, origin.width, origin.height);
+      case 'left':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          point.dx.clamp(0.0, origin.right - minimumSize),
+          origin.top, origin.right, origin.bottom);
+      case 'right':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          origin.left, origin.top,
+          point.dx.clamp(origin.left + minimumSize, 1.0), origin.bottom);
+      case 'top':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          origin.left, point.dy.clamp(0.0, origin.bottom - minimumSize),
+          origin.right, origin.bottom);
+      case 'bottom':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          origin.left, origin.top, origin.right,
+          point.dy.clamp(origin.top + minimumSize, 1.0));
+      case 'topLeft':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          point.dx.clamp(0.0, origin.right - minimumSize),
+          point.dy.clamp(0.0, origin.bottom - minimumSize),
+          origin.right, origin.bottom);
+      case 'topRight':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          origin.left,
+          point.dy.clamp(0.0, origin.bottom - minimumSize),
+          point.dx.clamp(origin.left + minimumSize, 1.0),
+          origin.bottom);
+      case 'bottomLeft':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          point.dx.clamp(0.0, origin.right - minimumSize),
+          origin.top, origin.right,
+          point.dy.clamp(origin.top + minimumSize, 1.0));
+      case 'bottomRight':
+        if (origin == null) return;
+        next = Rect.fromLTRB(
+          origin.left, origin.top,
+          point.dx.clamp(origin.left + minimumSize, 1.0),
+          point.dy.clamp(origin.top + minimumSize, 1.0));
+      default:
+        next = Rect.fromPoints(start, point);
+    }
+    setState(() => _selection = next);
   }
 
   void _finishSelection(DragEndDetails details) {
     _dragStart = null;
+    _dragOrigin = null;
+    _dragMode = 'new';
     final selection = _selection;
     if (selection == null ||
         selection.width < 0.01 ||
@@ -763,7 +858,7 @@ class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
                       return GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onPanStart: (details) =>
-                            _startSelection(details, imageRect),
+                            _startSelection(details, imageRect, selectedRect),
                         onPanUpdate: (details) =>
                             _updateSelection(details, imageRect),
                         onPanEnd: _finishSelection,
@@ -856,6 +951,26 @@ class _CropOverlayPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2;
       canvas.drawRect(selectionRect!, border);
+
+      final handleFill = Paint()..color = Colors.white;
+      final handleBorder = Paint()
+        ..color = Colors.black87
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      final handlePoints = [
+        selectionRect!.topLeft,
+        Offset(selectionRect!.center.dx, selectionRect!.top),
+        selectionRect!.topRight,
+        Offset(selectionRect!.right, selectionRect!.center.dy),
+        selectionRect!.bottomRight,
+        Offset(selectionRect!.center.dx, selectionRect!.bottom),
+        selectionRect!.bottomLeft,
+        Offset(selectionRect!.left, selectionRect!.center.dy),
+      ];
+      for (final point in handlePoints) {
+        canvas.drawCircle(point, 6, handleFill);
+        canvas.drawCircle(point, 6, handleBorder);
+      }
     }
   }
 
