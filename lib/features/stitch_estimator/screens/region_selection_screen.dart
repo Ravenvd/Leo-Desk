@@ -137,7 +137,7 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
   }
 
   String _hexColor(int color) =>
-      '#\${(color & 0x00FFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+      '#${(color & 0x00FFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
   @override
   void dispose() {
@@ -177,6 +177,12 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
                 'in your prepared artwork. Areas with the same detected colour '
                 'are grouped together in this first pass.',
                 style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Target size: ${widget.physicalWidthMm.toStringAsFixed(1)} × '
+                '${widget.physicalHeightMm.toStringAsFixed(1)} mm',
+                style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
               Card(
@@ -230,7 +236,7 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
                       ),
                       if (result != null)
                         Text(
-                          '$includedCount of \${result.regions.length} groups included',
+                          '$includedCount of ${result.regions.length} groups included',
                           style: theme.textTheme.bodySmall,
                         ),
                     ],
@@ -387,9 +393,9 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
                       border: Border.all(color: theme.colorScheme.outline),
                     ),
                   ),
-                  title: Text('Region \${index + 1}'),
+                  title: Text('Region ${index + 1}'),
                   subtitle: Text(
-                    '\${_hexColor(color)} · \${region.percentage.toStringAsFixed(1)}%',
+                    '${_hexColor(color)} · ${region.percentage.toStringAsFixed(1)}%',
                   ),
                   trailing: Checkbox(
                     value: included,
