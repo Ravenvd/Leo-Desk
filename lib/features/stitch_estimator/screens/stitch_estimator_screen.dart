@@ -652,8 +652,8 @@ class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
     if (start == null) return;
     final point = _normalisedPoint(
       Offset(
-        details.localPosition.dx.clamp(imageRect.left, imageRect.right),
-        details.localPosition.dy.clamp(imageRect.top, imageRect.bottom),
+        details.localPosition.dx.clamp(imageRect.left, imageRect.right).toDouble(),
+        details.localPosition.dy.clamp(imageRect.top, imageRect.bottom).toDouble(),
       ),
       imageRect,
     );
@@ -667,56 +667,70 @@ class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
         if (origin == null) return;
         final dx = point.dx - start.dx;
         final dy = point.dy - start.dy;
-        final left = (origin.left + dx).clamp(0.0, 1.0 - origin.width);
-        final top = (origin.top + dy).clamp(0.0, 1.0 - origin.height);
+        final left =
+            (origin.left + dx).clamp(0.0, 1.0 - origin.width).toDouble();
+        final top =
+            (origin.top + dy).clamp(0.0, 1.0 - origin.height).toDouble();
         next = Rect.fromLTWH(left, top, origin.width, origin.height);
+        break;
       case 'left':
         if (origin == null) return;
         next = Rect.fromLTRB(
-          point.dx.clamp(0.0, origin.right - minimumSize),
+          point.dx.clamp(0.0, origin.right - minimumSize).toDouble(),
           origin.top, origin.right, origin.bottom);
+        break;
       case 'right':
         if (origin == null) return;
         next = Rect.fromLTRB(
           origin.left, origin.top,
-          point.dx.clamp(origin.left + minimumSize, 1.0), origin.bottom);
+          point.dx.clamp(origin.left + minimumSize, 1.0).toDouble(),
+          origin.bottom);
+        break;
       case 'top':
         if (origin == null) return;
         next = Rect.fromLTRB(
-          origin.left, point.dy.clamp(0.0, origin.bottom - minimumSize),
+          origin.left,
+          point.dy.clamp(0.0, origin.bottom - minimumSize).toDouble(),
           origin.right, origin.bottom);
+        break;
       case 'bottom':
         if (origin == null) return;
         next = Rect.fromLTRB(
           origin.left, origin.top, origin.right,
-          point.dy.clamp(origin.top + minimumSize, 1.0));
+          point.dy.clamp(origin.top + minimumSize, 1.0).toDouble());
+        break;
       case 'topLeft':
         if (origin == null) return;
         next = Rect.fromLTRB(
-          point.dx.clamp(0.0, origin.right - minimumSize),
-          point.dy.clamp(0.0, origin.bottom - minimumSize),
+          point.dx.clamp(0.0, origin.right - minimumSize).toDouble(),
+          point.dy.clamp(0.0, origin.bottom - minimumSize).toDouble(),
           origin.right, origin.bottom);
+        break;
       case 'topRight':
         if (origin == null) return;
         next = Rect.fromLTRB(
           origin.left,
-          point.dy.clamp(0.0, origin.bottom - minimumSize),
-          point.dx.clamp(origin.left + minimumSize, 1.0),
+          point.dy.clamp(0.0, origin.bottom - minimumSize).toDouble(),
+          point.dx.clamp(origin.left + minimumSize, 1.0).toDouble(),
           origin.bottom);
+        break;
       case 'bottomLeft':
         if (origin == null) return;
         next = Rect.fromLTRB(
-          point.dx.clamp(0.0, origin.right - minimumSize),
+          point.dx.clamp(0.0, origin.right - minimumSize).toDouble(),
           origin.top, origin.right,
-          point.dy.clamp(origin.top + minimumSize, 1.0));
+          point.dy.clamp(origin.top + minimumSize, 1.0).toDouble());
+        break;
       case 'bottomRight':
         if (origin == null) return;
         next = Rect.fromLTRB(
           origin.left, origin.top,
-          point.dx.clamp(origin.left + minimumSize, 1.0),
-          point.dy.clamp(origin.top + minimumSize, 1.0));
+          point.dx.clamp(origin.left + minimumSize, 1.0).toDouble(),
+          point.dy.clamp(origin.top + minimumSize, 1.0).toDouble());
+        break;
       default:
         next = Rect.fromPoints(start, point);
+        break;
     }
     setState(() => _selection = next);
   }
