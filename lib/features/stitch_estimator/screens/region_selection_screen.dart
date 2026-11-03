@@ -22,13 +22,14 @@ class RegionSelectionScreen extends StatefulWidget {
 }
 
 class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
-  int _colorCount = 6;
+  int _colorCount = 5;
+  int _fragmentMergeSize = 2;
   bool _isDetecting = false;
   String? _errorMessage;
   RegionDetectionResult? _detection;
   ui.Image? _previewImage;
-  int? _selectedColor;
-  final Map<int, bool> _includedColors = {};
+  int? _selectedRegionIndex;
+  final Map<int, bool> _includedRegions = {};
 
   Future<void> _detectRegions() async {
     if (_isDetecting) return;
@@ -42,7 +43,6 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
     try {
       codec = await ui.instantiateImageCodec(
         widget.imageBytes,
-        targetWidth: 1200,
       );
       final frame = await codec.getNextFrame();
       sourceImage = frame.image;
@@ -58,22 +58,24 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
         width: sourceImage.width,
         height: sourceImage.height,
         colorCount: _colorCount,
+        mergeFragmentsUpToPixelCount: _fragmentMergeSize,
       );
 
       if (!mounted) return;
       _detection = result;
-      _includedColors
+      _includedRegions
         ..clear()
         ..addEntries(
-          result.regions.map((region) => MapEntry(region.color, true)),
+          result.regions.asMap().entries.map((entry) => MapEntry(entry.key, true)),
         );
-      _selectedColor = result.regions.isEmpty ? null : result.regions.first.color;
+      _selectedRegionIndex = result.regions.isEmpty ? null : 0;
       await _refreshPreview();
     } catch (error) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Region detection could not process this artwork. '
-              'Try a smaller image or a different colour count.';
+          _errorMessage = error is UnsupportedError
+              ? error.message.toString()
+              : 'LeoStitch could not identify regions in this artwork. $error';
         });
       }
       debugPrint('Region detection failed: $error');
@@ -89,18 +91,17 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
     if (result == null) return;
 
     final pixels = Uint8List.fromList(result.rgbaPixels);
-    final selected = _selectedColor;
-    final included = _includedColors;
+    final selected = _selectedRegionIndex;
+    final included = _includedRegions;
 
-    for (var offset = 0; offset < pixels.length; offset += 4) {
-      if (pixels[offset + 3] == 0) continue;
-      final color = 0xFF000000 |
-          (pixels[offset] << 16) |
-          (pixels[offset + 1] << 8) |
-          pixels[offset + 2];
-      final isIncluded = included[color] ?? true;
-      final isSelected = selected == color;
-      final factor = !isIncluded ? 0.08 : (selected == null || isSelected ? 1.0 : 0.34);
+    for (var pixel = 0; pixel < result.regionLabels.length; pixel++) {
+      final regionIndex = result.regionLabels[pixel];
+      if (regionIndex == 0xFFFFFFFF) continue;
+      final offset = pixel * 4;
+      final isIncluded = included[regionIndex] ?? true;
+      final isSelected = selected == regionIndex;
+      final factor =
+          !isIncluded ? 0.08 : (selected == null || isSelected ? 1.0 : 0.34);
       if (factor < 1) {
         pixels[offset] = (pixels[offset] * factor).round();
         pixels[offset + 1] = (pixels[offset + 1] * factor).round();
@@ -126,18 +127,16 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
     );
   }
 
-  void _selectRegion(int color) {
-    setState(() => _selectedColor = color);
+  void _selectRegion(int regionIndex) {
+    setState(() => _selectedRegionIndex = regionIndex);
     _refreshPreview();
   }
 
-  void _toggleRegion(int color, bool included) {
-    setState(() => _includedColors[color] = included);
+  void _toggleRegion(int regionIndex, bool included) {
+    setState(() => _includedRegions[regionIndex] = included);
     _refreshPreview();
   }
 
-  String _hexColor(int color) =>
-      '#${(color & 0x00FFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
   @override
   void dispose() {
@@ -150,7 +149,7 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
     final theme = Theme.of(context);
     final result = _detection;
     final includedCount =
-        _includedColors.values.where((included) => included).length;
+        _includedRegions.values.where((included) => included).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -173,9 +172,8 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Choose an approximate number of colours, then detect the regions '
-                'in your prepared artwork. Areas with the same detected colour '
-                'are grouped together in this first pass.',
+                'Choose the colour count and small-fragment threshold, then let '
+                'the LeoStitch engine identify individual connected regions.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 4),
@@ -200,19 +198,43 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Colour groups: $_colorCount',
+                              'Number of colours: $_colorCount',
                               style: theme.textTheme.titleSmall,
                             ),
                             Slider(
-                              min: 2,
-                              max: 12,
-                              divisions: 10,
+                              min: 1,
+                              max: 32,
+                              divisions: 31,
                               value: _colorCount.toDouble(),
                               label: '$_colorCount',
                               onChanged: _isDetecting
                                   ? null
                                   : (value) => setState(
                                         () => _colorCount = value.round(),
+                                      ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 230,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Merge fragments up to: $_fragmentMergeSize px',
+                              style: theme.textTheme.titleSmall,
+                            ),
+                            Slider(
+                              min: 0,
+                              max: 100,
+                              divisions: 100,
+                              value: _fragmentMergeSize.toDouble(),
+                              label: '$_fragmentMergeSize px',
+                              onChanged: _isDetecting
+                                  ? null
+                                  : (value) => setState(
+                                        () => _fragmentMergeSize = value.round(),
                                       ),
                             ),
                           ],
@@ -236,7 +258,7 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
                       ),
                       if (result != null)
                         Text(
-                          '$includedCount of ${result.regions.length} groups included',
+                          '$includedCount of ${result.regions.length} regions included',
                           style: theme.textTheme.bodySmall,
                         ),
                     ],
@@ -259,8 +281,8 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
               if (result != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  'This is a preliminary colour grouping. Fine boundaries and '
-                  'disconnected areas can be refined in the next region-editing stage.',
+                  'LeoStitch identifies separate connected shapes. Small fragments '
+                  'are merged using the selected pixel threshold.',
                   style: theme.textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -298,7 +320,7 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Your artwork will appear here with detected colour regions.',
+                  'Your artwork will appear here with the detected regions.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface,
                     backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.9),
@@ -367,7 +389,7 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
             child: Text(
-              'Detected colour groups',
+              'Detected regions',
               style: theme.textTheme.titleMedium,
             ),
           ),
@@ -378,29 +400,32 @@ class _RegionSelectionScreenState extends State<RegionSelectionScreen> {
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final region = result.regions[index];
-                final color = region.color;
-                final included = _includedColors[color] ?? true;
-                final selected = _selectedColor == color;
+                final regionIndex = index;
+                final included = _includedRegions[regionIndex] ?? true;
+                final selected = _selectedRegionIndex == regionIndex;
                 return ListTile(
                   selected: selected,
-                  onTap: () => _selectRegion(color),
+                  onTap: () => _selectRegion(regionIndex),
                   leading: Container(
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: Color(color),
+                      color: Color(region.color),
                       borderRadius: BorderRadius.circular(7),
                       border: Border.all(color: theme.colorScheme.outline),
                     ),
                   ),
-                  title: Text('Region ${index + 1}'),
+                  title: Text('Region ${region.id}'),
                   subtitle: Text(
-                    '${_hexColor(color)} · ${region.percentage.toStringAsFixed(1)}%',
+                    '${region.percentage.toStringAsFixed(1)}% · '
+                    '${region.pixelCount} px · ${region.width} × ${region.height} px'
+                    '${region.holeCount > 0 ? ' · ${region.holeCount} holes' : ''}'
+                    '${region.touchesImageEdge ? ' · touches edge' : ''}',
                   ),
                   trailing: Checkbox(
                     value: included,
                     onChanged: (value) =>
-                        _toggleRegion(color, value ?? false),
+                        _toggleRegion(regionIndex, value ?? false),
                   ),
                 );
               },
