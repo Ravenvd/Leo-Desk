@@ -1,3 +1,7 @@
+import 'dart:ffi';
+import 'dart:io';
+
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
 class RegionDetectionResult {
@@ -6,42 +10,69 @@ class RegionDetectionResult {
     required this.height,
     required this.rgbaPixels,
     required this.regions,
+    required this.regionLabels,
   });
 
   final int width;
   final int height;
   final Uint8List rgbaPixels;
   final List<DetectedColorRegion> regions;
+
+  /// For each source pixel, the index of its connected region.
+  /// 0xFFFFFFFF marks transparent/background pixels.
+  final Uint32List regionLabels;
 }
 
 class DetectedColorRegion {
   const DetectedColorRegion({
+    required this.id,
     required this.color,
     required this.pixelCount,
     required this.percentage,
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+    required this.holeCount,
+    required this.touchesImageEdge,
   });
 
+  final int id;
   final int color;
   final int pixelCount;
   final double percentage;
+  final int left;
+  final int top;
+  final int width;
+  final int height;
+  final int holeCount;
+  final bool touchesImageEdge;
 }
 
-/// Groups pixels by their nearest representative colour.
-/// This first pass groups disconnected areas of the same colour together.
+/// Calls the same Qt-independent C++ region analyzer used by LeoStitch.
 class RegionDetectionService {
   static Future<RegionDetectionResult> detect({
     required Uint8List rgbaPixels,
     required int width,
     required int height,
     required int colorCount,
+    int mergeFragmentsUpToPixelCount = 2,
   }) async {
+    if (!Platform.isWindows) {
+      throw UnsupportedError(
+        'The LeoStitch region engine is currently available in the Windows '
+        'desktop build of Leo Desk.',
+      );
+    }
+
     final result = await compute<Map<String, Object>, Map<String, Object>>(
-      _segmentPixels,
+      _detectWithNativeEngine,
       {
         'pixels': rgbaPixels,
         'width': width,
         'height': height,
         'colorCount': colorCount,
+        'mergeLimit': mergeFragmentsUpToPixelCount,
       },
     );
 
@@ -50,12 +81,20 @@ class RegionDetectionService {
       width: result['width']! as int,
       height: result['height']! as int,
       rgbaPixels: result['pixels']! as Uint8List,
+      regionLabels: result['labels']! as Uint32List,
       regions: rawRegions
           .map(
             (region) => DetectedColorRegion(
+              id: region['id']! as int,
               color: region['color']! as int,
               pixelCount: region['pixelCount']! as int,
               percentage: region['percentage']! as double,
+              left: region['left']! as int,
+              top: region['top']! as int,
+              width: region['width']! as int,
+              height: region['height']! as int,
+              holeCount: region['holeCount']! as int,
+              touchesImageEdge: region['touchesImageEdge']! as bool,
             ),
           )
           .toList(growable: false),
@@ -63,127 +102,137 @@ class RegionDetectionService {
   }
 }
 
-Map<String, Object> _segmentPixels(Map<String, Object> args) {
-  final source = args['pixels']! as Uint8List;
+Map<String, Object> _detectWithNativeEngine(Map<String, Object> args) {
+  final pixels = args['pixels']! as Uint8List;
   final width = args['width']! as int;
   final height = args['height']! as int;
-  final requestedColors = args['colorCount']! as int;
-  final pixelCount = width * height;
+  final colorCount = args['colorCount']! as int;
+  final mergeLimit = args['mergeLimit']! as int;
 
-  // Sample at most about 18,000 pixels to build a representative palette.
-  final stride = (pixelCount / 18000).ceil().clamp(1, pixelCount).toInt();
-  final samples = <List<double>>[];
-  for (var index = 0; index < pixelCount; index += stride) {
-    final offset = index * 4;
-    if (source[offset + 3] < 24) continue;
-    samples.add([
-      source[offset].toDouble(),
-      source[offset + 1].toDouble(),
-      source[offset + 2].toDouble(),
-    ]);
-  }
-
-  if (samples.isEmpty) {
-    throw StateError('The image does not contain visible pixels.');
-  }
-
-  final clusterCount = requestedColors.clamp(2, 12).clamp(1, samples.length).toInt();
-  final centroids = <List<double>>[];
-  // Spread initial representatives through the sampled image.
-  for (var i = 0; i < clusterCount; i++) {
-    final sampleIndex = ((i + 0.5) * samples.length / clusterCount)
-        .floor()
-        .clamp(0, samples.length - 1)
-        .toInt();
-    centroids.add(List<double>.from(samples[sampleIndex]));
-  }
-
-  for (var iteration = 0; iteration < 6; iteration++) {
-    final sums = List.generate(clusterCount, (_) => List<double>.filled(3, 0));
-    final counts = List<int>.filled(clusterCount, 0);
-
-    for (var i = 0; i < samples.length; i++) {
-      final sample = samples[i];
-      var bestCluster = 0;
-      var bestDistance = double.infinity;
-      for (var cluster = 0; cluster < clusterCount; cluster++) {
-        final center = centroids[cluster];
-        final dr = sample[0] - center[0];
-        final dg = sample[1] - center[1];
-        final db = sample[2] - center[2];
-        final distance = dr * dr + dg * dg + db * db;
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestCluster = cluster;
-        }
-      }
-      counts[bestCluster]++;
-      for (var channel = 0; channel < 3; channel++) {
-        sums[bestCluster][channel] += sample[channel];
-      }
-    }
-
-    for (var cluster = 0; cluster < clusterCount; cluster++) {
-      if (counts[cluster] == 0) continue;
-      for (var channel = 0; channel < 3; channel++) {
-        centroids[cluster][channel] = sums[cluster][channel] / counts[cluster];
-      }
-    }
-  }
-
-  final output = Uint8List(source.length);
-  final regionCounts = List<int>.filled(clusterCount, 0);
-  for (var pixel = 0; pixel < pixelCount; pixel++) {
-    final offset = pixel * 4;
-    if (source[offset + 3] < 24) {
-      output[offset + 3] = 0;
-      continue;
-    }
-
-    var bestCluster = 0;
-    var bestDistance = double.infinity;
-    for (var cluster = 0; cluster < clusterCount; cluster++) {
-      final center = centroids[cluster];
-      final dr = source[offset] - center[0];
-      final dg = source[offset + 1] - center[1];
-      final db = source[offset + 2] - center[2];
-      final distance = dr * dr + dg * dg + db * db;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestCluster = cluster;
-      }
-    }
-
-    final center = centroids[bestCluster];
-    output[offset] = center[0].round().clamp(0, 255).toInt();
-    output[offset + 1] = center[1].round().clamp(0, 255).toInt();
-    output[offset + 2] = center[2].round().clamp(0, 255).toInt();
-    output[offset + 3] = source[offset + 3];
-    regionCounts[bestCluster]++;
-  }
-
-  final regions = <Map<String, Object>>[];
-  for (var cluster = 0; cluster < clusterCount; cluster++) {
-    if (regionCounts[cluster] == 0) continue;
-    final center = centroids[cluster];
-    final color = 0xFF000000 |
-        (center[0].round().clamp(0, 255).toInt() << 16) |
-        (center[1].round().clamp(0, 255).toInt() << 8) |
-        center[2].round().clamp(0, 255).toInt();
-    regions.add({
-      'color': color,
-      'pixelCount': regionCounts[cluster],
-      'percentage': regionCounts[cluster] * 100 / pixelCount,
-    });
-  }
-  regions.sort(
-    (a, b) => (b['pixelCount']! as int).compareTo(a['pixelCount']! as int),
+  final library = DynamicLibrary.open('leo_region_engine.dll');
+  final analyze = library.lookupFunction<
+      Pointer<Void> Function(
+        Pointer<Uint8>, Int32, Int32, Uint32, Uint32, Uint8,
+      ),
+      Pointer<Void> Function(
+        Pointer<Uint8>, int, int, int, int, int,
+      )>('leo_region_analyze');
+  final getCount = library.lookupFunction<
+      Uint32 Function(Pointer<Void>),
+      int Function(Pointer<Void>)>('leo_region_result_count');
+  final getRegion = library.lookupFunction<
+      Int32 Function(Pointer<Void>, Uint32, Pointer<_NativeRegionInfo>),
+      int Function(Pointer<Void>, int, Pointer<_NativeRegionInfo>)>(
+    'leo_region_result_get_region',
   );
+  final copyLabels = library.lookupFunction<
+      Int32 Function(Pointer<Void>, Pointer<Uint32>, Uint64),
+      int Function(Pointer<Void>, Pointer<Uint32>, int)>(
+    'leo_region_result_copy_labels',
+  );
+  final freeResult = library.lookupFunction<
+      Void Function(Pointer<Void>),
+      void Function(Pointer<Void>)>('leo_region_result_free');
 
-  return {
-    'width': width,
-    'height': height,
-    'pixels': output,
-    'regions': regions,
-  };
+  final nativePixels = calloc<Uint8>(pixels.length);
+  final nativeInfo = calloc<_NativeRegionInfo>();
+  final nativeResult = calloc<Uint32>(width * height);
+  Pointer<Void> handle = nullptr;
+
+  try {
+    nativePixels.asTypedList(pixels.length).setAll(0, pixels);
+    handle = analyze(
+      nativePixels,
+      width,
+      height,
+      colorCount,
+      mergeLimit,
+      8,
+    );
+    if (handle == nullptr) {
+      throw StateError('LeoStitch could not analyse the supplied artwork.');
+    }
+
+    final count = getCount(handle);
+    final regions = <Map<String, Object>>[];
+    for (var index = 0; index < count; index++) {
+      if (getRegion(handle, index, nativeInfo) == 0) {
+        throw StateError('LeoStitch returned incomplete region information.');
+      }
+      final info = nativeInfo.ref;
+      final color = 0xFF000000 |
+          (info.red << 16) |
+          (info.green << 8) |
+          info.blue;
+      regions.add({
+        'id': info.id,
+        'color': color,
+        'pixelCount': info.pixelCount,
+        'percentage': info.pixelCount * 100 / (width * height),
+        'left': info.left,
+        'top': info.top,
+        'width': info.width,
+        'height': info.height,
+        'holeCount': info.holeCount,
+        'touchesImageEdge': info.touchesImageEdge != 0,
+      });
+    }
+
+    if (copyLabels(handle, nativeResult, width * height) == 0) {
+      throw StateError('LeoStitch could not return the region pixel map.');
+    }
+
+    return {
+      'width': width,
+      'height': height,
+      'pixels': pixels,
+      'labels': Uint32List.fromList(
+        nativeResult.asTypedList(width * height),
+      ),
+      'regions': regions,
+    };
+  } finally {
+    if (handle != nullptr) freeResult(handle);
+    calloc.free(nativeResult);
+    calloc.free(nativeInfo);
+    calloc.free(nativePixels);
+  }
+}
+
+final class _NativeRegionInfo extends Struct {
+  @Uint32()
+  external int id;
+
+  @Uint8()
+  external int red;
+
+  @Uint8()
+  external int green;
+
+  @Uint8()
+  external int blue;
+
+  @Uint8()
+  external int alpha;
+
+  @Int32()
+  external int left;
+
+  @Int32()
+  external int top;
+
+  @Int32()
+  external int width;
+
+  @Int32()
+  external int height;
+
+  @Uint32()
+  external int pixelCount;
+
+  @Uint32()
+  external int holeCount;
+
+  @Uint8()
+  external int touchesImageEdge;
 }
