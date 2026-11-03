@@ -16,6 +16,24 @@ add_executable(${BINARY_NAME} WIN32
   "runner.exe.manifest"
 )
 
+# LeoStitch's Qt-independent artwork region analysis engine.
+add_library(leo_region_engine SHARED
+  "../region_engine/ArtworkRegionAnalysis.cpp"
+  "../region_engine/RegionEngineC.cpp"
+)
+target_compile_features(leo_region_engine PRIVATE cxx_std_20)
+target_include_directories(leo_region_engine PRIVATE "../region_engine")
+target_compile_definitions(leo_region_engine PRIVATE LEO_REGION_ENGINE_EXPORTS)
+set_target_properties(leo_region_engine PROPERTIES
+  OUTPUT_NAME "leo_region_engine"
+  WINDOWS_EXPORT_ALL_SYMBOLS OFF
+)
+if(MSVC)
+  target_compile_options(leo_region_engine PRIVATE /W4 /EHsc)
+else()
+  target_compile_options(leo_region_engine PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})
@@ -34,6 +52,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+add_dependencies(${BINARY_NAME} leo_region_engine)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
