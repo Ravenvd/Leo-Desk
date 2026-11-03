@@ -73,7 +73,7 @@ Map<String, Object> _segmentPixels(Map<String, Object> args) {
   final pixelCount = width * height;
 
   // Sample at most about 18,000 pixels to build a representative palette.
-  final stride = (pixelCount / 18000).ceil().clamp(1, pixelCount);
+  final stride = (pixelCount / 18000).ceil().clamp(1, pixelCount).toInt();
   final samples = <List<double>>[];
   for (var index = 0; index < pixelCount; index += stride) {
     final offset = index * 4;
@@ -89,17 +89,17 @@ Map<String, Object> _segmentPixels(Map<String, Object> args) {
     throw StateError('The image does not contain visible pixels.');
   }
 
-  final clusterCount = requestedColors.clamp(2, 12).clamp(1, samples.length);
+  final clusterCount = requestedColors.clamp(2, 12).clamp(1, samples.length).toInt();
   final centroids = <List<double>>[];
   // Spread initial representatives through the sampled image.
   for (var i = 0; i < clusterCount; i++) {
     final sampleIndex = ((i + 0.5) * samples.length / clusterCount)
         .floor()
-        .clamp(0, samples.length - 1);
+        .clamp(0, samples.length - 1)
+        .toInt();
     centroids.add(List<double>.from(samples[sampleIndex]));
   }
 
-  final assignments = List<int>.filled(samples.length, 0);
   for (var iteration = 0; iteration < 6; iteration++) {
     final sums = List.generate(clusterCount, (_) => List<double>.filled(3, 0));
     final counts = List<int>.filled(clusterCount, 0);
@@ -119,7 +119,6 @@ Map<String, Object> _segmentPixels(Map<String, Object> args) {
           bestCluster = cluster;
         }
       }
-      assignments[i] = bestCluster;
       counts[bestCluster]++;
       for (var channel = 0; channel < 3; channel++) {
         sums[bestCluster][channel] += sample[channel];
@@ -158,9 +157,9 @@ Map<String, Object> _segmentPixels(Map<String, Object> args) {
     }
 
     final center = centroids[bestCluster];
-    output[offset] = center[0].round().clamp(0, 255);
-    output[offset + 1] = center[1].round().clamp(0, 255);
-    output[offset + 2] = center[2].round().clamp(0, 255);
+    output[offset] = center[0].round().clamp(0, 255).toInt();
+    output[offset + 1] = center[1].round().clamp(0, 255).toInt();
+    output[offset + 2] = center[2].round().clamp(0, 255).toInt();
     output[offset + 3] = source[offset + 3];
     regionCounts[bestCluster]++;
   }
@@ -170,9 +169,9 @@ Map<String, Object> _segmentPixels(Map<String, Object> args) {
     if (regionCounts[cluster] == 0) continue;
     final center = centroids[cluster];
     final color = 0xFF000000 |
-        (center[0].round().clamp(0, 255) << 16) |
-        (center[1].round().clamp(0, 255) << 8) |
-        center[2].round().clamp(0, 255);
+        (center[0].round().clamp(0, 255).toInt() << 16) |
+        (center[1].round().clamp(0, 255).toInt() << 8) |
+        center[2].round().clamp(0, 255).toInt();
     regions.add({
       'color': color,
       'pixelCount': regionCounts[cluster],
