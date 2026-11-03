@@ -28,6 +28,8 @@ struct LeoRegionInfo {
     std::uint8_t touches_image_edge;
 };
 
+static_assert(sizeof(LeoRegionInfo) == 36, "Unexpected C ABI region structure layout");
+
 struct LeoRegionResult {
     LeoStitch::Core::RegionAnalysisResult analysis;
 };
