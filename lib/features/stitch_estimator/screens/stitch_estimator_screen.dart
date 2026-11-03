@@ -26,6 +26,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
   int? _fileSize;
   bool _isImporting = false;
   bool _lockAspectRatio = true;
+  bool _cropCompleted = false;
 
   double? get _aspectRatio {
     if (_imageWidth == null || _imageHeight == null || _imageHeight == 0) {
@@ -77,9 +78,9 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
         _imageWidth = width;
         _imageHeight = height;
         _fileSize = file.size;
-        _widthController.text = _formatInches(_initialWidthInches);
-        _heightController.text =
-            _formatInches(_initialWidthInches * height / width);
+        _cropCompleted = false;
+        _widthController.clear();
+        _heightController.clear();
       });
     } on FormatException catch (error) {
       if (mounted) _showError(error.message);
@@ -88,6 +89,54 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
       debugPrint('Artwork import failed: $error');
     } finally {
       if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  void _completeCropStep(int width, int height) {
+    setState(() {
+      _cropCompleted = true;
+      _widthController.text = _formatInches(_initialWidthInches);
+      _heightController.text =
+          _formatInches(_initialWidthInches * height / width);
+    });
+  }
+
+  Future<void> _cropArtwork() async {
+    final bytes = _artworkBytes;
+    if (bytes == null) return;
+
+    final croppedBytes = await showDialog<Uint8List>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _ArtworkCropDialog(
+        imageBytes: bytes,
+        imageWidth: _imageWidth!,
+        imageHeight: _imageHeight!,
+      ),
+    );
+
+    if (croppedBytes == null || !mounted) return;
+
+    try {
+      final codec = await ui.instantiateImageCodec(croppedBytes);
+      final frame = await codec.getNextFrame();
+      final width = frame.image.width;
+      final height = frame.image.height;
+      frame.image.dispose();
+      codec.dispose();
+
+      if (!mounted) return;
+      setState(() {
+        _artworkBytes = croppedBytes;
+        _fileName = _fileName == null ? 'Cropped artwork' : 'Cropped $_fileName';
+        _imageWidth = width;
+        _imageHeight = height;
+        _fileSize = croppedBytes.length;
+      });
+      _completeCropStep(width, height);
+    } catch (error) {
+      if (mounted) _showError('The cropped image could not be created.');
+      debugPrint('Artwork crop failed: $error');
     }
   }
 
@@ -124,6 +173,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
       _imageWidth = null;
       _imageHeight = null;
       _fileSize = null;
+      _cropCompleted = false;
       _widthController.clear();
       _heightController.clear();
     });
@@ -303,8 +353,13 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
           ),
           const SizedBox(height: 12),
         ],
-        _buildPhysicalSizePanel(compact),
-        const SizedBox(height: 12),
+        if (!_cropCompleted) ...[
+          _buildCropStepPanel(compact),
+          const SizedBox(height: 12),
+        ] else ...[
+          _buildPhysicalSizePanel(compact),
+          const SizedBox(height: 12),
+        ],
         Expanded(
           child: Container(
             decoration: BoxDecoration(
@@ -337,6 +392,43 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+
+  Widget _buildCropStepPanel(bool compact) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Crop artwork', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Select the part of the image you want to embroider. '
+              'Remove blank margins and unwanted background before setting its size.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _cropArtwork,
+                  icon: const Icon(Icons.crop_rounded),
+                  label: const Text('Crop artwork'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _completeCropStep(_imageWidth!, _imageHeight!),
+                  child: const Text('Use original image'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -462,4 +554,313 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
       ],
     );
   }
+
+class _ArtworkCropDialog extends StatefulWidget {
+  const _ArtworkCropDialog({
+    required this.imageBytes,
+    required this.imageWidth,
+    required this.imageHeight,
+  });
+
+  final Uint8List imageBytes;
+  final int imageWidth;
+  final int imageHeight;
+
+  @override
+  State<_ArtworkCropDialog> createState() => _ArtworkCropDialogState();
+}
+
+class _ArtworkCropDialogState extends State<_ArtworkCropDialog> {
+  Rect? _selection;
+  Offset? _dragStart;
+  bool _isCropping = false;
+
+  Rect _fittedImageRect(Size size) {
+    final imageRatio = widget.imageWidth / widget.imageHeight;
+    final viewRatio = size.width / size.height;
+    late double width;
+    late double height;
+    if (imageRatio > viewRatio) {
+      width = size.width;
+      height = width / imageRatio;
+    } else {
+      height = size.height;
+      width = height * imageRatio;
+    }
+    return Rect.fromLTWH(
+      (size.width - width) / 2,
+      (size.height - height) / 2,
+      width,
+      height,
+    );
+  }
+
+  Offset? _normalisedPoint(Offset point, Rect imageRect) {
+    if (!imageRect.contains(point)) return null;
+    return Offset(
+      ((point.dx - imageRect.left) / imageRect.width).clamp(0.0, 1.0),
+      ((point.dy - imageRect.top) / imageRect.height).clamp(0.0, 1.0),
+    );
+  }
+
+  void _startSelection(DragStartDetails details, Rect imageRect) {
+    final point = _normalisedPoint(details.localPosition, imageRect);
+    if (point == null) return;
+    setState(() {
+      _dragStart = point;
+      _selection = Rect.fromPoints(point, point);
+    });
+  }
+
+  void _updateSelection(DragUpdateDetails details, Rect imageRect) {
+    final start = _dragStart;
+    if (start == null) return;
+    final point = _normalisedPoint(
+      Offset(
+        details.localPosition.dx.clamp(imageRect.left, imageRect.right),
+        details.localPosition.dy.clamp(imageRect.top, imageRect.bottom),
+      ),
+      imageRect,
+    );
+    if (point == null) return;
+    setState(() => _selection = Rect.fromPoints(start, point));
+  }
+
+  void _finishSelection(DragEndDetails details) {
+    _dragStart = null;
+    final selection = _selection;
+    if (selection == null ||
+        selection.width < 0.01 ||
+        selection.height < 0.01) {
+      setState(() => _selection = null);
+    }
+  }
+
+  Future<void> _applyCrop() async {
+    final selection = _selection;
+    if (selection == null || selection.width < 0.01 || selection.height < 0.01) {
+      return;
+    }
+
+    setState(() => _isCropping = true);
+    ui.Codec? codec;
+    ui.Image? sourceImage;
+    ui.Image? outputImage;
+    try {
+      codec = await ui.instantiateImageCodec(widget.imageBytes);
+      final frame = await codec.getNextFrame();
+      sourceImage = frame.image;
+
+      final left = (selection.left * widget.imageWidth)
+          .floor()
+          .clamp(0, widget.imageWidth - 1);
+      final top = (selection.top * widget.imageHeight)
+          .floor()
+          .clamp(0, widget.imageHeight - 1);
+      final right = (selection.right * widget.imageWidth)
+          .ceil()
+          .clamp(left + 1, widget.imageWidth);
+      final bottom = (selection.bottom * widget.imageHeight)
+          .ceil()
+          .clamp(top + 1, widget.imageHeight);
+      final cropWidth = right - left;
+      final cropHeight = bottom - top;
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawImageRect(
+        sourceImage,
+        Rect.fromLTWH(
+          left.toDouble(),
+          top.toDouble(),
+          cropWidth.toDouble(),
+          cropHeight.toDouble(),
+        ),
+        Rect.fromLTWH(0, 0, cropWidth.toDouble(), cropHeight.toDouble()),
+        Paint()..filterQuality = FilterQuality.high,
+      );
+      final picture = recorder.endRecording();
+      outputImage = await picture.toImage(cropWidth, cropHeight);
+      picture.dispose();
+      final data = await outputImage.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) throw StateError('Could not encode cropped image.');
+
+      if (!mounted) return;
+      Navigator.of(context).pop(data.buffer.asUint8List());
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to crop this image.')),
+        );
+      }
+      debugPrint('Crop operation failed: $error');
+    } finally {
+      sourceImage?.dispose();
+      outputImage?.dispose();
+      codec?.dispose();
+      if (mounted) setState(() => _isCropping = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Dialog(
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 760),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Crop artwork',
+                        style: theme.textTheme.headlineSmall),
+                  ),
+                  IconButton(
+                    tooltip: 'Close crop tool',
+                    onPressed: _isCropping
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Drag across the image to draw the crop area. '
+                'Only the selected area will be kept.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 260),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final imageRect = _fittedImageRect(
+                        Size(constraints.maxWidth, constraints.maxHeight),
+                      );
+                      final selectedRect = _selection == null
+                          ? null
+                          : Rect.fromLTRB(
+                              imageRect.left + _selection!.left * imageRect.width,
+                              imageRect.top + _selection!.top * imageRect.height,
+                              imageRect.left + _selection!.right * imageRect.width,
+                              imageRect.top + _selection!.bottom * imageRect.height,
+                            );
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanStart: (details) =>
+                            _startSelection(details, imageRect),
+                        onPanUpdate: (details) =>
+                            _updateSelection(details, imageRect),
+                        onPanEnd: _finishSelection,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Positioned.fromRect(
+                              rect: imageRect,
+                              child: Image.memory(
+                                widget.imageBytes,
+                                fit: BoxFit.fill,
+                                filterQuality: FilterQuality.high,
+                              ),
+                            ),
+                            CustomPaint(
+                              painter: _CropOverlayPainter(
+                                imageRect: imageRect,
+                                selectionRect: selectedRect,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: _isCropping
+                        ? null
+                        : () => setState(() => _selection = null),
+                    child: const Text('Reset selection'),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _isCropping
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _isCropping || _selection == null
+                        ? null
+                        : _applyCrop,
+                    icon: _isCropping
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_rounded),
+                    label: Text(_isCropping ? 'Cropping...' : 'Apply crop'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CropOverlayPainter extends CustomPainter {
+  const _CropOverlayPainter({
+    required this.imageRect,
+    required this.selectionRect,
+  });
+
+  final Rect imageRect;
+  final Rect? selectionRect;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dimPaint = Paint()..color = Colors.black.withValues(alpha: 0.58);
+    final outside = Path()..addRect(imageRect);
+    if (selectionRect != null) {
+      outside.addRect(selectionRect!);
+      outside.fillType = PathFillType.evenOdd;
+    }
+    canvas.drawPath(outside, dimPaint);
+
+    if (selectionRect != null) {
+      final border = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      canvas.drawRect(selectionRect!, border);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CropOverlayPainter oldDelegate) =>
+      oldDelegate.imageRect != imageRect ||
+      oldDelegate.selectionRect != selectionRect;
+}
+
 }
