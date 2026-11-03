@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'region_selection_screen.dart';
+
 class StitchEstimatorScreen extends StatefulWidget {
   const StitchEstimatorScreen({super.key});
 
@@ -521,7 +523,33 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: validSize ? _openRegionSelection : null,
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Continue to region selection'),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _openRegionSelection() {
+    final bytes = _artworkBytes;
+    final widthMm = _physicalWidthMm;
+    final heightMm = _physicalHeightMm;
+    if (bytes == null || widthMm == null || heightMm == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => RegionSelectionScreen(
+          imageBytes: bytes,
+          physicalWidthMm: widthMm,
+          physicalHeightMm: heightMm,
         ),
       ),
     );
