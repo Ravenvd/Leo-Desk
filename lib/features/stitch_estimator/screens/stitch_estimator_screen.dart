@@ -341,14 +341,14 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
   }
 
   Widget _buildPhysicalSizePanel(bool compact) {
-    final width = _physicalWidthInches;
-    final height = _physicalHeightInches;
-    final validSize = width != null &&
-        height != null &&
-        width > 0 &&
-        height > 0 &&
-        width.isFinite &&
-        height.isFinite;
+    final widthMm = _physicalWidthMm;
+    final heightMm = _physicalHeightMm;
+    final validSize = widthMm != null &&
+        heightMm != null &&
+        widthMm > 0 &&
+        heightMm > 0 &&
+        widthMm.isFinite &&
+        heightMm.isFinite;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -401,7 +401,7 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Height (in)',
                       isDense: true,
-                      suffixText: 'mm',
+                      suffixText: 'in',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: _updateHeight,
