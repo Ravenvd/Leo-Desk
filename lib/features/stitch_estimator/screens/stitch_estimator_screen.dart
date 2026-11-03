@@ -87,7 +87,9 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
     } on FormatException catch (error) {
       if (mounted) _showError(error.message);
     } catch (error) {
-      if (mounted) _showError('Unable to import this image. Please try another file.');
+      if (mounted) {
+        _showError('Unable to import this image. Please try another file.');
+      }
       debugPrint('Artwork import failed: $error');
     } finally {
       if (mounted) setState(() => _isImporting = false);
