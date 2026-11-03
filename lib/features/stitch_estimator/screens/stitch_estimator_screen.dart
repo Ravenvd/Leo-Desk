@@ -555,6 +555,8 @@ class _StitchEstimatorScreenState extends State<StitchEstimatorScreen> {
     );
   }
 
+}
+
 class _ArtworkCropDialog extends StatefulWidget {
   const _ArtworkCropDialog({
     required this.imageBytes,
@@ -861,6 +863,4 @@ class _CropOverlayPainter extends CustomPainter {
   bool shouldRepaint(covariant _CropOverlayPainter oldDelegate) =>
       oldDelegate.imageRect != imageRect ||
       oldDelegate.selectionRect != selectionRect;
-}
-
 }
