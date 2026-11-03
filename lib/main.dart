@@ -134,15 +134,20 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
         ),
         CustomersScreen(repository: CustomerRepository()),
         OrdersScreen(),
-        InvoicesScreen(),
         BillsScreen(),
+        InvoicesScreen(),
         ExpensesScreen(repository: ExpenseRepository()),
         InventoryScreen(
           assetRepository: AssetRepository(),
           consumableRepository: ConsumableRepository(),
         ),
-        StaffManagerScreen(repository: StaffRepository()),
         const CalculatorScreen(),
+        const _ComingSoonScreen(
+          title: 'Stitch Estimator',
+          description: 'Artwork-based stitch and thread estimation will be available here.',
+          icon: Icons.auto_awesome_rounded,
+        ),
+        StaffManagerScreen(repository: StaffRepository()),
         SyncSettingsScreen(syncServer: widget.syncServer),
       ];
 
@@ -189,7 +194,10 @@ class _LeoDeskShellState extends State<LeoDeskShell> {
       appBar: AppBar(title: const Text('Leo Desk')),
       drawer: _MobileNavigation(
         selectedIndex: _selectedIndex,
-        onSelected: _selectPage,
+        onSelected: (index) {
+          Navigator.of(context).pop();
+          _selectPage(index);
+        },
       ),
       body: _pages[_selectedIndex],
     );
@@ -212,13 +220,19 @@ class _DesktopNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 250,
-      padding: const EdgeInsets.all(20),
+      width: 270,
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          right: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 24),
+            padding: EdgeInsets.fromLTRB(12, 8, 12, 28),
             child: _LeoLogo(width: 150),
           ),
           Expanded(
@@ -230,63 +244,39 @@ class _DesktopNavigation extends StatelessWidget {
                   selected: selectedIndex == 0,
                   onTap: () => onSelected(0),
                 ),
-                _NavigationItem(
-                  icon: Icons.people_alt_rounded,
-                  label: 'Customers',
-                  selected: selectedIndex == 1,
-                  onTap: () => onSelected(1),
+                const SizedBox(height: 12),
+                _NavigationGroup(
+                  icon: Icons.business_rounded,
+                  title: 'Business Management',
+                  selected: selectedIndex >= 1 && selectedIndex <= 5,
+                  children: [
+                    _GroupDestination(icon: Icons.people_alt_rounded, label: 'Customers', selected: selectedIndex == 1, onTap: () => onSelected(1)),
+                    _GroupDestination(icon: Icons.shopping_bag_rounded, label: 'Orders', selected: selectedIndex == 2, onTap: () => onSelected(2)),
+                    _GroupDestination(icon: Icons.payments_rounded, label: 'Bills', selected: selectedIndex == 3, onTap: () => onSelected(3)),
+                    _GroupDestination(icon: Icons.receipt_long_rounded, label: 'Invoices', selected: selectedIndex == 4, onTap: () => onSelected(4)),
+                    _GroupDestination(icon: Icons.money_off_rounded, label: 'Expenses', selected: selectedIndex == 5, onTap: () => onSelected(5)),
+                  ],
                 ),
-                _NavigationItem(
-                  icon: Icons.shopping_bag_rounded,
-                  label: 'Orders',
-                  selected: selectedIndex == 2,
-                  onTap: () => onSelected(2),
-                ),
-                _NavigationItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Invoices',
-                  selected: selectedIndex == 3,
-                  onTap: () => onSelected(3),
-                ),
-                _NavigationItem(
-                  icon: Icons.payments_rounded,
-                  label: 'Bills',
-                  selected: selectedIndex == 4,
-                  onTap: () => onSelected(4),
-                ),
-                _NavigationItem(
-                  icon: Icons.money_off_rounded,
-                  label: 'Expenses',
-                  selected: selectedIndex == 5,
-                  onTap: () => onSelected(5),
-                ),
-                _NavigationItem(
-                  icon: Icons.inventory_2_rounded,
-                  label: 'Inventory',
-                  selected: selectedIndex == 6,
-                  onTap: () => onSelected(6),
-                ),
-                _NavigationItem(
-                  icon: Icons.people_alt_rounded,
-                  label: 'Staff Manager',
-                  selected: selectedIndex == 7,
-                  onTap: () => onSelected(7),
+                _NavigationGroup(
+                  icon: Icons.factory_rounded,
+                  title: 'Production Management',
+                  selected: selectedIndex >= 6 && selectedIndex <= 9,
+                  children: [
+                    _GroupDestination(icon: Icons.inventory_2_rounded, label: 'Inventory', selected: selectedIndex == 6, onTap: () => onSelected(6)),
+                    _GroupDestination(icon: Icons.calculate_rounded, label: 'Pricing Calculator', selected: selectedIndex == 7, onTap: () => onSelected(7)),
+                    _GroupDestination(icon: Icons.auto_awesome_rounded, label: 'Stitch Estimator', selected: selectedIndex == 8, onTap: () => onSelected(8)),
+                    _GroupDestination(icon: Icons.people_alt_rounded, label: 'Staff', selected: selectedIndex == 9, onTap: () => onSelected(9)),
+                  ],
                 ),
               ],
             ),
           ),
           const Divider(),
           _NavigationItem(
-            icon: Icons.calculate_rounded,
-            label: 'Calculator',
-            selected: selectedIndex == 8,
-            onTap: () => onSelected(8),
-          ),
-          _NavigationItem(
             icon: Icons.settings_rounded,
             label: 'Settings',
-            selected: selectedIndex == 9,
-            onTap: () => onSelected(9),
+            selected: selectedIndex == 10,
+            onTap: () => onSelected(10),
           ),
         ],
       ),
@@ -305,65 +295,160 @@ class _MobileNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NavigationDrawer(
-      selectedIndex: selectedIndex,
-      onDestinationSelected: onSelected,
-      children: const [
-        Padding(
-          padding: EdgeInsets.fromLTRB(28, 24, 28, 16),
-          child: _LeoLogo(width: 140),
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(12, 8, 12, 28),
+              child: _LeoLogo(width: 145),
+            ),
+            _NavigationItem(
+              icon: Icons.dashboard_rounded,
+              label: 'Dashboard',
+              selected: selectedIndex == 0,
+              onTap: () => onSelected(0),
+            ),
+            const SizedBox(height: 12),
+            _NavigationGroup(
+              icon: Icons.business_rounded,
+              title: 'Business Management',
+              selected: selectedIndex >= 1 && selectedIndex <= 5,
+              children: [
+                _GroupDestination(icon: Icons.people_alt_rounded, label: 'Customers', selected: selectedIndex == 1, onTap: () => onSelected(1)),
+                _GroupDestination(icon: Icons.shopping_bag_rounded, label: 'Orders', selected: selectedIndex == 2, onTap: () => onSelected(2)),
+                _GroupDestination(icon: Icons.payments_rounded, label: 'Bills', selected: selectedIndex == 3, onTap: () => onSelected(3)),
+                _GroupDestination(icon: Icons.receipt_long_rounded, label: 'Invoices', selected: selectedIndex == 4, onTap: () => onSelected(4)),
+                _GroupDestination(icon: Icons.money_off_rounded, label: 'Expenses', selected: selectedIndex == 5, onTap: () => onSelected(5)),
+              ],
+            ),
+            _NavigationGroup(
+              icon: Icons.factory_rounded,
+              title: 'Production Management',
+              selected: selectedIndex >= 6 && selectedIndex <= 9,
+              children: [
+                _GroupDestination(icon: Icons.inventory_2_rounded, label: 'Inventory', selected: selectedIndex == 6, onTap: () => onSelected(6)),
+                _GroupDestination(icon: Icons.calculate_rounded, label: 'Pricing Calculator', selected: selectedIndex == 7, onTap: () => onSelected(7)),
+                _GroupDestination(icon: Icons.auto_awesome_rounded, label: 'Stitch Estimator', selected: selectedIndex == 8, onTap: () => onSelected(8)),
+                _GroupDestination(icon: Icons.people_alt_rounded, label: 'Staff', selected: selectedIndex == 9, onTap: () => onSelected(9)),
+              ],
+            ),
+            const Divider(height: 32),
+            _NavigationItem(
+              icon: Icons.settings_rounded,
+              label: 'Settings',
+              selected: selectedIndex == 10,
+              onTap: () => onSelected(10),
+            ),
+          ],
         ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard_rounded),
-          label: Text('Dashboard'),
+      ),
+    );
+  }
+}
+
+class _NavigationGroup extends StatelessWidget {
+  const _NavigationGroup({
+    required this.icon,
+    required this.title,
+    required this.selected,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool selected;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: selected,
+        leading: Icon(icon, color: selected ? colors.primary : null),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            color: selected ? colors.primary : null,
+          ),
         ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.people_alt_outlined),
-          selectedIcon: Icon(Icons.people_alt_rounded),
-          label: Text('Customers'),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.only(left: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        children: children,
+      ),
+    );
+  }
+}
+
+class _GroupDestination extends StatelessWidget {
+  const _GroupDestination({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ListTile(
+        dense: true,
+        visualDensity: const VisualDensity(vertical: -1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        selected: selected,
+        leading: Icon(icon, size: 20),
+        title: Text(label),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _ComingSoonScreen extends StatelessWidget {
+  const _ComingSoonScreen({
+    required this.title,
+    required this.description,
+    required this.icon,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 52, color: colors.primary),
+              const SizedBox(height: 20),
+              Text(title, style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(description, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              Chip(label: const Text('Coming soon')),
+            ],
+          ),
         ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.shopping_bag_outlined),
-          selectedIcon: Icon(Icons.shopping_bag_rounded),
-          label: Text('Orders'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.receipt_long_outlined),
-          selectedIcon: Icon(Icons.receipt_long_rounded),
-          label: Text('Invoices'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.payments_outlined),
-          selectedIcon: Icon(Icons.payments_rounded),
-          label: Text('Bills'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.money_off_outlined),
-          selectedIcon: Icon(Icons.money_off_rounded),
-          label: Text('Expenses'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2_rounded),
-          label: Text('Inventory'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.people_alt_outlined),
-          selectedIcon: Icon(Icons.people_alt_rounded),
-          label: Text('Staff Manager'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.calculate_outlined),
-          selectedIcon: Icon(Icons.calculate_rounded),
-          label: Text('Calculator'),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings_rounded),
-          label: Text('Settings'),
-        ),
-      ],
+      ),
     );
   }
 }
