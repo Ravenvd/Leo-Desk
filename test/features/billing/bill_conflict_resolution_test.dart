@@ -125,7 +125,7 @@ void main() {
     expect(items.single.uuid, 'later-local-item');
   });
 
-  test('later incoming bill cannot replace the earliest local bill', () async {
+  test('a distinct incoming bill cannot replace the existing bill for its order', () async {
     await insertLocalBill(
       makeBill(uuid: 'earlier-local', number: 'BILL-EARLY', createdAt: early),
       'earlier-local-item',
@@ -147,7 +147,7 @@ void main() {
     expect(items.single.uuid, 'earlier-local-item');
   });
 
-  test('equal timestamps do not let a different UUID replace the canonical bill',
+  test('a different bill UUID is rejected for the same order regardless of timestamps',
       () async {
     await insertLocalBill(
       makeBill(uuid: 'z-local', number: 'BILL-Z', createdAt: early),
