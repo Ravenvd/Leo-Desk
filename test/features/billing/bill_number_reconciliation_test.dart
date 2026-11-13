@@ -96,4 +96,112 @@ void main() {
     expect(saved.uuid, incoming.uuid);
     expect(saved.billNumber, 'BILL-20261101-000001');
   });
+  test('preserves pending bills and frees synced legacy number collisions', () async {
+    final androidBills = BillRepository(database: database);
+    final legacy = Bill(
+      uuid: 'legacy-bill-number-owner',
+      syncStatus: 'pending',
+      customerId: customerId,
+      customerUuid: 'bill-number-customer',
+      orderUuid: 'bill-number-order-2',
+      billNumber: 'BILL-20261101-000001',
+      billDate: now,
+      subtotalPaise: 10000,
+      totalPaise: 10000,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await database.insert('bills', legacy.toMap()..remove('id'));
+
+    final incoming = Bill(
+      uuid: 'windows-canonical-bill',
+      customerId: customerId,
+      customerUuid: 'bill-number-customer',
+      orderUuid: 'bill-number-order-1',
+      billNumber: 'BILL-20261101-000001',
+      billDate: now,
+      subtotalPaise: 12000,
+      totalPaise: 12000,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    expect(await androidBills.upsertFromSync(incoming, []), isFalse);
+    var savedLegacy = Bill.fromMap(
+      (await database.query(
+        'bills',
+        where: 'uuid = ?',
+        whereArgs: [legacy.uuid],
+      )).single,
+    );
+    expect(savedLegacy.billNumber, incoming.billNumber);
+    expect(savedLegacy.syncStatus, 'pending');
+
+    await database.update(
+      'bills',
+      {'sync_status': 'synced'},
+      where: 'uuid = ?',
+      whereArgs: [legacy.uuid],
+    );
+    expect(await androidBills.upsertFromSync(incoming, []), isTrue);
+
+    savedLegacy = Bill.fromMap(
+      (await database.query(
+        'bills',
+        where: 'uuid = ?',
+        whereArgs: [legacy.uuid],
+      )).single,
+    );
+    final canonical = (await androidBills.getAll()).singleWhere(
+      (bill) => bill.uuid == incoming.uuid,
+    );
+    expect(savedLegacy.uuid, legacy.uuid);
+    expect(savedLegacy.billNumber, 'PENDING-${legacy.uuid}');
+    expect(canonical.billNumber, incoming.billNumber);
+  });
+
+  test('does not replace a pending bill for the same order', () async {
+    final androidBills = BillRepository(database: database);
+    final pending = Bill(
+      uuid: 'zzz-pending-bill',
+      syncStatus: 'pending',
+      customerId: customerId,
+      customerUuid: 'bill-number-customer',
+      orderUuid: 'bill-number-order-1',
+      billNumber: 'BILL-LOCAL',
+      billDate: now,
+      subtotalPaise: 10000,
+      totalPaise: 10000,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await database.insert('bills', pending.toMap()..remove('id'));
+
+    final incoming = Bill(
+      uuid: 'aaa-windows-bill',
+      customerId: customerId,
+      customerUuid: 'bill-number-customer',
+      orderUuid: 'bill-number-order-1',
+      billNumber: 'BILL-WINDOWS',
+      billDate: now,
+      subtotalPaise: 12000,
+      totalPaise: 12000,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    expect(await androidBills.upsertFromSync(incoming, []), isFalse);
+    final saved = Bill.fromMap(
+      (await database.query(
+        'bills',
+        where: 'uuid = ?',
+        whereArgs: [pending.uuid],
+      )).single,
+    );
+    expect(saved.uuid, pending.uuid);
+    expect(saved.billNumber, pending.billNumber);
+    expect(saved.syncStatus, 'pending');
+    expect(await androidBills.getAll(), hasLength(1));
+  });
+
 }
