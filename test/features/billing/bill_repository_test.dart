@@ -19,7 +19,7 @@ void main() {
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     customerRepository = CustomerRepository(database: database);
-    billRepository = BillRepository(database: database);
+    billRepository = BillRepository(database: database, isNumberAuthority: false);
   });
 
   tearDown(() async {
