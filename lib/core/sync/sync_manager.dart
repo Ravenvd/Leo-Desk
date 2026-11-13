@@ -220,7 +220,7 @@ class SyncManager {
       }
     }
     for (final record in await _client.fetchStaffRecords('staff')) {
-      final applied = await _staffRepository.upsertStaffFromSync(record, force: true);
+      final applied = await _staffRepository.upsertStaffFromSync(record);
       if (applied) {
         staffRecordsPulled++;
         acknowledgedStaff.add(record['uuid'] as String);
@@ -351,7 +351,7 @@ class SyncManager {
         acknowledgedMaintenance.add(record['uuid'] as String);
         continue;
       }
-      final applied = await _maintenanceRepository.upsertFromSync(record, force: true);
+      final applied = await _maintenanceRepository.upsertFromSync(record);
       if (applied) {
         maintenancePulled++;
         acknowledgedMaintenance.add(record['uuid'] as String);
@@ -370,7 +370,7 @@ class SyncManager {
 
     // --- Pull Windows inventory snapshot in dependency order ---
     for (final record in await _client.fetchInventoryRecords()) {
-      final applied = await _consumableRepository.upsertSyncRecord(record, force: true);
+      final applied = await _consumableRepository.upsertSyncRecord(record);
       if (applied) {
         inventoryPulled++;
         acknowledgedInventory.add({
@@ -465,7 +465,7 @@ class SyncManager {
       }
     }
     for (final record in await _client.fetchStaffRecords('staff_attendance')) {
-      final applied = await _staffRepository.upsertAttendanceFromSync(record, force: true);
+      final applied = await _staffRepository.upsertAttendanceFromSync(record);
       if (applied) {
         staffRecordsPulled++;
         acknowledgedStaffAttendance.add(record['uuid'] as String);
@@ -479,7 +479,7 @@ class SyncManager {
       }
     }
     for (final record in await _client.fetchStaffRecords('staff_payments')) {
-      final applied = await _staffRepository.upsertPaymentFromSync(record, force: true);
+      final applied = await _staffRepository.upsertPaymentFromSync(record);
       if (applied) {
         staffRecordsPulled++;
         acknowledgedStaffPayments.add(record['uuid'] as String);
