@@ -132,4 +132,34 @@ void main() {
     expect(await maintenance.getForAsset(assetId), isEmpty);
     await db.close();
   });
+
+  test('UUID sync preserves a pending local maintenance edit', () async {
+    final db = await database();
+    final assets = AssetRepository(database: db);
+    final maintenance = MaintenanceRepository(database: db);
+    final now = DateTime(2026, 10, 2);
+    final assetId = await assets.insert(
+      Asset(name: 'Machine', createdAt: now, updatedAt: now),
+    );
+    final asset = (await assets.getById(assetId))!;
+    final local = MaintenanceRecord(
+      assetId: assetId,
+      assetUuid: asset.uuid,
+      maintenanceDate: now,
+      description: 'Local repair notes',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final localId = await maintenance.insert(local);
+    final incoming = Map<String, Object?>.from(local.toMap())
+      ..remove('id')
+      ..remove('asset_id')
+      ..['description'] = 'Stale Windows copy';
+
+    expect(await maintenance.upsertFromSync(incoming), isFalse);
+    expect((await maintenance.getById(localId))!.description,
+        'Local repair notes');
+    await db.close();
+  });
+
 }
