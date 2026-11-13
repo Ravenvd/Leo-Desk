@@ -2,7 +2,7 @@
 
 **Branch:** `feature/windows-authoritative-sync`  
 **Baseline:** `379fa4e84a7ef00b88cc7c580885d76a423bc333` (Phase 1 audit commit)  
-**Status:** Approved policy — allocator and pure reconciliation core added; local test execution pending  
+**Status:** Approved policy — allocator and pure reconciliation core added; order server persistence and canonical response path implemented; local verification pending  
 **Baseline tests:** User reports `flutter analyze` and `flutter test` pass locally on this baseline.
 
 ## 1. Purpose
@@ -223,4 +223,4 @@ The following behaviours must be tests before the corresponding implementation i
 
 The Windows-authoritative policy, universal canonical suffix numbering, and deletion-request/tombstone policy in this document have been approved.
 
-Phase 3 added a pure number allocator with focused unit tests. Phase 4 added `SyncEngine`, a pure Windows-authoritative decision core that checks UUID identity before number allocation and returns the complete canonical record decision. Both components are deliberately not yet wired into repository persistence or HTTP routes. The new reconciliation tests require local Flutter execution. No migrations or existing sync workflows have been changed.
+Phase 3 added a pure number allocator with focused unit tests. Phase 4 added `SyncEngine`, a pure Windows-authoritative decision core. Phase 5 wires the engine into transactional Windows order persistence: UUID is checked first, all Windows order numbers are considered, suffix allocation and order/item insertion occur in one transaction, and the response includes the complete canonical order graph. The client now applies the returned canonical graph, pushes all pending orders, and pulls the complete Windows order set. Order pull no longer deletes a different UUID's order or its dependent invoices/bills when a local number collision is encountered; it defers that application instead. A focused HTTP reconciliation test covers same-UUID authority, A/B suffix allocation, retries, and preservation of order items. Local Flutter execution is still required. This phase is limited to orders; invoices, bills, assets, other entity adapters, and the full tombstone protocol remain future integration work. No database migration was required.
