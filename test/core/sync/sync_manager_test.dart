@@ -1673,6 +1673,49 @@ void main() {
   );
 
   test(
+    'preserves a pending Android asset when Windows sends a deletion tombstone',
+    () async {
+      final windowsAssets = AssetRepository(
+        database: serverDatabase,
+        isNumberAuthority: true,
+      );
+      final androidAssets = AssetRepository(
+        database: clientDatabase,
+        isNumberAuthority: false,
+      );
+      final now = DateTime.utc(2026, 11, 2);
+
+      final windowsAsset = Asset(
+        uuid: 'shared-deleted-pending-asset',
+        name: 'Windows asset',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await windowsAssets.insert(windowsAsset);
+      await windowsAssets.markDeletedPendingByUuid(windowsAsset.uuid);
+
+      final androidAsset = Asset(
+        uuid: windowsAsset.uuid,
+        name: 'Android unsynced edit',
+        createdAt: now,
+        updatedAt: now.add(const Duration(minutes: 1)),
+      );
+      await androidAssets.insert(androidAsset);
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.assetsPushed, 0);
+      expect(result.assetsPulled, 0);
+
+      final local = await androidAssets.getByUuid(androidAsset.uuid);
+      expect(local, isNotNull);
+      expect(local!.name, 'Android unsynced edit');
+      expect(local.syncStatus, Asset.syncStatusPending);
+    },
+  );
+
+  test(
     'Windows pending consumable edit wins over an Android conflict',
     () async {
     final windowsInventory = ConsumableRepository(database: serverDatabase);
