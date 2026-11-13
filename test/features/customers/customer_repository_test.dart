@@ -272,16 +272,16 @@ void main() {
     test(
       'Windows reconciliation inserts a distinct UUID as a new record',
       () async {
-      final incoming = makeCustomer(
-        uuid: 'new-android-customer',
-        name: 'New customer',
-      );
+        final incoming = makeCustomer(
+          uuid: 'new-android-customer',
+          name: 'New customer',
+        );
 
-      final canonical = await repository.reconcileFromSync(incoming);
+        final canonical = await repository.reconcileFromSync(incoming);
 
-      expect(canonical.uuid, incoming.uuid);
-      expect(canonical.name, 'New customer');
-      expect(canonical.syncStatus, 'pending');
+        expect(canonical.uuid, incoming.uuid);
+        expect(canonical.name, 'New customer');
+        expect(canonical.syncStatus, 'pending');
         expect(await repository.getAll(), hasLength(1));
       },
     );
