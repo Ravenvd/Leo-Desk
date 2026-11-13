@@ -10,6 +10,7 @@ import 'package:leo_desk/features/inventory/models/consumable.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
+import 'package:leo_desk/features/staff/models/staff.dart';
 import 'package:leo_desk/features/staff/repositories/staff_repository.dart';
 import 'package:leo_desk/features/customers/models/customer.dart';
 import 'package:leo_desk/features/customers/repositories/customer_repository.dart';
@@ -193,5 +194,102 @@ void main() {
     expect(await client.sendMaintenanceRecord(maintenance), isTrue);
     final tombstones = await client.fetchMaintenanceRecords();
     expect(tombstones.single['sync_status'], 'deleted_pending');
+  });
+
+  test('staff attendance POST returns the Windows natural-key canonical row', () async {
+    final staffRepository = StaffRepository(database: database);
+    final now = DateTime.utc(2026, 11, 5);
+    final staff = StaffMember(
+      uuid: 'staff-http-attendance',
+      name: 'Attendance Staff',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await staffRepository.insertStaff(staff);
+    final windowsAttendance = StaffAttendance(
+      uuid: 'attendance-http-windows',
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.fullDay,
+      notes: 'Windows canonical',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await database.insert(
+      'staff_attendance',
+      windowsAttendance.toMap()..remove('id'),
+    );
+
+    final client = SyncClient(
+      serverAddress: '127.0.0.1',
+      port: server.port!,
+      token: SyncConfig.defaultToken,
+    );
+    final canonical = await client.sendStaffRecordCanonical(
+      'staff_attendance',
+      {
+        ...windowsAttendance.toMap(),
+        'uuid': 'attendance-http-android',
+        'status': StaffAttendance.absent,
+        'notes': 'Android duplicate',
+      },
+    );
+
+    expect(canonical, isNotNull);
+    expect(canonical!['uuid'], windowsAttendance.uuid);
+    expect(canonical['status'], StaffAttendance.fullDay);
+    expect(canonical['notes'], 'Windows canonical');
+    expect((await staffRepository.getAllAttendanceForSync()), hasLength(1));
+  });
+
+  test('staff payment POST returns complete canonical Windows payment', () async {
+    final staffRepository = StaffRepository(database: database);
+    final now = DateTime.utc(2026, 11, 6);
+    final staff = StaffMember(
+      uuid: 'staff-http-payment',
+      name: 'Payroll Staff',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await staffRepository.insertStaff(staff);
+    final windowsPayment = StaffPayment(
+      uuid: 'payment-http-windows',
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      periodStart: DateTime.utc(2026, 11, 1),
+      periodEnd: DateTime.utc(2026, 11, 30),
+      paymentDate: now,
+      amountPaise: 175000,
+      notes: 'Windows payroll',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await database.insert(
+      'staff_payments',
+      windowsPayment.toMap()..remove('id'),
+    );
+
+    final client = SyncClient(
+      serverAddress: '127.0.0.1',
+      port: server.port!,
+      token: SyncConfig.defaultToken,
+    );
+    final canonical = await client.sendStaffRecordCanonical(
+      'staff_payments',
+      {
+        ...windowsPayment.toMap(),
+        'amount_paise': 1,
+        'notes': 'Android edit',
+      },
+    );
+
+    expect(canonical, isNotNull);
+    expect(canonical!['uuid'], windowsPayment.uuid);
+    expect(canonical['amount_paise'], 175000);
+    expect(canonical['notes'], 'Windows payroll');
+    expect((await staffRepository.getAllPaymentsForSync()), hasLength(1));
   });
 }
