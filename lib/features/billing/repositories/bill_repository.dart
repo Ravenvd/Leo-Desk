@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
@@ -6,8 +8,12 @@ import '../models/bill_item.dart';
 
 class BillRepository {
   final Database? database;
+  final bool isNumberAuthority;
 
-  BillRepository({this.database});
+  /// Windows assigns canonical bill numbers. Android retains a UUID placeholder
+  /// until the Windows host returns the canonical record in the next pull.
+  BillRepository({this.database, bool? isNumberAuthority})
+      : isNumberAuthority = isNumberAuthority ?? !Platform.isAndroid;
 
   Future<Database> get _db async {
     return database ?? await AppDatabase.database;
@@ -53,10 +59,19 @@ class BillRepository {
     final localBill = bill.copyWith(
       syncStatus: 'pending',
       customerUuid: customerUuid,
+      billNumber: 'PENDING-${bill.uuid}',
     );
 
     return db.transaction((txn) async {
       final billId = await txn.insert('bills', localBill.toMap()..remove('id'));
+      if (isNumberAuthority) {
+        await txn.update(
+          'bills',
+          {'bill_number': _formatBillNumber(bill.billDate, billId)},
+          where: 'id = ?',
+          whereArgs: [billId],
+        );
+      }
 
       for (final item in items) {
         await txn.insert(
@@ -129,7 +144,16 @@ class BillRepository {
       orderId = orders.first['id'] as int;
     }
 
-    final map = bill
+    // Windows ignores a client-proposed bill number. Existing UUIDs retain
+    // their assigned number; new UUIDs receive a number from the Windows row ID.
+    final reconciledBill = isNumberAuthority
+        ? bill.copyWith(
+            billNumber: existingByUuid.isEmpty
+                ? 'PENDING-${bill.uuid}'
+                : existingByUuid.first['bill_number'] as String,
+          )
+        : bill;
+    final map = reconciledBill
         .copyWith(
           syncStatus: 'synced',
           customerId: customerId,
@@ -179,12 +203,14 @@ class BillRepository {
 
       // bill_number is also globally unique. Never delete a bill belonging to
       // another order just to make room for an incoming number.
-      final billNumberOwners = await txn.query(
-        'bills',
-        columns: ['id', 'uuid'],
-        where: 'bill_number = ? AND uuid != ?',
-        whereArgs: [bill.billNumber, bill.uuid],
-      );
+      final billNumberOwners = isNumberAuthority
+          ? <Map<String, Object?>>[]
+          : await txn.query(
+              'bills',
+              columns: ['id', 'uuid'],
+              where: 'bill_number = ? AND uuid != ?',
+              whereArgs: [bill.billNumber, bill.uuid],
+            );
       final conflictIds = orderConflicts
           .map((row) => row['id'] as int)
           .toSet();
@@ -215,6 +241,14 @@ class BillRepository {
       int billId;
       if (sameUuid.isEmpty) {
         billId = await txn.insert('bills', map);
+        if (isNumberAuthority) {
+          await txn.update(
+            'bills',
+            {'bill_number': _formatBillNumber(bill.billDate, billId)},
+            where: 'id = ?',
+            whereArgs: [billId],
+          );
+        }
       } else {
         billId = sameUuid.first['id'] as int;
         await txn.update('bills', map, where: 'id = ?', whereArgs: [billId]);
@@ -236,6 +270,13 @@ class BillRepository {
 
       return true;
     });
+  }
+
+  String _formatBillNumber(DateTime billDate, int id) {
+    final date = '${billDate.year}'
+        '${billDate.month.toString().padLeft(2, '0')}'
+        '${billDate.day.toString().padLeft(2, '0')}';
+    return 'BILL-$date-${id.toString().padLeft(6, '0')}';
   }
 
   /// Returns negative when [left] wins, positive when [right] wins.
