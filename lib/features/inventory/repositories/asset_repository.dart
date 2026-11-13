@@ -150,8 +150,23 @@ class AssetRepository {
     return db.transaction((txn) async {
       final rows = await txn.query('assets', orderBy: 'id ASC');
       final existingAssets = rows.map(Asset.fromMap).toList(growable: false);
+      final sameUuid = existingAssets.where((asset) => asset.uuid == incoming.uuid);
+      if (sameUuid.isNotEmpty) return sameUuid.first;
+
+      var candidate = incoming;
+      if (candidate.assetCode.trim().isEmpty) {
+        final highestLocalId = existingAssets.fold<int>(
+          0,
+          (highest, asset) => asset.id != null && asset.id! > highest
+              ? asset.id!
+              : highest,
+        );
+        candidate = candidate.copyWith(
+          assetCode: _formatAssetCode(highestLocalId + 1),
+        );
+      }
       final result = const SyncEngine().reconcileNumberedRecord<Asset>(
-        incomingRecord: incoming,
+        incomingRecord: candidate,
         existingRecords: existingAssets,
         uuidOf: (asset) => asset.uuid,
         numberOf: (asset) => asset.assetCode,
