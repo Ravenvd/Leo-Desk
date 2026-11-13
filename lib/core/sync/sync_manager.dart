@@ -392,20 +392,35 @@ class SyncManager {
       }
     }
     // --- Push pending invoices ---
-    for (final invoice in await _invoiceRepository.getPending()) {
-      final items = await _invoiceRepository.getItems(invoice.id!);
-      if (await _client.sendInvoice(
-        SyncInvoice(invoice: invoice, items: items),
-      )) {
-        await _invoiceRepository.markSynced(invoice.uuid);
-        invoicesPushed++;
-      }
-    }
-
-    // --- Pull invoices ---
     final localOrderIdsByUuid = {
       for (final order in await _orderRepository.getAll()) order.uuid: order.id!,
     };
+    for (final invoice in await _invoiceRepository.getPending()) {
+      final items = await _invoiceRepository.getItems(invoice.id!);
+      final canonicalPayload = await _client.sendInvoice(
+        SyncInvoice(invoice: invoice, items: items),
+      );
+      if (canonicalPayload == null) continue;
+
+      final canonicalCustomerUuid =
+          canonicalPayload['customer_uuid'] as String?;
+      final canonicalOrderUuid = canonicalPayload['order_uuid'] as String?;
+      if (canonicalCustomerUuid == null || canonicalOrderUuid == null) continue;
+
+      final canonicalInvoice = SyncInvoice.fromMap(
+        canonicalPayload,
+        customerId: customerIdsByUuid[canonicalCustomerUuid] ?? 0,
+        orderId: localOrderIdsByUuid[canonicalOrderUuid] ?? 0,
+      );
+      final applied = await _invoiceRepository.upsertFromSync(
+        canonicalInvoice.invoice,
+        canonicalInvoice.items,
+        force: true,
+      );
+      if (applied) invoicesPushed++;
+    }
+
+    // --- Pull canonical Windows invoices ---
     for (final syncInvoice in await _client.fetchInvoices(
       customerIdsByUuid: customerIdsByUuid,
       orderIdsByUuid: localOrderIdsByUuid,
@@ -413,6 +428,7 @@ class SyncManager {
       final applied = await _invoiceRepository.upsertFromSync(
         syncInvoice.invoice,
         syncInvoice.items,
+        force: true,
       );
       if (applied) {
         invoicesPulled++;
@@ -423,17 +439,26 @@ class SyncManager {
     // --- Push pending bills ---
     for (final bill in await _billRepository.getPending()) {
       final items = await _billRepository.getItems(bill.id!);
-      if (await _client.sendBill(SyncBill(bill: bill, items: items))) {
-        await _billRepository.markSynced(bill.uuid);
-        billsPushed++;
-      }
+      final canonicalPayload = await _client.sendBill(
+        SyncBill(bill: bill, items: items),
+      );
+      if (canonicalPayload == null) continue;
+
+      final canonicalBill = SyncBill.fromMap(canonicalPayload);
+      final applied = await _billRepository.upsertFromSync(
+        canonicalBill.bill,
+        canonicalBill.items,
+        force: true,
+      );
+      if (applied) billsPushed++;
     }
 
-    // --- Pull bills ---
+    // --- Pull canonical Windows bills ---
     for (final syncBill in await _client.fetchBills()) {
       final applied = await _billRepository.upsertFromSync(
         syncBill.bill,
         syncBill.items,
+        force: true,
       );
       if (applied) {
         billsPulled++;
