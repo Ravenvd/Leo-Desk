@@ -492,7 +492,13 @@ class ConsumableRepository {
   /// from relationship UUIDs and are never accepted from another device.
   Future<bool> upsertSyncRecord(Map<String, Object?> incoming, {bool force = false}) async {
     final db = await _db;
-    final map = Map<String, Object?>.from(incoming);
+    final map = Map<String, Object?>.from(incoming)
+      // SQLite IDs are device-local. Never trust primary or foreign keys
+      // received over the network; relationship UUIDs are resolved below.
+      ..remove('id')
+      ..remove('consumable_id')
+      ..remove('spool_id')
+      ..remove('order_id');
     final type = map.remove('record_type') as String?;
     if (!['consumables', 'thread_spools', 'inventory_activities'].contains(type)) throw FormatException('Unknown inventory record type: $type');
     final uuid = map['uuid'] as String;
