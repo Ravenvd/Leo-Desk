@@ -544,6 +544,20 @@ class SyncServer {
         final existingByUuid = existingOrders
             .where((candidate) => candidate.uuid == syncOrder.order.uuid)
             .firstOrNull;
+
+        // A retry for an existing UUID must never replace its Windows-assigned
+        // number with a stale or newly proposed client value. Reconcile against
+        // the canonical row before checking number collisions.
+        if (existingByUuid != null) {
+          syncOrder = SyncOrder(
+            order: syncOrder.order.copyWith(
+              orderNumber: existingByUuid.orderNumber,
+            ),
+            items: syncOrder.items,
+            customerUuid: syncOrder.customerUuid,
+          );
+        }
+
         final numberOwner = existingOrders
             .where(
               (candidate) =>
