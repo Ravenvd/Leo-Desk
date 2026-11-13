@@ -59,6 +59,18 @@ class MaintenanceRepository {
     return MaintenanceRecord.fromMap(maps.first);
   }
 
+  Future<MaintenanceRecord?> getByUuid(String uuid) async {
+    final db = await _db;
+    final maps = await db.query(
+      'maintenance_records',
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return MaintenanceRecord.fromMap(maps.first);
+  }
+
   Future<int> delete(int id) async {
     final db = await _db;
     return db.update(
