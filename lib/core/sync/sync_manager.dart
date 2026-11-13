@@ -3,6 +3,7 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/inventory/repositories/maintenance_repository.dart';
@@ -103,9 +104,9 @@ class SyncResult {
 /// relationships; local integer IDs are resolved independently on each device.
 /// Windows is authoritative when reconciling these records after the push attempt.
 ///
-/// Conflict rules are entity-specific. For bills, the earliest-created bill
-/// for an order wins regardless of sync status; UUID order breaks timestamp ties.
-/// Other repositories retain their existing pending-local/Windows rules.
+/// Windows resolves UUID authority and canonical numbering for syncable
+/// numbered records. Android applies canonical responses before acknowledging
+/// successful reconciliation.
 class SyncManager {
   final SyncClient _client;
   final CustomerRepository _customerRepository;
@@ -226,15 +227,26 @@ class SyncManager {
       }
     }
 
-    // --- Push pending assets ---
+    // --- Push pending assets; Windows returns the canonical UUID/code/data ---
     for (final asset in await _assetRepository.getPending()) {
-      if (await _client.sendAsset(asset)) {
-        if (asset.syncStatus == 'deleted_pending') {
+      if (asset.syncStatus == 'deleted_pending') {
+        if (await _client.sendAssetDeletion(asset.uuid)) {
           await _assetRepository.finalizeDeletion(asset.uuid);
-        } else {
-          await _assetRepository.markSynced(asset.uuid);
+          assetsPushed++;
         }
+        continue;
+      }
+
+      final canonicalPayload = await _client.sendAsset(asset);
+      if (canonicalPayload == null) continue;
+      final canonicalAsset = Asset.fromMap(canonicalPayload);
+      final applied = await _assetRepository.upsertFromSync(
+        canonicalAsset,
+        force: true,
+      );
+      if (applied) {
         assetsPushed++;
+        acknowledgedAssets.add(asset.uuid);
       }
     }
 
