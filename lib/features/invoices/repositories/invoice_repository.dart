@@ -143,8 +143,8 @@ class InvoiceRepository {
       final orderConflicts = await txn.query(
         'invoices',
         columns: ['id', 'uuid', 'sync_status'],
-        where: 'order_uuid = ? AND uuid != ?',
-        whereArgs: [invoice.orderUuid, invoice.uuid],
+        where: '(order_uuid = ? OR order_id = ?) AND uuid != ?',
+        whereArgs: [invoice.orderUuid, orders.first['id'], invoice.uuid],
       );
       if (!force &&
           orderConflicts.any((row) => row['sync_status'] == 'pending')) {
