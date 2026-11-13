@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
@@ -5,8 +7,12 @@ import '../models/asset.dart';
 
 class AssetRepository {
   final Database? database;
+  final bool isNumberAuthority;
 
-  AssetRepository({this.database});
+  /// Windows owns canonical asset-code allocation. Android stores a UUID-based
+  /// placeholder until the Windows host assigns and returns the real code.
+  AssetRepository({this.database, bool? isNumberAuthority})
+      : isNumberAuthority = isNumberAuthority ?? Platform.isWindows;
 
   Future<Database> get _db async {
     return database ?? await AppDatabase.database;
@@ -19,19 +25,22 @@ class AssetRepository {
       final localAsset = asset.copyWith(syncStatus: Asset.syncStatusPending);
       final map = localAsset.toMap()..remove('id');
 
-      // Asset codes are generated from SQLite's AUTOINCREMENT id so they
-      // remain human-readable and are not reused after an asset is deleted.
-      map['asset_code'] = 'PENDING-${localAsset.uuid}';
+      // Never derive a canonical suffix on Android. Its local SQLite ID is
+      // unrelated to the Windows database and can collide with another device.
+      // Windows may safely use its own AUTOINCREMENT sequence as the authority.
+      map['asset_code'] = isNumberAuthority
+          ? ''
+          : 'PENDING-${localAsset.uuid}';
 
       final id = await txn.insert('assets', map);
-      final assetCode = _formatAssetCode(id);
-
-      await txn.update(
-        'assets',
-        {'asset_code': assetCode},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      if (isNumberAuthority) {
+        await txn.update(
+          'assets',
+          {'asset_code': _formatAssetCode(id)},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
 
       return id;
     });
