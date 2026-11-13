@@ -368,21 +368,22 @@ class SyncServer {
           return;
         }
 
-        final customer = Customer.fromMap(Map<String, Object?>.from(decoded));
-
-        final applied = await _customerRepository.upsertFromSync(customer);
-
-        if (!applied) {
-          await _sendJson(request.response, 409, {
-            'error': 'Customer could not be applied.',
-            'uuid': customer.uuid,
+        final customerMap = Map<String, Object?>.from(decoded);
+        final uuid = customerMap['uuid'];
+        if (uuid is! String || uuid.trim().isEmpty) {
+          await _sendJson(request.response, 400, {
+            'error': 'A valid customer UUID is required.',
           });
           return;
         }
 
+        final customer = Customer.fromMap(customerMap);
+        final canonical = await _customerRepository.reconcileFromSync(customer);
+
         await _sendJson(request.response, 200, {
           'status': 'ok',
-          'uuid': customer.uuid,
+          'uuid': canonical.uuid,
+          'canonical_customer': canonical.toMap()..remove('id'),
         });
         return;
       }
