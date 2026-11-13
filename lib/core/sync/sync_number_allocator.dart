@@ -24,13 +24,16 @@ class SyncNumberAllocator {
           'Number must not be empty.');
     }
 
-    final parsed = _parse(requested);
     final occupied = existingNumbers.map((value) => value.toUpperCase()).toSet();
 
+    // A free legacy/custom identifier does not need suffix parsing. Only a
+    // collision requires a structured trailing number so Windows can append
+    // a deterministic alphabetic suffix.
     if (!occupied.contains(requested.toUpperCase())) {
       return requested;
     }
 
+    final parsed = _parse(requested);
     final root = '${parsed.prefix}${parsed.digits}';
     var suffixIndex = 1;
     while (true) {
