@@ -141,25 +141,14 @@ class OrderRepository {
     final db = await _db;
 
     return db.transaction((txn) async {
-      final customers = await txn.query(
-        'customers',
-        columns: ['id'],
-        where: 'uuid = ?',
-        whereArgs: [customerUuid],
-        limit: 1,
-      );
-      if (customers.isEmpty) {
-        throw StateError('Order customer does not exist on Windows.');
-      }
-
-      final incoming = incomingOrder.copyWith(
-        customerId: customers.first['id'] as int,
-        syncStatus: 'synced',
-      );
       final rows = await txn.query('orders');
       final existingOrders = rows.map(Order.fromMap).toList(growable: false);
-      final decision = const SyncEngine().reconcileNumberedRecord<Order>(
-        incomingRecord: incoming,
+      final engine = const SyncEngine();
+
+      // UUID authority is resolved before validating any incoming attributes:
+      // an Android payload cannot change an existing Windows record.
+      final identityDecision = engine.reconcileNumberedRecord<Order>(
+        incomingRecord: incomingOrder,
         existingRecords: existingOrders,
         uuidOf: (record) => record.uuid,
         numberOf: (record) => record.orderNumber,
@@ -167,8 +156,8 @@ class OrderRepository {
             record.copyWith(orderNumber: number),
       );
 
-      if (!decision.isNewRecord) {
-        final canonical = decision.canonicalRecord;
+      if (!identityDecision.isNewRecord) {
+        final canonical = identityDecision.canonicalRecord;
         final canonicalItems = await txn.query(
           'order_items',
           where: 'order_id = ?',
@@ -192,6 +181,29 @@ class OrderRepository {
         );
       }
 
+      final customers = await txn.query(
+        'customers',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [customerUuid],
+        limit: 1,
+      );
+      if (customers.isEmpty) {
+        throw StateError('Order customer does not exist on Windows.');
+      }
+
+      final incoming = incomingOrder.copyWith(
+        customerId: customers.first['id'] as int,
+        syncStatus: 'synced',
+      );
+      final decision = engine.reconcileNumberedRecord<Order>(
+        incomingRecord: incoming,
+        existingRecords: existingOrders,
+        uuidOf: (record) => record.uuid,
+        numberOf: (record) => record.orderNumber,
+        withCanonicalNumber: (record, number) =>
+            record.copyWith(orderNumber: number),
+      );
       final canonical = decision.canonicalRecord;
       final orderId = await txn.insert(
         'orders',
