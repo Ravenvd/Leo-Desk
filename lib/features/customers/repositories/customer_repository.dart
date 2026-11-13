@@ -20,6 +20,41 @@ class CustomerRepository {
     return db.insert('customers', localCustomer.toMap()..remove('id'));
   }
 
+  /// Reconciles an Android customer submission on the Windows authority.
+  ///
+  /// UUID identity is checked before any incoming fields are considered. An
+  /// existing Windows row is returned unchanged; a distinct UUID is inserted
+  /// as a new pending canonical record.
+  Future<Customer> reconcileFromSync(Customer incoming) async {
+    final db = await _db;
+
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        'customers',
+        where: 'uuid = ?',
+        whereArgs: [incoming.uuid],
+        limit: 1,
+      );
+
+      if (existing.isNotEmpty) {
+        return Customer.fromMap(existing.first);
+      }
+
+      final canonical = incoming.copyWith(syncStatus: 'pending');
+      final id = await txn.insert(
+        'customers',
+        canonical.toMap()..remove('id'),
+      );
+      final saved = await txn.query(
+        'customers',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      return Customer.fromMap(saved.single);
+    });
+  }
+
   /// Inserts or updates a customer received from sync.
   ///
   /// Returns false when a locally modified (pending) record with the same
