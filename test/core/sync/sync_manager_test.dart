@@ -322,35 +322,35 @@ void main() {
   test(
     'Windows customer fields win over a same-UUID Android edit',
     () async {
-    final clientRepository = CustomerRepository(database: clientDatabase);
-    final serverRepository = CustomerRepository(database: serverDatabase);
+      final clientRepository = CustomerRepository(database: clientDatabase);
+      final serverRepository = CustomerRepository(database: serverDatabase);
 
-    final windowsCustomer = makeCustomer(
-      uuid: 'shared-customer-authority',
-      name: 'Windows canonical customer',
-      syncStatus: 'synced',
-    );
-    await serverRepository.insert(windowsCustomer);
-    await serverRepository.markSynced(windowsCustomer.uuid);
+      final windowsCustomer = makeCustomer(
+        uuid: 'shared-customer-authority',
+        name: 'Windows canonical customer',
+        syncStatus: 'synced',
+      );
+      await serverRepository.insert(windowsCustomer);
+      await serverRepository.markSynced(windowsCustomer.uuid);
 
-    final androidEdit = makeCustomer(
-      uuid: windowsCustomer.uuid,
-      name: 'Android conflicting edit',
-    );
-    await clientRepository.insert(androidEdit);
+      final androidEdit = makeCustomer(
+        uuid: windowsCustomer.uuid,
+        name: 'Android conflicting edit',
+      );
+      await clientRepository.insert(androidEdit);
 
-    final result = await syncWithRealHttpClient();
+      final result = await syncWithRealHttpClient();
 
-    expect(result.connected, isTrue);
-    expect(result.customersPushed, 1);
+      expect(result.connected, isTrue);
+      expect(result.customersPushed, 1);
 
-    final local = (await clientRepository.getAll()).single;
-    final canonical = (await serverRepository.getAll()).single;
-    expect(local.uuid, windowsCustomer.uuid);
-    expect(local.name, 'Windows canonical customer');
-    expect(local.syncStatus, 'synced');
-    expect(canonical.name, 'Windows canonical customer');
-    expect(canonical.syncStatus, 'synced');
+      final local = (await clientRepository.getAll()).single;
+      final canonical = (await serverRepository.getAll()).single;
+      expect(local.uuid, windowsCustomer.uuid);
+      expect(local.name, 'Windows canonical customer');
+      expect(local.syncStatus, 'synced');
+      expect(canonical.name, 'Windows canonical customer');
+      expect(canonical.syncStatus, 'synced');
     },
   );
 
