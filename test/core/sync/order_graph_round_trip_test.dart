@@ -441,8 +441,8 @@ void main() {
       // Windows remains authoritative for an existing UUID; Android's
       // attempted status edit is acknowledged but does not overwrite it.
       expect(pushedServerOrder.status, 'In Progress');
-      expect(pushedServerInvoice.notes, 'Android invoice edit');
-      expect(pushedServerBill.notes, 'Android bill edit');
+      expect(pushedServerInvoice.notes, 'Windows invoice');
+      expect(pushedServerBill.notes, 'Windows bill');
 
       // Windows -> Android: Windows makes the next canonical edit.
       await serverDatabase.update(
