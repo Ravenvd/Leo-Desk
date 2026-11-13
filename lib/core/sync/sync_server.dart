@@ -169,12 +169,12 @@ class SyncServer {
         }
         final record = Map<String, Object?>.from(decoded);
         final uuid = record['uuid'] as String;
-        final applied = await _staffRepository.upsertStaffFromSync(record);
-        if (!applied) {
-          await _sendJson(request.response, 409, {'error': 'Staff record has a pending Windows edit.', 'uuid': uuid});
-          return;
-        }
-        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
+        final canonical = await _staffRepository.reconcileStaffFromSync(record);
+        await _sendJson(request.response, 200, {
+          'status': 'ok',
+          'uuid': uuid,
+          'canonical_staff': canonical..remove('id'),
+        });
         return;
       }
 
