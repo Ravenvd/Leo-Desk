@@ -13,7 +13,7 @@ class BillRepository {
   /// Windows assigns canonical bill numbers. Android retains a UUID placeholder
   /// until the Windows host returns the canonical record in the next pull.
   BillRepository({this.database, bool? isNumberAuthority})
-      : isNumberAuthority = isNumberAuthority ?? !Platform.isAndroid;
+      : isNumberAuthority = isNumberAuthority ?? Platform.isWindows;
 
   Future<Database> get _db async {
     return database ?? await AppDatabase.database;
