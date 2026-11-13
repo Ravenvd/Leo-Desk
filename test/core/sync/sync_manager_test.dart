@@ -1523,6 +1523,43 @@ void main() {
   });
 
 
+  test('Windows asset fields win over a same-UUID Android edit', () async {
+    final windowsAssets = AssetRepository(database: serverDatabase);
+    final androidAssets = AssetRepository(database: clientDatabase);
+
+    final windowsAsset = Asset(
+      uuid: 'shared-asset-conflict',
+      name: 'Windows machine',
+      manufacturerModel: 'Windows model',
+      createdAt: DateTime.utc(2026, 10, 30),
+      updatedAt: DateTime.utc(2026, 10, 30),
+    );
+    await windowsAssets.insert(windowsAsset);
+
+    final androidAsset = Asset(
+      uuid: windowsAsset.uuid,
+      name: 'Android attempted edit',
+      manufacturerModel: 'Android model',
+      createdAt: DateTime.utc(2026, 10, 30),
+      updatedAt: DateTime.utc(2026, 10, 31),
+    );
+    await androidAssets.insert(androidAsset);
+
+    final result = await syncWithRealHttpClient();
+
+    expect(result.connected, isTrue);
+    expect(result.assetsPushed, 1);
+
+    final local = (await androidAssets.getAll()).single;
+    final windows = (await windowsAssets.getAll()).single;
+    expect(local.uuid, windowsAsset.uuid);
+    expect(local.name, 'Windows machine');
+    expect(local.manufacturerModel, 'Windows model');
+    expect(local.syncStatus, Asset.syncStatusSynced);
+    expect(windows.name, 'Windows machine');
+    expect(windows.syncStatus, Asset.syncStatusSynced);
+  });
+
   test(
     'Windows pending consumable edit wins over an Android conflict',
     () async {
