@@ -89,10 +89,10 @@ class BillRepository {
   /// Inserts or reconciles a bill received from sync.
   ///
   /// A bill UUID identifies the same bill across devices. When two different
-  /// bills claim the same order, the earliest creation timestamp wins; UUID
-  /// order is the deterministic tie-breaker. Sync status never overrides this
-  /// rule. Returns false when the incoming bill loses or its dependencies are
-  /// not available locally.
+  /// synced bills claim the same order, the earliest creation timestamp wins;
+  /// UUID order is the deterministic tie-breaker. Pending local bills are
+  /// protected until their push is resolved. Returns false when reconciliation
+  /// must be deferred or the incoming bill loses.
   Future<bool> upsertFromSync(
     Bill bill,
     List<BillItem> items, {
