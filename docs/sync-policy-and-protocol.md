@@ -2,7 +2,7 @@
 
 **Branch:** `feature/windows-authoritative-sync`  
 **Baseline:** `379fa4e84a7ef00b88cc7c580885d76a423bc333` (Phase 1 audit commit)  
-**Status:** Draft for review — no application code or tests changed  
+**Status:** Approved policy — implementation not yet started  
 **Baseline tests:** User reports `flutter analyze` and `flutter test` pass locally on this baseline.
 
 ## 1. Purpose
@@ -133,20 +133,19 @@ A client must apply the returned canonical record rather than independently gues
 - A number collision must never delete a different UUID's parent or children.
 - If a parent with the same UUID exists on Windows, its Windows child graph remains authoritative.
 
-## 7. Deletion and tombstone policy — approval required
+## 7. Deletion and tombstone policy — approved
 
-The Phase 1 audit found tombstone support for expenses, assets and maintenance, but not a consistent deletion workflow for all entities. The exact meaning of an Android-originated deletion request must be confirmed before implementation.
+The Phase 1 audit found tombstone support for expenses, assets and maintenance, but not a consistent deletion workflow for all entities. The following policy is approved and applies universally to syncable entities.
 
-**Proposed safe default:**
+1. **Windows deletion:** A deletion performed on Windows creates the authoritative tombstone for that entity UUID.
+2. **Propagation:** The Windows tombstone is propagated to Android and all other peers. A tombstoned UUID must not be recreated by a stale copy or an ordinary upsert.
+3. **Android deletion:** A deletion initiated on Android is a deletion request, not an immediate canonical deletion. Android records and submits the request without treating the entity as canonically deleted.
+4. **Windows decision:** Windows validates the request and either accepts or rejects it. Only Windows can create the authoritative tombstone. A rejection must be returned explicitly so the client can show the outcome; it must not silently mark the entity deleted.
+5. **Idempotency and retention:** Repeated deletion requests and repeated tombstone delivery are idempotent. A tombstone may be compacted only when the protocol can prove every required peer has received it, or an equivalent durable mechanism guarantees that stale copies cannot resurrect the UUID.
+6. **Relationships:** Parent deletion must respect dependent records and explicit cascade/retention rules. The implementation must not silently discard dependent financial or historical records.
+7. **Recovery:** A normal sync, retry, restore, or stale offline upload must not resurrect a tombstoned UUID. Any future undelete operation requires an explicit Windows-authorized workflow; it is not an ordinary Android upsert.
 
-1. A Windows deletion creates the authoritative tombstone for that UUID.
-2. The tombstone is propagated to Android and prevents stale copies from being re-uploaded.
-3. An Android deletion is a deletion request, not an immediate canonical deletion.
-4. Windows validates and applies or rejects that request; only the resulting Windows tombstone is authoritative.
-5. Acknowledgement may compact/remove a tombstone only when the protocol can prove all required peers have received it or another durable mechanism prevents resurrection.
-6. Parent deletion must respect dependent records and explicit cascade/retention rules.
-
-This proposal preserves Windows authority, but the user must approve it before deletion behaviour is coded.
+The server-side SyncEngine owns validation and tombstone decisions. Android submits requests and applies the canonical response.
 
 ## 8. Failure, retry and offline behaviour
 
@@ -220,8 +219,8 @@ The following behaviours must be tests before the corresponding implementation i
 - Retried requests converge to the same canonical result.
 - Offline-created records are preserved until server acceptance.
 
-## 11. Explicit decisions still needed
+## 11. Approval and implementation sequence
 
-Only the deletion-request rule in Section 7 is blocking at this point. The remaining contract follows the previously agreed Windows-authoritative and universal numbering requirements.
+The Windows-authoritative policy, universal canonical suffix numbering, and deletion-request/tombstone policy in this document have been approved.
 
-After approval, this specification becomes the basis for Phase 3: implementing and testing the pure number allocator before introducing the SyncEngine.
+The next implementation phase is to build and test the pure number allocator before introducing the SyncEngine. Application code, migrations and tests remain unchanged at this specification commit.
