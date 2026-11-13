@@ -116,7 +116,17 @@ void main() {
       );
     });
 
-    test('rejects values without a trailing numeric component', () {
+    test('preserves an unoccupied legacy/custom identifier', () {
+      expect(
+        SyncNumberAllocator.allocate(
+          requestedNumber: 'AST-SYNC-TEST',
+          existingNumbers: const [],
+        ),
+        'AST-SYNC-TEST',
+      );
+    });
+
+    test('rejects a colliding identifier without a trailing numeric component', () {
       expect(
         () => SyncNumberAllocator.allocate(
           requestedNumber: 'ORDER-NEW',
