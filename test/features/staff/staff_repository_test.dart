@@ -180,9 +180,9 @@ void main() {
   });
 
   test('staff relationships reconcile by UUID across different local IDs', () async {
-    final sourceDb = await AppDatabase.openTestDatabase();
+    final sourceDb = await AppDatabase.openTestDatabase(path: ':memory:');
     final source = StaffRepository(database: sourceDb);
-    final targetDb = await AppDatabase.openTestDatabase();
+    final targetDb = await AppDatabase.openTestDatabase(path: ':memory:');
     final target = StaffRepository(database: targetDb);
     final now = DateTime(2026, 11, 5);
 
