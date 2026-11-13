@@ -30,9 +30,9 @@ This document records implementation coverage, not merely whether an entity has 
 | Consumables | `/api/inventory` | Legacy | Canonical response and UUID-first Windows reconciliation |
 | Thread spools | `/api/inventory` | Legacy | Canonical response; resolve consumable UUID; reconcile as part of inventory dependency ordering |
 | Inventory activities | `/api/inventory` | Legacy | Canonical response; resolve consumable, optional spool and optional order UUIDs; preserve event history |
-| Staff profiles | `/api/staff` | Implemented; local verification pending | UUID-first Windows reconciliation and complete canonical response; Android applies the response before acknowledging |
-| Staff attendance | `/api/staff/attendance` | Legacy | Canonical response; Windows-authoritative natural-key handling for staff UUID + attendance date |
-| Staff payments | `/api/staff/payments` | Legacy | Canonical response; preserve staff UUID and linked salary expense relationship |
+| Staff profiles | `/api/staff` | Integrated; previously locally verified | UUID-first Windows reconciliation and complete canonical response; Android applies the response before acknowledging |
+| Staff attendance | `/api/staff/attendance` | Integrated; verification pending | Transactional UUID-first reconciliation; same staff/date collision returns the existing Windows row as canonical; Android adopts the canonical UUID and values |
+| Staff payments | `/api/staff/payments` | Integrated; verification pending | Transactional UUID-first reconciliation; canonical response applied before acknowledgement; staff UUID resolved locally |
 
 ## 3. Numbering namespace audit
 
@@ -55,7 +55,7 @@ The sync implementation must preserve these dependencies:
 2. **Consumables → thread spools → inventory activities:** spool and activity rows reference their parent consumable by UUID. Activities may also reference a spool and an order.
 3. **Staff → attendance and payments:** attendance and payments reference staff by UUID.
 4. **Staff payments ↔ expenses:** a salary expense can reference a staff payment through the unique `staff_payment_uuid` relationship. The two sides must remain consistent.
-5. **Staff attendance natural key:** the schema enforces one row per `staff_uuid + attendance_date`. A distinct UUID cannot bypass that uniqueness rule or replace the canonical Windows row.
+5. **Staff attendance natural key:** the schema enforces one row per `staff_uuid + attendance_date`. If two offline devices create that same logical daily entry with different UUIDs, Windows returns its existing row; the Android device adopts the Windows UUID and values rather than creating a duplicate.
 6. **Financial graphs:** order, invoice, and bill parent/child graph rules remain as specified in `sync-policy-and-protocol.md`.
 
 ## 5. Deletion audit
@@ -84,7 +84,7 @@ The approved deletion contract remains:
 
 Implement and test one entity family at a time:
 
-1. Staff profiles are implemented; verify them locally, then integrate attendance and payments.
+1. Staff profiles, attendance, and payments are integrated; verify them locally, including same-UUID conflicts and attendance natural-key convergence.
 2. Expenses, including the staff-payment relationship.
 3. Consumables, thread spools, and inventory activities.
 4. Maintenance records, after asset reconciliation is confirmed.
