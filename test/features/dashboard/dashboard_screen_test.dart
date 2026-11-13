@@ -109,12 +109,13 @@ void main() {
       ),
     );
 
+    // sqflite's FFI calls need the real async zone to complete. Do not
+    // call tester.pump() from inside runAsync: pump uses the test binding's
+    // fake-async clock and can deadlock when nested in the real async zone.
     await tester.runAsync(() async {
-      for (var i = 0; i < 10; i++) {
-        await tester.pump();
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
+      await Future<void>.delayed(const Duration(seconds: 1));
     });
+    await tester.pump();
 
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('Customers'), findsOneWidget);
