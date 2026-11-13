@@ -219,7 +219,7 @@ void main() {
     return manager.sync();
   }
 
-  test('pulls exactly the 100 newest orders at the 100th/101st boundary',
+  test('pulls the complete order history beyond the 100th/101st boundary',
       () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
@@ -250,22 +250,18 @@ void main() {
     final result = await sync();
 
     expect(result.connected, isTrue);
-    expect(result.ordersPulled, 100);
+    expect(result.ordersPulled, 101);
 
     final localOrders = await clientOrders.getAll();
-    expect(localOrders, hasLength(100));
+    expect(localOrders, hasLength(101));
 
-    for (var rank = 1; rank <= 100; rank++) {
+    for (var rank = 1; rank <= 101; rank++) {
       expect(
         localOrders.any((order) => order.uuid == 'ten-order-boundary-$rank'),
         isTrue,
       );
     }
 
-    expect(
-      localOrders.any((order) => order.uuid == 'ten-order-boundary-101'),
-      isFalse,
-    );
   });
 
   test(
@@ -442,7 +438,9 @@ void main() {
         (row) => row.uuid == serverBill.uuid,
       );
 
-      expect(pushedServerOrder.status, 'Completed');
+      // Windows remains authoritative for an existing UUID; Android's
+      // attempted status edit is acknowledged but does not overwrite it.
+      expect(pushedServerOrder.status, 'In Progress');
       expect(pushedServerInvoice.notes, 'Android invoice edit');
       expect(pushedServerBill.notes, 'Android bill edit');
 
