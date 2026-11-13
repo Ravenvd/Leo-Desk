@@ -1015,6 +1015,70 @@ void main() {
     expect(localBillItems.single.billId, localBills.single.id);
   });
 
+  test('preserves pending bills when a stale order number is reconciled', () async {
+    final customers = CustomerRepository(database: clientDatabase);
+    final orders = OrderRepository(database: clientDatabase);
+    final bills = BillRepository(
+      database: clientDatabase,
+      isNumberAuthority: false,
+    );
+    final customer = makeCustomer(
+      uuid: 'pending-order-dependency-customer',
+      name: 'Pending Dependency Customer',
+      syncStatus: 'synced',
+    );
+    await customers.insert(customer);
+    await customers.markSynced(customer.uuid);
+    final localCustomer = (await customers.getAll()).single;
+
+    final staleOrder = makeOrder(
+      uuid: 'stale-order-with-pending-bill',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    await orders.insert(staleOrder);
+    await orders.markSynced(staleOrder.uuid);
+    final savedOrder = (await orders.getAll()).single;
+
+    final pendingBill = makeBill(
+      uuid: 'pending-bill-on-stale-order',
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      billNumber: 'BILL-LOCAL',
+    ).copyWith(
+      orderId: savedOrder.id,
+      orderUuid: savedOrder.uuid,
+    );
+    await bills.insert(
+      bill: pendingBill,
+      items: [
+        makeItem(
+          uuid: 'pending-bill-item',
+          description: 'Pending embroidery work',
+          quantity: 1,
+          ratePaise: 10000,
+          amountPaise: 10000,
+        ),
+      ],
+    );
+
+    final canonicalOrder = makeOrder(
+      uuid: 'windows-canonical-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    expect(await orders.upsertFromSync(canonicalOrder, []), isFalse);
+
+    final savedOrders = await orders.getAll();
+    expect(savedOrders, hasLength(1));
+    expect(savedOrders.single.uuid, staleOrder.uuid);
+    final savedBill = (await bills.getAll()).single;
+    expect(savedBill.uuid, pendingBill.uuid);
+    expect(savedBill.syncStatus, 'pending');
+  });
+
   test('pulls an older order when it is among the 100 most recently updated', () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
