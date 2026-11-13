@@ -223,7 +223,7 @@ void main() {
 
   test('creating an asset generates uuid and automatic asset code', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final id = await repository.insert(
       Asset(
@@ -246,7 +246,7 @@ void main() {
 
   test('asset codes increment and are not reused after deletion', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final firstId = await repository.insert(makeAsset(name: 'Machine 1'));
     final secondId = await repository.insert(makeAsset(name: 'Machine 2'));
@@ -264,9 +264,30 @@ void main() {
     await database.close();
   });
 
+  test('Windows sync allocation ignores client codes and never reuses deleted numbers', () async {
+    final database = await createCurrentDatabase();
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
+
+    final firstId = await repository.insert(makeAsset(name: 'First machine'));
+    final first = await repository.getById(firstId);
+    expect(first!.assetCode, 'AST-0001');
+    await repository.finalizeDeletion(first.uuid);
+
+    final incoming = makeAsset(
+      name: 'Android machine',
+      assetCode: 'AST-0001',
+    );
+    expect(await repository.upsertFromSync(incoming), isTrue);
+
+    final reconciled = await repository.getByUuid(incoming.uuid);
+    expect(reconciled!.assetCode, 'AST-0002');
+
+    await database.close();
+  });
+
   test('asset repository reads and updates all asset fields', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final id = await repository.insert(makeAsset());
     final original = await repository.getById(id);
@@ -301,9 +322,18 @@ void main() {
     await database.close();
   });
 
+  test('non-authority stores a UUID placeholder instead of allocating a suffix', () async {
+    final database = await createCurrentDatabase();
+    final repository = AssetRepository(database: database, isNumberAuthority: false);
+    final id = await repository.insert(makeAsset());
+    final asset = await repository.getById(id);
+    expect(asset!.assetCode, 'PENDING-${asset.uuid}');
+    await database.close();
+  });
+
   test('asset repository supports lookup by uuid and listing', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final firstId = await repository.insert(makeAsset(name: 'Z Machine'));
     await repository.insert(makeAsset(name: 'A Machine'));
@@ -322,7 +352,7 @@ void main() {
 
   test('deletion is soft until sync acknowledgement', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final id = await repository.insert(makeAsset());
     final asset = await repository.getById(id);
@@ -352,5 +382,28 @@ void main() {
         Asset.statusCondemned,
       ]),
     );
+  });
+
+  test('Windows retains the assigned asset code when a UUID is retried', () async {
+    final database = await createCurrentDatabase();
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
+    final incoming = makeAsset(name: 'Offline machine', assetCode: 'AST-CLIENT');
+
+    expect(await repository.upsertFromSync(incoming), isTrue);
+    final first = await repository.getByUuid(incoming.uuid);
+    expect(first!.assetCode, 'AST-0001');
+
+    final retry = incoming.copyWith(
+      assetCode: 'AST-9999',
+      name: 'Offline machine updated',
+      updatedAt: DateTime(2026, 10, 3),
+    );
+    expect(await repository.upsertFromSync(retry), isTrue);
+
+    final saved = await repository.getByUuid(incoming.uuid);
+    expect(saved!.assetCode, 'AST-0001');
+    expect(saved.name, 'Offline machine updated');
+
+    await database.close();
   });
 }

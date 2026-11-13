@@ -19,6 +19,7 @@ import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/models/consumable.dart';
+import 'package:leo_desk/features/inventory/models/maintenance_record.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
@@ -212,11 +213,11 @@ void main() {
 
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
-      billRepository: BillRepository(database: serverDatabase),
-      invoiceRepository: InvoiceRepository(database: serverDatabase),
+      billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
+      invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
       expenseRepository: ExpenseRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
-      assetRepository: AssetRepository(database: serverDatabase),
+      assetRepository: AssetRepository(database: serverDatabase, isNumberAuthority: true),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),
       consumableRepository: ConsumableRepository(database: serverDatabase),
       staffRepository: StaffRepository(database: serverDatabase),
@@ -240,11 +241,11 @@ void main() {
         token: SyncConfig.defaultToken,
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
-      billRepository: BillRepository(database: clientDatabase),
-      invoiceRepository: InvoiceRepository(database: clientDatabase),
+      billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
+      invoiceRepository: InvoiceRepository(database: clientDatabase, isNumberAuthority: false),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
-      assetRepository: AssetRepository(database: clientDatabase),
+      assetRepository: AssetRepository(database: clientDatabase, isNumberAuthority: false),
       maintenanceRepository: MaintenanceRepository(database: clientDatabase),
       consumableRepository: ConsumableRepository(database: clientDatabase),
       staffRepository: StaffRepository(database: clientDatabase),
@@ -367,9 +368,9 @@ void main() {
 
   test('syncs a bill and all line items from Android to Windows', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-push-customer',
@@ -428,7 +429,7 @@ void main() {
 
     expect(serverCustomer.uuid, customer.uuid);
     expect(serverBill.uuid, bill.uuid);
-    expect(serverBill.billNumber, 'INV-1001');
+    expect(serverBill.billNumber, 'BILL-20260101-000001');
     expect(serverBill.amountPaidPaise, 50000);
     expect(serverBill.notes, 'Embroidery order');
     expect(serverBill.customerUuid, customer.uuid);
@@ -445,9 +446,9 @@ void main() {
   });
 
   test('pulls a Windows bill and its line items into Android', () async {
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-pull-customer',
@@ -494,7 +495,7 @@ void main() {
     final localBills = await clientBills.getAll();
     expect(localBills, hasLength(1));
     expect(localBills.single.uuid, bill.uuid);
-    expect(localBills.single.billNumber, 'INV-2001');
+    expect(localBills.single.billNumber, 'BILL-20260101-000001');
     expect(localBills.single.syncStatus, 'synced');
     expect(localBills.single.customerId, localCustomer.id);
     expect(localBills.single.customerUuid, customer.uuid);
@@ -506,13 +507,19 @@ void main() {
     expect(localItems.single.quantity, 1);
     expect(localItems.single.ratePaise, 150000);
     expect(localItems.single.amountPaise, 150000);
+
+    await syncWithRealHttpClient();
+    final repeatedBills = await clientBills.getAll();
+    expect(repeatedBills, hasLength(1));
+    expect(repeatedBills.single.uuid, bill.uuid);
+    expect(repeatedBills.single.billNumber, 'BILL-20260101-000001');
   });
 
   test('replaces a synced bill and its items when Windows sends changes',
       () async {
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-update-customer',
@@ -600,9 +607,9 @@ void main() {
   });
 
   test('rejected bill push stays pending after full sync', () async {
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-conflict-customer',
@@ -706,12 +713,12 @@ void main() {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final clientOrderItems = OrderItemRepository(database: clientDatabase);
-    final clientInvoices = InvoiceRepository(database: clientDatabase);
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
-    final serverInvoices = InvoiceRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'graph-customer',
@@ -817,13 +824,13 @@ void main() {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final clientOrderItems = OrderItemRepository(database: clientDatabase);
-    final clientInvoices = InvoiceRepository(database: clientDatabase);
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
-    final serverInvoices = InvoiceRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'graph-reconcile-customer',
@@ -1013,6 +1020,78 @@ void main() {
     expect(localBillItems, hasLength(1));
     expect(localBillItems.single.uuid, 'canonical-bill-item');
     expect(localBillItems.single.billId, localBills.single.id);
+
+    await syncWithRealHttpClient();
+    expect(await clientOrders.getAll(), hasLength(1));
+    expect((await clientOrders.getAll()).single.orderNumber, 'ORD-000001');
+    expect(await clientInvoices.getAll(), hasLength(1));
+    expect((await clientInvoices.getAll()).single.invoiceNumber, 'INV-000001');
+    expect(await clientBills.getAll(), hasLength(1));
+    expect((await clientBills.getAll()).single.billNumber, 'BILL-20260101-000001');
+  });
+
+  test('preserves pending bills when a stale order number is reconciled', () async {
+    final customers = CustomerRepository(database: clientDatabase);
+    final orders = OrderRepository(database: clientDatabase);
+    final bills = BillRepository(
+      database: clientDatabase,
+      isNumberAuthority: false,
+    );
+    final customer = makeCustomer(
+      uuid: 'pending-order-dependency-customer',
+      name: 'Pending Dependency Customer',
+      syncStatus: 'synced',
+    );
+    await customers.insert(customer);
+    await customers.markSynced(customer.uuid);
+    final localCustomer = (await customers.getAll()).single;
+
+    final staleOrder = makeOrder(
+      uuid: 'stale-order-with-pending-bill',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    await orders.insert(staleOrder);
+    await orders.markSynced(staleOrder.uuid);
+    final savedOrder = (await orders.getAll()).single;
+
+    final pendingBill = makeBill(
+      uuid: 'pending-bill-on-stale-order',
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      billNumber: 'BILL-LOCAL',
+    ).copyWith(
+      orderId: savedOrder.id,
+      orderUuid: savedOrder.uuid,
+    );
+    await bills.insert(
+      bill: pendingBill,
+      items: [
+        makeItem(
+          uuid: 'pending-bill-item',
+          description: 'Pending embroidery work',
+          quantity: 1,
+          ratePaise: 10000,
+          amountPaise: 10000,
+        ),
+      ],
+    );
+
+    final canonicalOrder = makeOrder(
+      uuid: 'windows-canonical-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    expect(await orders.upsertFromSync(canonicalOrder, []), isFalse);
+
+    final savedOrders = await orders.getAll();
+    expect(savedOrders, hasLength(1));
+    expect(savedOrders.single.uuid, staleOrder.uuid);
+    final savedBill = (await bills.getAll()).single;
+    expect(savedBill.uuid, pendingBill.uuid);
+    expect(savedBill.syncStatus, 'pending');
   });
 
   test('pulls an older order when it is among the 100 most recently updated', () async {
@@ -1172,6 +1251,12 @@ void main() {
     expect(localItems.single.uuid, 'order-pull-item');
     expect(localItems.single.workType, 'Aari');
     expect(localItems.single.garmentType, 'Garment piece');
+
+    await syncWithRealHttpClient();
+    final repeatedOrders = await clientOrders.getAll();
+    expect(repeatedOrders, hasLength(1));
+    expect(repeatedOrders.single.uuid, order.uuid);
+    expect(repeatedOrders.single.orderNumber, 'ORD-000101');
   });
 
   test('does not delete a pending local order during reconciliation', () async {
@@ -1316,6 +1401,78 @@ void main() {
     );
   });
 
+  test('retains the Windows order number when a retry proposes a collision', () async {
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'order-retry-customer',
+      name: 'Order Retry Customer',
+      syncStatus: 'synced',
+    );
+    await serverCustomers.insert(customer);
+    await serverCustomers.markSynced(customer.uuid);
+
+    final canonicalOrder = makeOrder(
+      uuid: 'retry-canonical-order',
+      customerId: (await serverCustomers.getAll()).single.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    final otherOrder = makeOrder(
+      uuid: 'retry-number-owner',
+      customerId: canonicalOrder.customerId,
+      orderNumber: 'ORD-000002',
+      syncStatus: 'synced',
+    );
+    await serverOrders.insert(canonicalOrder);
+    await serverOrders.markSynced(canonicalOrder.uuid);
+    await serverOrders.insert(otherOrder);
+    await serverOrders.markSynced(otherOrder.uuid);
+
+    await syncWithRealHttpClient();
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final localOrders = OrderRepository(database: clientDatabase);
+    final localCanonicalOrder = (await localOrders.getAll()).singleWhere(
+      (order) => order.uuid == canonicalOrder.uuid,
+    );
+    final retry = localCanonicalOrder.copyWith(
+      orderNumber: 'ORD-000002',
+      syncStatus: 'pending',
+    );
+    final client = SyncClient(
+      serverAddress: '127.0.0.1',
+      port: server.port!,
+      token: SyncConfig.defaultToken,
+    );
+
+    final retryItems = await localOrders.getItems(localCanonicalOrder.id!);
+    final returnedNumber = await HttpOverrides.runZoned(
+      () => client.sendOrder(
+        SyncOrder(
+          order: retry,
+          items: retryItems,
+          customerUuid: localCustomer.uuid,
+        ),
+      ),
+      createHttpClient: (context) =>
+          RealHttpOverrides().createHttpClient(context),
+    );
+
+    expect(returnedNumber, 'ORD-000001');
+    final windowsOrders = await serverOrders.getAll();
+    expect(
+      windowsOrders.singleWhere((order) => order.uuid == canonicalOrder.uuid).orderNumber,
+      'ORD-000001',
+    );
+    expect(
+      windowsOrders.singleWhere((order) => order.uuid == otherOrder.uuid).orderNumber,
+      'ORD-000002',
+    );
+  });
+
   test(
     'pulls Windows consumables, spools and activity history by UUID',
     () async {
@@ -1449,8 +1606,8 @@ void main() {
   test(
     'reconciles colliding local asset codes to Windows canonical codes',
     () async {
-    final windowsAssets = AssetRepository(database: serverDatabase);
-    final androidAssets = AssetRepository(database: clientDatabase);
+    final windowsAssets = AssetRepository(database: serverDatabase, isNumberAuthority: true);
+    final androidAssets = AssetRepository(database: clientDatabase, isNumberAuthority: false);
     final now = DateTime.utc(2026, 10, 30);
 
     final windowsAsset = Asset(
@@ -1486,8 +1643,176 @@ void main() {
       localAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
       'AST-0002',
     );
+
+    await syncWithRealHttpClient();
+    final repeatedAssets = await androidAssets.getAll();
+    expect(repeatedAssets, hasLength(2));
+    expect(
+      repeatedAssets.singleWhere((asset) => asset.uuid == windowsAsset.uuid).assetCode,
+      'AST-0001',
+    );
+    expect(
+      repeatedAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
+      'AST-0002',
+    );
   });
 
+
+  test(
+    'preserves a pending Android asset when its Windows push is rejected',
+    () async {
+      final windowsAssets = AssetRepository(
+        database: serverDatabase,
+        isNumberAuthority: true,
+      );
+      final androidAssets = AssetRepository(
+        database: clientDatabase,
+        isNumberAuthority: false,
+      );
+      final now = DateTime.utc(2026, 11, 1);
+
+      final windowsAsset = Asset(
+        uuid: 'shared-pending-asset',
+        name: 'Windows offline edit',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await windowsAssets.insert(windowsAsset);
+
+      final androidAsset = Asset(
+        uuid: 'shared-pending-asset',
+        name: 'Android offline edit',
+        createdAt: now.add(const Duration(minutes: 1)),
+        updatedAt: now.add(const Duration(minutes: 1)),
+      );
+      await androidAssets.insert(androidAsset);
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.assetsPushed, 0);
+      expect(result.assetsPulled, 0);
+
+      final local = await androidAssets.getByUuid(androidAsset.uuid);
+      expect(local, isNotNull);
+      expect(local!.name, 'Android offline edit');
+      expect(local.syncStatus, Asset.syncStatusPending);
+
+      final windows = await windowsAssets.getByUuid(windowsAsset.uuid);
+      expect(windows, isNotNull);
+      expect(windows!.name, 'Windows offline edit');
+      expect(windows.syncStatus, Asset.syncStatusPending);
+    },
+  );
+
+  test(
+    'preserves a pending Android asset when Windows sends a deletion tombstone',
+    () async {
+      final windowsAssets = AssetRepository(
+        database: serverDatabase,
+        isNumberAuthority: true,
+      );
+      final androidAssets = AssetRepository(
+        database: clientDatabase,
+        isNumberAuthority: false,
+      );
+      final now = DateTime.utc(2026, 11, 2);
+
+      final windowsAsset = Asset(
+        uuid: 'shared-deleted-pending-asset',
+        name: 'Windows asset',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await windowsAssets.insert(windowsAsset);
+      await windowsAssets.markDeletedPendingByUuid(windowsAsset.uuid);
+
+      final androidAsset = Asset(
+        uuid: windowsAsset.uuid,
+        name: 'Android unsynced edit',
+        createdAt: now,
+        updatedAt: now.add(const Duration(minutes: 1)),
+      );
+      await androidAssets.insert(androidAsset);
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.assetsPushed, 0);
+      expect(result.assetsPulled, 0);
+
+      final local = await androidAssets.getByUuid(androidAsset.uuid);
+      expect(local, isNotNull);
+      expect(local!.name, 'Android unsynced edit');
+      expect(local.syncStatus, Asset.syncStatusPending);
+    },
+  );
+
+  test(
+    'preserves a pending Android maintenance edit when Windows sends a deletion tombstone',
+    () async {
+      final windowsAssets = AssetRepository(
+        database: serverDatabase,
+        isNumberAuthority: true,
+      );
+      final androidAssets = AssetRepository(
+        database: clientDatabase,
+        isNumberAuthority: false,
+      );
+      final windowsMaintenance = MaintenanceRepository(database: serverDatabase);
+      final androidMaintenance = MaintenanceRepository(database: clientDatabase);
+      final now = DateTime.utc(2026, 11, 3);
+
+      final windowsAssetId = await windowsAssets.insert(Asset(
+        uuid: 'maintenance-tombstone-asset',
+        name: 'Machine',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await windowsAssets.markSynced('maintenance-tombstone-asset');
+      final androidAssetId = await androidAssets.insert(Asset(
+        uuid: 'maintenance-tombstone-asset',
+        name: 'Machine',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await androidAssets.markSynced('maintenance-tombstone-asset');
+
+      final windowsRecord = MaintenanceRecord(
+        uuid: 'shared-maintenance-tombstone',
+        assetId: windowsAssetId,
+        assetUuid: 'maintenance-tombstone-asset',
+        maintenanceDate: now,
+        description: 'Windows maintenance record',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await windowsMaintenance.insert(windowsRecord);
+      await windowsMaintenance.markDeletedPendingByUuid(windowsRecord.uuid);
+
+      final androidRecord = MaintenanceRecord(
+        uuid: windowsRecord.uuid,
+        assetId: androidAssetId,
+        assetUuid: 'maintenance-tombstone-asset',
+        maintenanceDate: now,
+        description: 'Android offline edit',
+        createdAt: now,
+        updatedAt: now.add(const Duration(minutes: 1)),
+      );
+      final androidRecordId = await androidMaintenance.insert(androidRecord);
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.maintenancePushed, 0);
+      expect(result.maintenancePulled, 0);
+
+      final local = await androidMaintenance.getById(androidRecordId);
+      expect(local, isNotNull);
+      expect(local!.description, 'Android offline edit');
+      expect(local.syncStatus, MaintenanceRecord.syncStatusPending);
+    },
+  );
 
   test(
     'Windows pending consumable edit wins over an Android conflict',

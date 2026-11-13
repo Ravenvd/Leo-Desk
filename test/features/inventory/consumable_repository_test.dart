@@ -254,33 +254,100 @@ void main() {
     expect((await repository.getSpools(id)).single.id, spoolId);
     await db.close();
   });
-  test('inventory sync exports UUID relationships and imports into different local IDs', () async {
+  test('inventory sync resolves UUID relationships and ignores remote SQLite IDs', () async {
     final directory = await Directory.systemTemp.createTemp('leo_inventory_sync_');
     final sourceDb = await openTestDb('${directory.path}/source.db');
     final source = ConsumableRepository(database: sourceDb);
-    final thread = item(category: Consumable.categoryEmbroideryThread, name: 'Black', trackingType: Consumable.trackingPercentage, unit: Consumable.unitMetres);
+    final thread = item(
+      category: Consumable.categoryEmbroideryThread,
+      name: 'Black',
+      trackingType: Consumable.trackingPercentage,
+      unit: Consumable.unitMetres,
+    );
     final sourceId = await source.insertConsumable(thread);
     final saved = (await source.getConsumableById(sourceId))!;
-    await source.addThreadSpool(consumable: saved, approximateLengthM: 100, notes: 'Sync test');
+    await source.addThreadSpool(
+      consumable: saved,
+      approximateLengthM: 100,
+      notes: 'Sync test',
+    );
+    final sourceSpool = (await source.getSpools(sourceId)).single;
+    await source.updateSpoolRemaining(
+      spool: sourceSpool,
+      remainingPercent: 75,
+      orderUuid: 'order-outside-sync-window',
+      notes: 'Usage linked to an order not present on this device',
+    );
+
     final records = await source.getAllSyncRecords();
-    expect(records.map((record) => record['record_type']).toList(), ['consumables', 'thread_spools', 'inventory_activities']);
+    expect(
+      records.map((record) => record['record_type']).toList(),
+      ['consumables', 'thread_spools', 'inventory_activities', 'inventory_activities'],
+    );
+    for (final record in records) {
+      expect(record.containsKey('id'), isFalse);
+    }
+    final spoolPayload = records.singleWhere(
+      (record) => record['record_type'] == 'thread_spools',
+    );
+    expect(spoolPayload, containsPair('consumable_uuid', thread.uuid));
+    expect(spoolPayload.containsKey('consumable_id'), isFalse);
+
+    final usagePayload = records.singleWhere(
+      (record) => record['order_uuid'] == 'order-outside-sync-window',
+    );
+    expect(usagePayload, containsPair('consumable_uuid', thread.uuid));
+    expect(usagePayload, containsPair('spool_uuid', sourceSpool.uuid));
+    expect(usagePayload.containsKey('consumable_id'), isFalse);
+    expect(usagePayload.containsKey('spool_id'), isFalse);
+    expect(usagePayload.containsKey('order_id'), isFalse);
 
     final targetDb = await openTestDb('${directory.path}/target.db');
     final target = ConsumableRepository(database: targetDb);
-    final dummy = item(category: Consumable.categoryBeads, name: 'Dummy', trackingType: Consumable.trackingQuantity, unit: Consumable.unitGrams);
+    final dummy = item(
+      category: Consumable.categoryBeads,
+      name: 'Dummy',
+      trackingType: Consumable.trackingQuantity,
+      unit: Consumable.unitGrams,
+    );
     await target.insertConsumable(dummy);
+
+    // Simulate a payload carrying stale IDs from the source device. The
+    // receiver must ignore them and resolve every relationship by UUID.
     for (final record in records) {
-      expect(await target.upsertSyncRecord(record), isTrue);
+      final incoming = Map<String, Object?>.from(record)..['id'] = 9000;
+      if (record['record_type'] == 'thread_spools') {
+        incoming['consumable_id'] = 9000;
+      }
+      if (record['record_type'] == 'inventory_activities') {
+        incoming['consumable_id'] = 9000;
+        incoming['spool_id'] = 9000;
+        incoming['order_id'] = 9000;
+      }
+      expect(await target.upsertSyncRecord(incoming), isTrue);
     }
+
     final imported = await target.getConsumableByUuid(thread.uuid);
     expect(imported, isNotNull);
     expect(imported!.id, isNot(sourceId));
+    expect(imported.id, isNot(9000));
+
     final spools = await target.getSpools(imported.id!);
     expect(spools, hasLength(1));
-    expect(spools.single.uuid, records[1]['uuid']);
+    expect(spools.single.uuid, sourceSpool.uuid);
+    expect(spools.single.consumableId, imported.id);
+
     final history = await target.getActivityHistory(imported.id!);
-    expect(history, hasLength(1));
-    expect(history.single.spoolUuid, spools.single.uuid);
+    expect(history, hasLength(2));
+    final importedUsage = history.singleWhere(
+      (activity) => activity.orderUuid == 'order-outside-sync-window',
+    );
+    expect(importedUsage.consumableId, imported.id);
+    expect(importedUsage.spoolId, spools.single.id);
+    expect(importedUsage.spoolUuid, spools.single.uuid);
+    expect(importedUsage.orderUuid, 'order-outside-sync-window');
+    expect(importedUsage.orderId, isNull);
+
     await sourceDb.close();
     await targetDb.close();
     await directory.delete(recursive: true);
@@ -300,4 +367,48 @@ void main() {
     expect(await repository.getCurrentStock(id), 850);
     await db.close();
   });
+
+  test('UUID sync preserves pending consumables, spools and activity events', () async {
+    final db = await openTestDb();
+    final repository = ConsumableRepository(database: db);
+    final model = item(
+      category: Consumable.categoryEmbroideryThread,
+      name: 'Local black thread',
+      trackingType: Consumable.trackingPercentage,
+      unit: Consumable.unitMetres,
+    );
+    final consumableId = await repository.insertConsumable(model);
+
+    var records = await repository.getAllSyncRecords();
+    final incomingConsumable = Map<String, Object?>.from(records.single)
+      ..['name'] = 'Remote black thread';
+    expect(await repository.upsertSyncRecord(incomingConsumable), isFalse);
+    expect((await repository.getConsumableById(consumableId))!.name,
+        'Local black thread');
+
+    await repository.markSyncRecordSynced('consumables', model.uuid);
+    final saved = (await repository.getConsumableById(consumableId))!;
+    await repository.addThreadSpool(
+      consumable: saved,
+      approximateLengthM: 1000,
+    );
+
+    records = await repository.getAllSyncRecords();
+    final spool = records.singleWhere(
+      (record) => record['record_type'] == 'thread_spools',
+    );
+    final incomingSpool = Map<String, Object?>.from(spool)
+      ..['remaining_percent'] = 50.0;
+    expect(await repository.upsertSyncRecord(incomingSpool), isFalse);
+
+    final activity = records.singleWhere(
+      (record) => record['record_type'] == 'inventory_activities',
+    );
+    final incomingActivity = Map<String, Object?>.from(activity)
+      ..['notes'] = 'Remote replacement';
+    expect(await repository.upsertSyncRecord(incomingActivity), isFalse);
+
+    await db.close();
+  });
+
 }

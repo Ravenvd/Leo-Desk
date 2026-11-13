@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
@@ -5,8 +7,12 @@ import '../models/asset.dart';
 
 class AssetRepository {
   final Database? database;
+  final bool isNumberAuthority;
 
-  AssetRepository({this.database});
+  /// Windows owns canonical asset-code allocation. Android stores a UUID-based
+  /// placeholder until the Windows host assigns and returns the real code.
+  AssetRepository({this.database, bool? isNumberAuthority})
+      : isNumberAuthority = isNumberAuthority ?? Platform.isWindows;
 
   Future<Database> get _db async {
     return database ?? await AppDatabase.database;
@@ -19,19 +25,22 @@ class AssetRepository {
       final localAsset = asset.copyWith(syncStatus: Asset.syncStatusPending);
       final map = localAsset.toMap()..remove('id');
 
-      // Asset codes are generated from SQLite's AUTOINCREMENT id so they
-      // remain human-readable and are not reused after an asset is deleted.
-      map['asset_code'] = 'PENDING-${localAsset.uuid}';
+      // Never derive a canonical suffix on Android. Its local SQLite ID is
+      // unrelated to the Windows database and can collide with another device.
+      // Windows may safely use its own AUTOINCREMENT sequence as the authority.
+      map['asset_code'] = isNumberAuthority
+          ? ''
+          : 'PENDING-${localAsset.uuid}';
 
       final id = await txn.insert('assets', map);
-      final assetCode = _formatAssetCode(id);
-
-      await txn.update(
-        'assets',
-        {'asset_code': assetCode},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      if (isNumberAuthority) {
+        await txn.update(
+          'assets',
+          {'asset_code': _formatAssetCode(id)},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
 
       return id;
     });
@@ -146,7 +155,7 @@ class AssetRepository {
 
     final existing = await db.query(
       'assets',
-      columns: ['id', 'sync_status'],
+      columns: ['id', 'sync_status', 'asset_code'],
       where: 'uuid = ?',
       whereArgs: [asset.uuid],
       limit: 1,
@@ -161,32 +170,54 @@ class AssetRepository {
       }
     }
 
-    final map = asset.copyWith(syncStatus: Asset.syncStatusSynced).toMap()
+    // Windows never accepts a client-proposed number for a new UUID. Its
+    // AUTOINCREMENT row ID supplies a monotonic sequence that survives deletes.
+    // For an existing UUID, retain the already assigned Windows code.
+    var reconciledAsset = asset;
+    if (isNumberAuthority) {
+      reconciledAsset = asset.copyWith(
+        assetCode: existing.isEmpty
+            ? 'PENDING-${asset.uuid}'
+            : existing.first['asset_code'] as String,
+      );
+    }
+
+    final map = reconciledAsset
+        .copyWith(syncStatus: Asset.syncStatusSynced)
+        .toMap()
       ..remove('id');
 
-    // Asset codes are allocated by Windows and may collide temporarily with
-    // a different Android-created asset's locally generated code. Free the
-    // canonical code before applying the Windows row; the displaced asset
-    // will receive its own canonical code when its UUID is pulled.
     await db.transaction((txn) async {
-      final codeOwner = await txn.query(
-        'assets',
-        columns: ['id', 'uuid'],
-        where: 'asset_code = ? AND uuid != ?',
-        whereArgs: [asset.assetCode, asset.uuid],
-        limit: 1,
-      );
-      if (codeOwner.isNotEmpty) {
-        await txn.update(
+      if (!isNumberAuthority) {
+        // Older Android installs may still have locally generated AST codes.
+        // Free a colliding value before applying the Windows canonical code.
+        final codeOwner = await txn.query(
           'assets',
-          {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
-          where: 'id = ?',
-          whereArgs: [codeOwner.first['id']],
+          columns: ['id', 'uuid'],
+          where: 'asset_code = ? AND uuid != ?',
+          whereArgs: [reconciledAsset.assetCode, reconciledAsset.uuid],
+          limit: 1,
         );
+        if (codeOwner.isNotEmpty) {
+          await txn.update(
+            'assets',
+            {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
+            where: 'id = ?',
+            whereArgs: [codeOwner.first['id']],
+          );
+        }
       }
 
       if (existing.isEmpty) {
-        await txn.insert('assets', map);
+        final insertedId = await txn.insert('assets', map);
+        if (isNumberAuthority) {
+          await txn.update(
+            'assets',
+            {'asset_code': _formatAssetCode(insertedId)},
+            where: 'id = ?',
+            whereArgs: [insertedId],
+          );
+        }
       } else {
         await txn.update(
           'assets',

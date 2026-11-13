@@ -280,6 +280,11 @@ class SyncClient {
     final payload = Map<String, Object?>.from(record)
       ..remove('id')
       ..remove('sync_status');
+    // Staff foreign keys are local SQLite IDs. The receiver resolves them
+    // from staff_uuid, just as it resolves the staff profile by UUID.
+    if (table == 'staff_attendance' || table == 'staff_payments') {
+      payload.remove('staff_id');
+    }
     return _postJson(path, payload, uuid);
   }
 

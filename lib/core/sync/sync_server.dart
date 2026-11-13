@@ -315,16 +315,9 @@ class SyncServer {
           await _sendJson(request.response, 400, {'error': 'Invalid asset data.'});
           return;
         }
-        var asset = Asset.fromMap(Map<String, Object?>.from(decoded));
-        final existingAsset = await _assetRepository.getByUuid(asset.uuid);
-        if (existingAsset != null) {
-          // The Windows-generated asset code is canonical for this UUID.
-          asset = asset.copyWith(assetCode: existingAsset.assetCode);
-        } else {
-          // Asset codes are local-ID-derived on each device. Allocate a
-          // Windows code before inserting an offline-created Android asset.
-          asset = asset.copyWith(assetCode: _nextAvailableAssetCode(await _assetRepository.getAllForSync()));
-        }
+        final asset = Asset.fromMap(Map<String, Object?>.from(decoded));
+        // The Windows repository assigns the canonical code using its own
+        // AUTOINCREMENT sequence when this UUID is first accepted.
         final applied = await _assetRepository.upsertFromSync(asset);
         if (!applied) {
           await _sendJson(request.response, 409, {'error': 'Asset could not be applied.', 'uuid': asset.uuid});
@@ -551,6 +544,20 @@ class SyncServer {
         final existingByUuid = existingOrders
             .where((candidate) => candidate.uuid == syncOrder.order.uuid)
             .firstOrNull;
+
+        // A retry for an existing UUID must never replace its Windows-assigned
+        // number with a stale or newly proposed client value. Reconcile against
+        // the canonical row before checking number collisions.
+        if (existingByUuid != null) {
+          syncOrder = SyncOrder(
+            order: syncOrder.order.copyWith(
+              orderNumber: existingByUuid.orderNumber,
+            ),
+            items: syncOrder.items,
+            customerUuid: syncOrder.customerUuid,
+          );
+        }
+
         final numberOwner = existingOrders
             .where(
               (candidate) =>
@@ -677,16 +684,6 @@ class SyncServer {
         'error': 'Internal server error',
       });
     }
-  }
-
-  String _nextAvailableAssetCode(List<Asset> assets) {
-    var highest = 0;
-    for (final asset in assets) {
-      if (!asset.assetCode.startsWith('AST-')) continue;
-      final number = int.tryParse(asset.assetCode.substring(4));
-      if (number != null && number > highest) highest = number;
-    }
-    return 'AST-${(highest + 1).toString().padLeft(4, '0')}';
   }
 
   String _nextAvailableOrderNumber(List<Order> orders) {

@@ -13,6 +13,7 @@ import 'package:leo_desk/features/billing/models/bill_item.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
@@ -73,14 +74,14 @@ void main() {
     );
 
     serverCustomers = CustomerRepository(database: serverDb);
-    serverBills = BillRepository(database: serverDb);
+    serverBills = BillRepository(database: serverDb, isNumberAuthority: true);
     serverExpenses = ExpenseRepository(database: serverDb);
-    serverInvoices = InvoiceRepository(database: serverDb);
+    serverInvoices = InvoiceRepository(database: serverDb, isNumberAuthority: true);
     serverOrders = OrderRepository(database: serverDb);
     clientCustomers = CustomerRepository(database: clientDb);
-    clientBills = BillRepository(database: clientDb);
+    clientBills = BillRepository(database: clientDb, isNumberAuthority: false);
     clientExpenses = ExpenseRepository(database: clientDb);
-    clientInvoices = InvoiceRepository(database: clientDb);
+    clientInvoices = InvoiceRepository(database: clientDb, isNumberAuthority: false);
     clientOrders = OrderRepository(database: clientDb);
     serverStaff = StaffRepository(database: serverDb);
     clientStaff = StaffRepository(database: clientDb);
@@ -91,7 +92,7 @@ void main() {
       expenseRepository: serverExpenses,
       invoiceRepository: serverInvoices,
       orderRepository: serverOrders,
-      assetRepository: AssetRepository(database: serverDb),
+      assetRepository: AssetRepository(database: serverDb, isNumberAuthority: true),
       maintenanceRepository: MaintenanceRepository(database: serverDb),
       consumableRepository: ConsumableRepository(database: serverDb),
       staffRepository: serverStaff,
@@ -105,7 +106,7 @@ void main() {
       expenseRepository: clientExpenses,
       invoiceRepository: clientInvoices,
       orderRepository: clientOrders,
-      assetRepository: AssetRepository(database: clientDb),
+      assetRepository: AssetRepository(database: clientDb, isNumberAuthority: false),
       maintenanceRepository: MaintenanceRepository(database: clientDb),
       consumableRepository: ConsumableRepository(database: clientDb),
       staffRepository: clientStaff,
@@ -117,6 +118,33 @@ void main() {
     await serverDb.close();
     await clientDb.close();
     tempDir.deleteSync(recursive: true);
+  });
+
+  test('Android applies the Windows-assigned canonical asset code', () async {
+    final androidAssets = AssetRepository(database: clientDb, isNumberAuthority: false);
+    final now = DateTime(2026, 11, 1);
+    final id = await androidAssets.insert(Asset(
+      uuid: 'android-offline-asset-numbering',
+      name: 'Offline-created machine',
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final beforeSync = await androidAssets.getById(id);
+    expect(beforeSync!.assetCode, 'PENDING-${beforeSync.uuid}');
+
+    final result = await manager.sync();
+    expect(result.connected, isTrue);
+
+    final afterSync = await androidAssets.getById(id);
+    expect(afterSync!.assetCode, 'AST-0001');
+    expect(afterSync.syncStatus, 'synced');
+
+    final windowsCopy = await AssetRepository(
+      database: serverDb,
+      isNumberAuthority: true,
+    ).getByUuid(beforeSync.uuid);
+    expect(windowsCopy!.assetCode, 'AST-0001');
   });
 
   test('syncs staff, attendance and payroll payments between devices', () async {
@@ -216,7 +244,8 @@ void main() {
     expect(remoteCustomers.single.syncStatus, 'synced');
 
     final remoteBills = await serverBills.getAll();
-    expect(remoteBills.single.billNumber, 'INV-100');
+    expect(localBills.single.billNumber, remoteBills.single.billNumber);
+    expect(remoteBills.single.billNumber, matches(RegExp(r'^BILL-\d{8}-\d{6}$')));
     expect(remoteBills.single.customerId, remoteCustomers.single.id);
     expect(remoteBills.single.customerUuid, remoteCustomers.single.uuid);
 
@@ -307,7 +336,7 @@ void main() {
       expect(customers.every((c) => c.syncStatus == 'synced'), isTrue);
 
       final bills = await clientBills.getAll();
-      expect(bills.single.billNumber, 'INV-SERVER');
+      expect(bills.single.billNumber, matches(RegExp(r'^BILL-\d{8}-\d{6}$')));
       expect(bills.single.syncStatus, 'synced');
 
       final serverAlice = (await serverCustomers.getAll()).firstWhere(

@@ -3,6 +3,7 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/inventory/repositories/maintenance_repository.dart';
@@ -219,7 +220,7 @@ class SyncManager {
       }
     }
     for (final record in await _client.fetchStaffRecords('staff')) {
-      final applied = await _staffRepository.upsertStaffFromSync(record, force: true);
+      final applied = await _staffRepository.upsertStaffFromSync(record);
       if (applied) {
         staffRecordsPulled++;
         acknowledgedStaff.add(record['uuid'] as String);
@@ -241,12 +242,18 @@ class SyncManager {
     // --- Pull Windows assets; Windows is authoritative after the push attempt ---
     for (final asset in await _client.fetchAssets()) {
       if (asset.syncStatus == 'deleted_pending') {
+        final localAsset = await _assetRepository.getByUuid(asset.uuid);
+        if (localAsset?.syncStatus == Asset.syncStatusPending) {
+          // A failed push must not let a remote tombstone erase unsynced
+          // Android edits. Leave it unacknowledged so reconciliation retries.
+          continue;
+        }
         await _assetRepository.applyDeletionFromSync(asset.uuid);
         assetsPulled++;
         acknowledgedAssets.add(asset.uuid);
         continue;
       }
-      final applied = await _assetRepository.upsertFromSync(asset, force: true);
+      final applied = await _assetRepository.upsertFromSync(asset);
       if (applied) {
         assetsPulled++;
         acknowledgedAssets.add(asset.uuid);
@@ -339,12 +346,19 @@ class SyncManager {
     // --- Pull Windows maintenance records after assets ---
     for (final record in await _client.fetchMaintenanceRecords()) {
       if (record['sync_status'] == 'deleted_pending') {
-        await _maintenanceRepository.applyDeletionFromSync(record['uuid'] as String);
+        final uuid = record['uuid'] as String;
+        final localRecord = await _maintenanceRepository.getByUuid(uuid);
+        if (localRecord?.syncStatus == 'pending') {
+          // A rejected Android edit must not be erased by a Windows
+          // tombstone. Leave it unacknowledged for a later reconciliation.
+          continue;
+        }
+        await _maintenanceRepository.applyDeletionFromSync(uuid);
         maintenancePulled++;
-        acknowledgedMaintenance.add(record['uuid'] as String);
+        acknowledgedMaintenance.add(uuid);
         continue;
       }
-      final applied = await _maintenanceRepository.upsertFromSync(record, force: true);
+      final applied = await _maintenanceRepository.upsertFromSync(record);
       if (applied) {
         maintenancePulled++;
         acknowledgedMaintenance.add(record['uuid'] as String);
@@ -362,8 +376,15 @@ class SyncManager {
     }
 
     // --- Pull Windows inventory snapshot in dependency order ---
+    // Windows is authoritative for inventory UUIDs. If an Android push was
+    // rejected because Windows has its own pending edit for the same UUID,
+    // apply that Windows version rather than retaining the conflicting local
+    // pending copy.
     for (final record in await _client.fetchInventoryRecords()) {
-      final applied = await _consumableRepository.upsertSyncRecord(record, force: true);
+      final applied = await _consumableRepository.upsertSyncRecord(
+        record,
+        force: true,
+      );
       if (applied) {
         inventoryPulled++;
         acknowledgedInventory.add({
@@ -458,7 +479,7 @@ class SyncManager {
       }
     }
     for (final record in await _client.fetchStaffRecords('staff_attendance')) {
-      final applied = await _staffRepository.upsertAttendanceFromSync(record, force: true);
+      final applied = await _staffRepository.upsertAttendanceFromSync(record);
       if (applied) {
         staffRecordsPulled++;
         acknowledgedStaffAttendance.add(record['uuid'] as String);
@@ -472,7 +493,7 @@ class SyncManager {
       }
     }
     for (final record in await _client.fetchStaffRecords('staff_payments')) {
-      final applied = await _staffRepository.upsertPaymentFromSync(record, force: true);
+      final applied = await _staffRepository.upsertPaymentFromSync(record);
       if (applied) {
         staffRecordsPulled++;
         acknowledgedStaffPayments.add(record['uuid'] as String);

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
@@ -6,8 +8,12 @@ import '../models/bill_item.dart';
 
 class BillRepository {
   final Database? database;
+  final bool isNumberAuthority;
 
-  BillRepository({this.database});
+  /// Windows assigns canonical bill numbers. Android retains a UUID placeholder
+  /// until the Windows host returns the canonical record in the next pull.
+  BillRepository({this.database, bool? isNumberAuthority})
+      : isNumberAuthority = isNumberAuthority ?? Platform.isWindows;
 
   Future<Database> get _db async {
     return database ?? await AppDatabase.database;
@@ -53,10 +59,19 @@ class BillRepository {
     final localBill = bill.copyWith(
       syncStatus: 'pending',
       customerUuid: customerUuid,
+      billNumber: 'PENDING-${bill.uuid}',
     );
 
     return db.transaction((txn) async {
       final billId = await txn.insert('bills', localBill.toMap()..remove('id'));
+      if (isNumberAuthority) {
+        await txn.update(
+          'bills',
+          {'bill_number': _formatBillNumber(bill.billDate, billId)},
+          where: 'id = ?',
+          whereArgs: [billId],
+        );
+      }
 
       for (final item in items) {
         await txn.insert(
@@ -74,10 +89,10 @@ class BillRepository {
   /// Inserts or reconciles a bill received from sync.
   ///
   /// A bill UUID identifies the same bill across devices. When two different
-  /// bills claim the same order, the earliest creation timestamp wins; UUID
-  /// order is the deterministic tie-breaker. Sync status never overrides this
-  /// rule. Returns false when the incoming bill loses or its dependencies are
-  /// not available locally.
+  /// synced bills claim the same order, the earliest creation timestamp wins;
+  /// UUID order is the deterministic tie-breaker. Pending local bills are
+  /// protected until their push is resolved. Returns false when reconciliation
+  /// must be deferred or the incoming bill loses.
   Future<bool> upsertFromSync(
     Bill bill,
     List<BillItem> items, {
@@ -129,7 +144,16 @@ class BillRepository {
       orderId = orders.first['id'] as int;
     }
 
-    final map = bill
+    // Windows ignores a client-proposed bill number. Existing UUIDs retain
+    // their assigned number; new UUIDs receive a number from the Windows row ID.
+    final reconciledBill = isNumberAuthority
+        ? bill.copyWith(
+            billNumber: existingByUuid.isEmpty
+                ? 'PENDING-${bill.uuid}'
+                : existingByUuid.first['bill_number'] as String,
+          )
+        : bill;
+    final map = reconciledBill
         .copyWith(
           syncStatus: 'synced',
           customerId: customerId,
@@ -165,6 +189,9 @@ class BillRepository {
 
       for (final conflictMap in orderConflicts) {
         final conflict = Bill.fromMap(conflictMap);
+        // Different UUIDs claiming the same order are resolved by the
+        // established creation-time/UUID priority, even if the local copy is
+        // pending. A pending copy with the same UUID is still protected above.
         if (_compareBillPriority(bill, conflict) >= 0) {
           // ignore: avoid_print
           print(
@@ -179,25 +206,37 @@ class BillRepository {
 
       // bill_number is also globally unique. Never delete a bill belonging to
       // another order just to make room for an incoming number.
-      final billNumberOwners = await txn.query(
-        'bills',
-        columns: ['id', 'uuid'],
-        where: 'bill_number = ? AND uuid != ?',
-        whereArgs: [bill.billNumber, bill.uuid],
-      );
+      final billNumberOwners = isNumberAuthority
+          ? <Map<String, Object?>>[]
+          : await txn.query(
+              'bills',
+              columns: ['id', 'uuid', 'sync_status'],
+              where: 'bill_number = ? AND uuid != ?',
+              whereArgs: [bill.billNumber, bill.uuid],
+            );
       final conflictIds = orderConflicts
           .map((row) => row['id'] as int)
           .toSet();
-      if (billNumberOwners.any(
-        (owner) => !conflictIds.contains(owner['id'] as int),
+      final unrelatedNumberOwners = billNumberOwners
+          .where((owner) => !conflictIds.contains(owner['id'] as int))
+          .toList();
+      if (unrelatedNumberOwners.any(
+        (owner) => !force && owner['sync_status'] == 'pending',
       )) {
-        // ignore: avoid_print
-        print(
-          'Bill sync conflict: bill number ${bill.billNumber} is already '
-          'used by a bill for another order; incoming bill ${bill.uuid} '
-          'was not applied.',
-        );
+        // Never evict an unsynced bill just to free a canonical number.
         return false;
+      }
+
+      // A synced local record may still carry a legacy/client-generated
+      // number that collides with Windows. Keep the record, but free the
+      // canonical number so its own Windows copy can reconcile later.
+      for (final owner in unrelatedNumberOwners) {
+        await txn.update(
+          'bills',
+          {'bill_number': 'PENDING-${owner['uuid']}'},
+          where: 'id = ?',
+          whereArgs: [owner['id']],
+        );
       }
 
       // Remove losing copies and their items in the same transaction. The
@@ -215,6 +254,14 @@ class BillRepository {
       int billId;
       if (sameUuid.isEmpty) {
         billId = await txn.insert('bills', map);
+        if (isNumberAuthority) {
+          await txn.update(
+            'bills',
+            {'bill_number': _formatBillNumber(bill.billDate, billId)},
+            where: 'id = ?',
+            whereArgs: [billId],
+          );
+        }
       } else {
         billId = sameUuid.first['id'] as int;
         await txn.update('bills', map, where: 'id = ?', whereArgs: [billId]);
@@ -236,6 +283,13 @@ class BillRepository {
 
       return true;
     });
+  }
+
+  String _formatBillNumber(DateTime billDate, int id) {
+    final date = '${billDate.year}'
+        '${billDate.month.toString().padLeft(2, '0')}'
+        '${billDate.day.toString().padLeft(2, '0')}';
+    return 'BILL-$date-${id.toString().padLeft(6, '0')}';
   }
 
   /// Returns negative when [left] wins, positive when [right] wins.

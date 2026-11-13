@@ -74,9 +74,9 @@ void main() {
           token: SyncConfig.defaultToken,
         ),
         customerRepository: CustomerRepository(database: clientDatabase),
-        billRepository: BillRepository(database: clientDatabase),
+        billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
         expenseRepository: clientExpenses,
-        invoiceRepository: InvoiceRepository(database: clientDatabase),
+        invoiceRepository: InvoiceRepository(database: clientDatabase, isNumberAuthority: false),
         orderRepository: OrderRepository(database: clientDatabase),
         assetRepository: AssetRepository(database: clientDatabase),
       maintenanceRepository: MaintenanceRepository(database: clientDatabase),
@@ -96,9 +96,9 @@ void main() {
 
       final server = SyncServer(
         customerRepository: CustomerRepository(database: serverDatabase),
-        billRepository: BillRepository(database: serverDatabase),
+        billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
         expenseRepository: serverExpenses,
-        invoiceRepository: InvoiceRepository(database: serverDatabase),
+        invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
         orderRepository: OrderRepository(database: serverDatabase),
       assetRepository: AssetRepository(database: serverDatabase),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),

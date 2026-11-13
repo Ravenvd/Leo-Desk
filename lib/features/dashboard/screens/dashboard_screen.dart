@@ -43,7 +43,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Invoice> _invoices = [];
   List<Expense> _expenses = [];
   List<Order> _orders = [];
-  int _pendingSyncCount = 0;
   bool _isLoading = true;
   String? _error;
 
@@ -80,9 +79,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final invoices = await widget.invoiceRepository.getAll();
       final expenses = await widget.expenseRepository.getAll();
       final orders = await (widget.orderRepository ?? OrderRepository()).getAll();
-      final pendingCustomers = await widget.customerRepository.getPending();
-      final pendingBills = await widget.billRepository.getPending();
-      final pendingExpenses = await widget.expenseRepository.getPending();
 
       if (!mounted) return;
 
@@ -92,8 +88,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _invoices = invoices;
         _expenses = expenses;
         _orders = orders;
-        _pendingSyncCount =
-            pendingCustomers.length + pendingBills.length + pendingExpenses.length;
         _isLoading = false;
       });
     } catch (error, stackTrace) {
@@ -481,12 +475,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icons.pending_actions_rounded,
           label: 'Pending orders',
           value: '$_pendingOrdersCount',
-        ),
-        _StatCard(
-          icon: Icons.sync_rounded,
-          label: 'Pending sync',
-          value: '$_pendingSyncCount',
-          highlight: _pendingSyncCount > 0,
         ),
       ],
     );

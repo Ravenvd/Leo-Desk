@@ -178,6 +178,12 @@ class OrderRepository {
             return false;
           }
           final conflictingOrderId = conflictingOrder['id'] as int;
+          if (!force &&
+              await _hasPendingOrderDependencies(txn, conflictingOrderId)) {
+            // Keep pending bills/invoices attached to the stale local order.
+            // Reconciliation can retry after those records are pushed.
+            return false;
+          }
           await _deleteOrderGraph(txn, conflictingOrderId);
         }
         localOrderId = await txn.insert('orders', map);
@@ -191,6 +197,10 @@ class OrderRepository {
             return false;
           }
           final conflictingOrderId = conflictingOrder['id'] as int;
+          if (!force &&
+              await _hasPendingOrderDependencies(txn, conflictingOrderId)) {
+            return false;
+          }
           await _deleteOrderGraph(txn, conflictingOrderId);
         }
 
@@ -218,6 +228,23 @@ class OrderRepository {
     });
   }
 
+
+  Future<bool> _hasPendingOrderDependencies(
+    Transaction txn,
+    int orderId,
+  ) async {
+    for (final table in ['bills', 'invoices']) {
+      final pending = await txn.query(
+        table,
+        columns: ['id'],
+        where: 'order_id = ? AND sync_status IN (?, ?)',
+        whereArgs: [orderId, 'pending', 'deleted_pending'],
+        limit: 1,
+      );
+      if (pending.isNotEmpty) return true;
+    }
+    return false;
+  }
 
   /// Removes an order and every local child rooted at that order.
   ///

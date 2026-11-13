@@ -178,9 +178,9 @@ void main() {
 
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
-      billRepository: BillRepository(database: serverDatabase),
+      billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
       expenseRepository: ExpenseRepository(database: serverDatabase),
-      invoiceRepository: InvoiceRepository(database: serverDatabase),
+      invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
       orderRepository: OrderRepository(database: serverDatabase),
       assetRepository: AssetRepository(database: serverDatabase),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),
@@ -205,8 +205,8 @@ void main() {
         token: SyncConfig.defaultToken,
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
-      billRepository: BillRepository(database: clientDatabase),
-      invoiceRepository: InvoiceRepository(database: clientDatabase),
+      billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
+      invoiceRepository: InvoiceRepository(database: clientDatabase, isNumberAuthority: false),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
       assetRepository: AssetRepository(database: clientDatabase),
@@ -274,14 +274,14 @@ void main() {
       final serverCustomers = CustomerRepository(database: serverDatabase);
       final serverOrders = OrderRepository(database: serverDatabase);
       final serverOrderItems = OrderItemRepository(database: serverDatabase);
-      final serverInvoices = InvoiceRepository(database: serverDatabase);
-      final serverBills = BillRepository(database: serverDatabase);
+      final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
+      final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
       final clientCustomers = CustomerRepository(database: clientDatabase);
       final clientOrders = OrderRepository(database: clientDatabase);
       final clientOrderItems = OrderItemRepository(database: clientDatabase);
-      final clientInvoices = InvoiceRepository(database: clientDatabase);
-      final clientBills = BillRepository(database: clientDatabase);
+      final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
+      final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
 
       final customer = makeCustomer(
         'graph-roundtrip-customer',

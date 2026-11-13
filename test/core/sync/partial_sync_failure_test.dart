@@ -72,11 +72,11 @@ void main() {
     () async {
       final clientCustomers = CustomerRepository(database: clientDatabase);
       final clientOrders = OrderRepository(database: clientDatabase);
-      final clientInvoices = InvoiceRepository(database: clientDatabase);
+      final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
 
       final serverCustomers = CustomerRepository(database: serverDatabase);
       final serverOrders = OrderRepository(database: serverDatabase);
-      final serverInvoices = InvoiceRepository(database: serverDatabase);
+      final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
 
       final now = DateTime.utc(2026, 2, 10, 8);
 
@@ -137,7 +137,7 @@ void main() {
       final manager = SyncManager(
         client: client,
         customerRepository: clientCustomers,
-        billRepository: BillRepository(database: clientDatabase),
+        billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
         expenseRepository: ExpenseRepository(database: clientDatabase),
         orderRepository: clientOrders,
         invoiceRepository: clientInvoices,
@@ -150,7 +150,7 @@ void main() {
 
       final server = SyncServer(
         customerRepository: serverCustomers,
-        billRepository: BillRepository(database: serverDatabase),
+        billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
         expenseRepository: ExpenseRepository(database: serverDatabase),
         invoiceRepository: serverInvoices,
         orderRepository: serverOrders,

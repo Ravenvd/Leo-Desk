@@ -19,27 +19,21 @@ void main() {
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     customerRepository = CustomerRepository(database: database);
-    billRepository = BillRepository(database: database);
+    billRepository = BillRepository(database: database, isNumberAuthority: true);
   });
 
   tearDown(() async {
     await database.close();
   });
 
-  test('inserts a bill with items and retrieves it', () async {
+  test('inserts a bill with items and retrieves its Windows-assigned number', () async {
     final now = DateTime.now();
-
     final customerId = await customerRepository.insert(
-      Customer(
-        name: 'Alice',
-        createdAt: now,
-        updatedAt: now,
-      ),
+      Customer(name: 'Alice', createdAt: now, updatedAt: now),
     );
-
     final bill = Bill(
       customerId: customerId,
-      billNumber: 'INV-0001',
+      billNumber: 'CLIENT-PROPOSED',
       billDate: now,
       subtotalPaise: 300000,
       totalPaise: 300000,
@@ -62,13 +56,12 @@ void main() {
 
     final savedBill = await billRepository.getById(billId);
     final items = await billRepository.getItems(billId);
-
     expect(savedBill, isNotNull);
     expect(savedBill!.customerId, customerId);
-    expect(savedBill.billNumber, 'INV-0001');
+    expect(savedBill.billNumber.startsWith('BILL-'), isTrue);
+    expect(savedBill.billNumber.endsWith('000001'), isTrue);
     expect(savedBill.totalPaise, 300000);
-
-    expect(items.length, 1);
+    expect(items, hasLength(1));
     expect(items.first.description, 'Logo embroidery');
     expect(items.first.quantity, 20);
     expect(items.first.amountPaise, 300000);
@@ -76,21 +69,15 @@ void main() {
 
   test('gets bills for a customer newest first', () async {
     final now = DateTime.now();
-
     final customerId = await customerRepository.insert(
-      Customer(
-        name: 'Alice',
-        createdAt: now,
-        updatedAt: now,
-      ),
+      Customer(name: 'Alice', createdAt: now, updatedAt: now),
     );
-
     final firstDate = now.subtract(const Duration(days: 2));
 
     await billRepository.insert(
       bill: Bill(
         customerId: customerId,
-        billNumber: 'INV-0001',
+        billNumber: 'CLIENT-1',
         billDate: firstDate,
         subtotalPaise: 10000,
         totalPaise: 10000,
@@ -107,11 +94,10 @@ void main() {
         ),
       ],
     );
-
     await billRepository.insert(
       bill: Bill(
         customerId: customerId,
-        billNumber: 'INV-0002',
+        billNumber: 'CLIENT-2',
         billDate: now,
         subtotalPaise: 20000,
         totalPaise: 20000,
@@ -130,15 +116,13 @@ void main() {
     );
 
     final bills = await billRepository.getForCustomer(customerId);
-
-    expect(bills.length, 2);
-    expect(bills[0].billNumber, 'INV-0002');
-    expect(bills[1].billNumber, 'INV-0001');
+    expect(bills, hasLength(2));
+    expect(bills[0].billNumber.endsWith('000002'), isTrue);
+    expect(bills[1].billNumber.endsWith('000001'), isTrue);
   });
 
   test('calculates payment status', () {
     final now = DateTime.now();
-
     final unpaid = Bill(
       customerId: 1,
       billNumber: 'INV-1',
@@ -148,10 +132,8 @@ void main() {
       createdAt: now,
       updatedAt: now,
     );
-
     final partial = unpaid.copyWith(amountPaidPaise: 5000);
     final paid = unpaid.copyWith(amountPaidPaise: 10000);
-
     expect(unpaid.paymentStatus, 'unpaid');
     expect(partial.paymentStatus, 'partial');
     expect(paid.paymentStatus, 'paid');

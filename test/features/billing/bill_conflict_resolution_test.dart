@@ -20,7 +20,7 @@ void main() {
 
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
-    bills = BillRepository(database: database);
+    bills = BillRepository(database: database, isNumberAuthority: false);
     final now = DateTime.utc(2026, 10, 1);
     final customerId = await database.insert('customers', {
       'uuid': 'bill-conflict-customer',
@@ -141,7 +141,7 @@ void main() {
     final allBills = await bills.getAll();
     expect(allBills, hasLength(1));
     expect(allBills.single.uuid, 'earlier-local');
-    expect(allBills.single.billNumber, 'BILL-EARLY');
+    expect(allBills.single.billNumber, 'PENDING-earlier-local');
 
     final items = await bills.getItems(allBills.single.id!);
     expect(items, hasLength(1));
@@ -175,7 +175,7 @@ void main() {
     );
 
     // The incoming bill belongs to another order but tries to reuse the
-    // globally unique bill number. It must be rejected without deleting data.
+    // existing Android placeholder. It must be rejected without deleting data.
     await database.insert('orders', {
       'uuid': 'another-order',
       'sync_status': 'synced',
@@ -192,7 +192,7 @@ void main() {
     });
 
     final applied = await bills.upsertFromSync(
-      makeBill(uuid: 'other-order-bill', number: 'BILL-SHARED', createdAt: early)
+      makeBill(uuid: 'other-order-bill', number: 'PENDING-existing-bill', createdAt: early)
           .copyWith(orderUuid: 'another-order'),
       [makeItem('other-order-item', 'Should not apply')],
     );
