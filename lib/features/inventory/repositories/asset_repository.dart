@@ -155,7 +155,7 @@ class AssetRepository {
 
     final existing = await db.query(
       'assets',
-      columns: ['id', 'sync_status'],
+      columns: ['id', 'sync_status', 'asset_code'],
       where: 'uuid = ?',
       whereArgs: [asset.uuid],
       limit: 1,
@@ -170,32 +170,54 @@ class AssetRepository {
       }
     }
 
-    final map = asset.copyWith(syncStatus: Asset.syncStatusSynced).toMap()
+    // Windows never accepts a client-proposed number for a new UUID. Its
+    // AUTOINCREMENT row ID supplies a monotonic sequence that survives deletes.
+    // For an existing UUID, retain the already assigned Windows code.
+    var reconciledAsset = asset;
+    if (isNumberAuthority) {
+      reconciledAsset = asset.copyWith(
+        assetCode: existing.isEmpty
+            ? 'PENDING-${asset.uuid}'
+            : existing.first['asset_code'] as String,
+      );
+    }
+
+    final map = reconciledAsset
+        .copyWith(syncStatus: Asset.syncStatusSynced)
+        .toMap()
       ..remove('id');
 
-    // Asset codes are allocated by Windows and may collide temporarily with
-    // a different Android-created asset's locally generated code. Free the
-    // canonical code before applying the Windows row; the displaced asset
-    // will receive its own canonical code when its UUID is pulled.
     await db.transaction((txn) async {
-      final codeOwner = await txn.query(
-        'assets',
-        columns: ['id', 'uuid'],
-        where: 'asset_code = ? AND uuid != ?',
-        whereArgs: [asset.assetCode, asset.uuid],
-        limit: 1,
-      );
-      if (codeOwner.isNotEmpty) {
-        await txn.update(
+      if (!isNumberAuthority) {
+        // Older Android installs may still have locally generated AST codes.
+        // Free a colliding value before applying the Windows canonical code.
+        final codeOwner = await txn.query(
           'assets',
-          {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
-          where: 'id = ?',
-          whereArgs: [codeOwner.first['id']],
+          columns: ['id', 'uuid'],
+          where: 'asset_code = ? AND uuid != ?',
+          whereArgs: [reconciledAsset.assetCode, reconciledAsset.uuid],
+          limit: 1,
         );
+        if (codeOwner.isNotEmpty) {
+          await txn.update(
+            'assets',
+            {'asset_code': 'PENDING-${codeOwner.first['uuid']}'},
+            where: 'id = ?',
+            whereArgs: [codeOwner.first['id']],
+          );
+        }
       }
 
       if (existing.isEmpty) {
-        await txn.insert('assets', map);
+        final insertedId = await txn.insert('assets', map);
+        if (isNumberAuthority) {
+          await txn.update(
+            'assets',
+            {'asset_code': _formatAssetCode(insertedId)},
+            where: 'id = ?',
+            whereArgs: [insertedId],
+          );
+        }
       } else {
         await txn.update(
           'assets',
