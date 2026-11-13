@@ -220,6 +220,45 @@ class StaffRepository {
     );
   }
 
+  /// Reconciles a staff profile submitted to the Windows authority.
+  ///
+  /// UUID identity is checked before incoming fields. Existing Windows data
+  /// remains canonical; a new UUID is inserted and returned as the canonical
+  /// profile for the client to apply.
+  Future<Map<String, Object?>> reconcileStaffFromSync(
+    Map<String, Object?> incoming,
+  ) async {
+    final uuid = incoming['uuid'];
+    if (uuid is! String || uuid.isEmpty) {
+      throw ArgumentError('A staff UUID is required for sync.');
+    }
+
+    final db = await _db;
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        'staff',
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return Map<String, Object?>.from(existing.first);
+      }
+
+      final value = Map<String, Object?>.from(incoming)
+        ..remove('id')
+        ..['sync_status'] = StaffMember.syncStatusPending;
+      final id = await txn.insert('staff', value);
+      final saved = await txn.query(
+        'staff',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      return Map<String, Object?>.from(saved.single);
+    });
+  }
+
   Future<bool> upsertStaffFromSync(
     Map<String, Object?> record, {
     bool force = false,
