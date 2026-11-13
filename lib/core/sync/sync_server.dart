@@ -11,7 +11,6 @@ import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/inventory/repositories/maintenance_repository.dart';
-import '../../features/orders/models/order.dart';
 import '../../features/orders/repositories/order_repository.dart';
 import '../../features/staff/repositories/staff_repository.dart';
 import 'sync_client.dart';
