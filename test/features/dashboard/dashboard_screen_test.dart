@@ -26,7 +26,7 @@ void main() {
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     customerRepository = CustomerRepository(database: database);
-    billRepository = BillRepository(database: database);
+    billRepository = BillRepository(database: database, isNumberAuthority: true);
     expenseRepository = ExpenseRepository(database: database);
     invoiceRepository = InvoiceRepository(database: database);
 
@@ -143,6 +143,7 @@ void main() {
 
     await tester.scrollUntilVisible(find.text('Recent transactions'), 200);
     expect(find.text('Recent transactions'), findsOneWidget);
-    expect(find.text('INV-NEW'), findsOneWidget);
+    final latestBill = (await billRepository.getAll()).first;
+    expect(find.text(latestBill.billNumber), findsOneWidget);
   });
 }
