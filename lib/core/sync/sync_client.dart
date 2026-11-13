@@ -299,6 +299,27 @@ class SyncClient {
     return _postJson(path, payload, uuid);
   }
 
+  Future<Map<String, Object?>?> sendStaffProfileCanonical(
+    Map<String, Object?> record,
+  ) async {
+    final uuid = record['uuid'];
+    if (uuid is! String || uuid.isEmpty) return null;
+
+    final payload = Map<String, Object?>.from(record)
+      ..remove('id')
+      ..remove('sync_status');
+    final data = await _postJsonResponse('/api/staff', payload);
+    if (data == null || data['status'] != 'ok' || data['uuid'] != uuid) {
+      return null;
+    }
+
+    final canonical = data['canonical_staff'];
+    if (canonical is! Map) return null;
+    final result = Map<String, Object?>.from(canonical);
+    if (result['uuid'] != uuid) return null;
+    return result;
+  }
+
   Future<List<Customer>> fetchCustomers() async {
     final decoded = await _getJson('/api/customers');
 
