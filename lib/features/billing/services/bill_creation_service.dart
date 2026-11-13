@@ -55,7 +55,7 @@ class BillCreationService {
       customerUuid: customer.uuid,
       orderId: order.id,
       orderUuid: order.uuid,
-      billNumber: _billNumber(now),
+      billNumber: 'PENDING',
       billDate: now,
       subtotalPaise: invoice.subtotalPaise,
       discountPaise: 0,
@@ -88,13 +88,4 @@ class BillCreationService {
     return created;
   }
 
-  String _billNumber(DateTime value) {
-    return 'BILL-${value.year}'
-        '${value.month.toString().padLeft(2, '0')}'
-        '${value.day.toString().padLeft(2, '0')}-'
-        '${value.hour.toString().padLeft(2, '0')}'
-        '${value.minute.toString().padLeft(2, '0')}'
-        '${value.second.toString().padLeft(2, '0')}'
-        '${value.microsecond.toString().padLeft(6, '0')}';
-  }
 }
