@@ -13,6 +13,7 @@ import 'package:leo_desk/features/billing/models/bill_item.dart';
 import 'package:leo_desk/features/billing/repositories/bill_repository.dart';
 import 'package:leo_desk/features/expenses/repositories/expense_repository.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
+import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
@@ -117,6 +118,33 @@ void main() {
     await serverDb.close();
     await clientDb.close();
     tempDir.deleteSync(recursive: true);
+  });
+
+  test('Android applies the Windows-assigned canonical asset code', () async {
+    final androidAssets = AssetRepository(database: clientDb, isNumberAuthority: false);
+    final now = DateTime(2026, 11, 1);
+    final id = await androidAssets.insert(Asset(
+      uuid: 'android-offline-asset-numbering',
+      name: 'Offline-created machine',
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final beforeSync = await androidAssets.getById(id);
+    expect(beforeSync!.assetCode, 'PENDING-${beforeSync.uuid}');
+
+    final result = await manager.sync();
+    expect(result.connected, isTrue);
+
+    final afterSync = await androidAssets.getById(id);
+    expect(afterSync!.assetCode, 'AST-0001');
+    expect(afterSync.syncStatus, 'synced');
+
+    final windowsCopy = await AssetRepository(
+      database: serverDb,
+      isNumberAuthority: true,
+    ).getByUuid(beforeSync.uuid);
+    expect(windowsCopy!.assetCode, 'AST-0001');
   });
 
   test('syncs staff, attendance and payroll payments between devices', () async {
