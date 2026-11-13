@@ -178,9 +178,9 @@ void main() {
 
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
-      billRepository: BillRepository(database: serverDatabase),
+      billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
       expenseRepository: ExpenseRepository(database: serverDatabase),
-      invoiceRepository: InvoiceRepository(database: serverDatabase),
+      invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
       orderRepository: OrderRepository(database: serverDatabase),
       assetRepository: AssetRepository(database: serverDatabase),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),
@@ -274,8 +274,8 @@ void main() {
       final serverCustomers = CustomerRepository(database: serverDatabase);
       final serverOrders = OrderRepository(database: serverDatabase);
       final serverOrderItems = OrderItemRepository(database: serverDatabase);
-      final serverInvoices = InvoiceRepository(database: serverDatabase);
-      final serverBills = BillRepository(database: serverDatabase);
+      final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
+      final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
       final clientCustomers = CustomerRepository(database: clientDatabase);
       final clientOrders = OrderRepository(database: clientDatabase);
