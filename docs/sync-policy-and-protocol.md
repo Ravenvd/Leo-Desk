@@ -90,7 +90,7 @@ The same rule applies to invoice and bill numbers. For example, a colliding bill
 - If a requested suffixed value itself collides, allocation searches the corresponding root number's suffix family for the first available suffix.
 - A number without a suffix sorts before its suffixed variants.
 - Suffix variants sort before the next numeric base number: `ORD-000039`, `ORD-000039A`, `ORD-000039B`, `ORD-000040`.
-- Parsing and formatting must preserve the established prefix and zero-padding conventions.
+- Parsing and formatting must preserve the established prefix and zero-padding conventions. Parsing is based on the final numeric component, so timestamp-style bill numbers retain their full existing timestamp and receive any suffix at the end (for example, `BILL-20261113-103011000042A`).
 
 ### 4.4 Allocation order and concurrency
 
