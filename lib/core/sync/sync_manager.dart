@@ -314,17 +314,33 @@ class SyncManager {
 
     // Pull the complete canonical Windows order set. A bounded page could
     // omit the UUID that owns a colliding number and delay safe reconciliation.
-    for (final syncOrder in await _client.fetchOrders(
+    // Retry deferred rows: applying a colliding UUID's own canonical suffix may
+    // free the number needed by another Windows record in the same batch.
+    var deferredWindowsOrders = await _client.fetchOrders(
       customerIdsByUuid: customerIdsByUuid,
-    )) {
-      final applied = await _orderRepository.upsertFromSync(
-        syncOrder.order,
-        syncOrder.items,
-      );
-      if (applied) {
-        ordersPulled++;
-        acknowledgedOrders.add(syncOrder.order.uuid);
+    );
+    while (deferredWindowsOrders.isNotEmpty) {
+      final deferredNextPass = <SyncOrder>[];
+      var appliedAny = false;
+
+      for (final syncOrder in deferredWindowsOrders) {
+        final applied = await _orderRepository.upsertFromSync(
+          syncOrder.order,
+          syncOrder.items,
+          customerUuid: syncOrder.customerUuid,
+          force: true,
+        );
+        if (applied) {
+          appliedAny = true;
+          ordersPulled++;
+          acknowledgedOrders.add(syncOrder.order.uuid);
+        } else {
+          deferredNextPass.add(syncOrder);
+        }
       }
+
+      if (!appliedAny) break;
+      deferredWindowsOrders = deferredNextPass;
     }
 
     // --- Push pending maintenance records after their assets ---
