@@ -537,5 +537,147 @@ void main() {
       expect(finalBillItems.single.uuid, 'graph-roundtrip-bill-item');
       expect(finalBillItems.single.billId, finalBill.id);
     },
+
+
+  test('applies Windows-assigned invoice and bill suffixes on Android', () async {
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase);
+
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+    final clientOrders = OrderRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      'financial-suffix-customer',
+      'Financial Suffix Customer',
+    );
+    await serverCustomers.insert(customer);
+    await serverCustomers.markSynced(customer.uuid);
+    final serverCustomer = (await serverCustomers.getAll()).single;
+
+    final windowsOrder = makeOrder(
+      uuid: 'financial-suffix-windows-order',
+      customerId: serverCustomer.id!,
+      orderNumber: 'ORD-000001',
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
+    await serverOrders.insert(windowsOrder);
+    await serverOrders.markSynced(windowsOrder.uuid);
+    final savedWindowsOrder = (await serverOrders.getAll()).single;
+
+    await serverInvoices.create(
+      invoice: makeInvoice(
+        orderId: savedWindowsOrder.id!,
+        orderUuid: savedWindowsOrder.uuid,
+        customerId: serverCustomer.id!,
+        customerUuid: serverCustomer.uuid,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      ),
+      items: [makeInvoiceItem()],
+    );
+    await serverInvoices.markSynced('graph-roundtrip-invoice');
+
+    await serverBills.insert(
+      bill: makeBill(
+        orderId: savedWindowsOrder.id!,
+        orderUuid: savedWindowsOrder.uuid,
+        customerId: serverCustomer.id!,
+        customerUuid: serverCustomer.uuid,
+        updatedAt: DateTime.utc(2026, 1, 1),
+      ),
+      items: [makeBillItem()],
+    );
+    await serverBills.markSynced('graph-roundtrip-bill');
+
+    await clientCustomers.insert(customer);
+    await clientCustomers.markSynced(customer.uuid);
+    final localCustomer = (await clientCustomers.getAll()).single;
+
+    final androidOrder = makeOrder(
+      uuid: 'financial-suffix-android-order',
+      customerId: localCustomer.id!,
+      orderNumber: 'ORD-000002',
+      updatedAt: DateTime.utc(2026, 1, 2),
+    );
+    await clientOrders.insert(androidOrder);
+    final savedAndroidOrder = (await clientOrders.getAll()).single;
+
+    final androidInvoice = makeInvoice(
+      orderId: savedAndroidOrder.id!,
+      orderUuid: savedAndroidOrder.uuid,
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      updatedAt: DateTime.utc(2026, 1, 2),
+    ).copyWith(uuid: 'financial-suffix-android-invoice');
+    await clientInvoices.create(
+      invoice: androidInvoice,
+      items: [
+        InvoiceItem(
+          uuid: 'financial-suffix-android-invoice-item',
+          invoiceId: 0,
+          description: 'Android invoice item',
+          quantity: 1,
+          ratePaise: 100000,
+          amountPaise: 100000,
+        ),
+      ],
+    );
+
+    final androidBill = makeBill(
+      orderId: savedAndroidOrder.id!,
+      orderUuid: savedAndroidOrder.uuid,
+      customerId: localCustomer.id!,
+      customerUuid: localCustomer.uuid,
+      updatedAt: DateTime.utc(2026, 1, 2),
+    ).copyWith(uuid: 'financial-suffix-android-bill');
+    await clientBills.insert(
+      bill: androidBill,
+      items: [
+        BillItem(
+          uuid: 'financial-suffix-android-bill-item',
+          billId: 0,
+          description: 'Android bill item',
+          quantity: 1,
+          ratePaise: 100000,
+          amountPaise: 100000,
+        ),
+      ],
+    );
+
+    final result = await sync();
+    expect(result.connected, isTrue);
+    expect(result.ordersPushed, 1);
+    expect(result.invoicesPushed, 1);
+    expect(result.billsPushed, 1);
+
+    final localInvoice = (await clientInvoices.getAll()).singleWhere(
+      (invoice) => invoice.uuid == androidInvoice.uuid,
+    );
+    final serverInvoice = (await serverInvoices.getAll()).singleWhere(
+      (invoice) => invoice.uuid == androidInvoice.uuid,
+    );
+    expect(localInvoice.invoiceNumber, 'INV-000001A');
+    expect(serverInvoice.invoiceNumber, 'INV-000001A');
+    expect(
+      (await clientInvoices.getItems(localInvoice.id!)).single.uuid,
+      'financial-suffix-android-invoice-item',
+    );
+
+    final localBill = (await clientBills.getAll()).singleWhere(
+      (bill) => bill.uuid == androidBill.uuid,
+    );
+    final serverBill = (await serverBills.getAll()).singleWhere(
+      (bill) => bill.uuid == androidBill.uuid,
+    );
+    expect(localBill.billNumber, 'BILL-000001A');
+    expect(serverBill.billNumber, 'BILL-000001A');
+    expect(
+      (await clientBills.getItems(localBill.id!)).single.uuid,
+      'financial-suffix-android-bill-item',
+    );
+  });
   );
 }
