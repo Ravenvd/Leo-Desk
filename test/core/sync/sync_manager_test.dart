@@ -216,7 +216,7 @@ void main() {
       invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
       expenseRepository: ExpenseRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
-      assetRepository: AssetRepository(database: serverDatabase),
+      assetRepository: AssetRepository(database: serverDatabase, isNumberAuthority: true),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),
       consumableRepository: ConsumableRepository(database: serverDatabase),
       staffRepository: StaffRepository(database: serverDatabase),
@@ -244,7 +244,7 @@ void main() {
       invoiceRepository: InvoiceRepository(database: clientDatabase, isNumberAuthority: false),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
-      assetRepository: AssetRepository(database: clientDatabase),
+      assetRepository: AssetRepository(database: clientDatabase, isNumberAuthority: false),
       maintenanceRepository: MaintenanceRepository(database: clientDatabase),
       consumableRepository: ConsumableRepository(database: clientDatabase),
       staffRepository: StaffRepository(database: clientDatabase),
@@ -1449,8 +1449,8 @@ void main() {
   test(
     'reconciles colliding local asset codes to Windows canonical codes',
     () async {
-    final windowsAssets = AssetRepository(database: serverDatabase);
-    final androidAssets = AssetRepository(database: clientDatabase);
+    final windowsAssets = AssetRepository(database: serverDatabase, isNumberAuthority: true);
+    final androidAssets = AssetRepository(database: clientDatabase, isNumberAuthority: false);
     final now = DateTime.utc(2026, 10, 30);
 
     final windowsAsset = Asset(
