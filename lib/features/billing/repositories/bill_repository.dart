@@ -189,6 +189,11 @@ class BillRepository {
 
       for (final conflictMap in orderConflicts) {
         final conflict = Bill.fromMap(conflictMap);
+        if (!force && conflict.syncStatus == 'pending') {
+          // A pending local bill must be pushed before a competing canonical
+          // copy can replace it. Defer reconciliation rather than lose edits.
+          return false;
+        }
         if (_compareBillPriority(bill, conflict) >= 0) {
           // ignore: avoid_print
           print(
@@ -207,23 +212,33 @@ class BillRepository {
           ? <Map<String, Object?>>[]
           : await txn.query(
               'bills',
-              columns: ['id', 'uuid'],
+              columns: ['id', 'uuid', 'sync_status'],
               where: 'bill_number = ? AND uuid != ?',
               whereArgs: [bill.billNumber, bill.uuid],
             );
       final conflictIds = orderConflicts
           .map((row) => row['id'] as int)
           .toSet();
-      if (billNumberOwners.any(
-        (owner) => !conflictIds.contains(owner['id'] as int),
+      final unrelatedNumberOwners = billNumberOwners
+          .where((owner) => !conflictIds.contains(owner['id'] as int))
+          .toList();
+      if (unrelatedNumberOwners.any(
+        (owner) => !force && owner['sync_status'] == 'pending',
       )) {
-        // ignore: avoid_print
-        print(
-          'Bill sync conflict: bill number ${bill.billNumber} is already '
-          'used by a bill for another order; incoming bill ${bill.uuid} '
-          'was not applied.',
-        );
+        // Never evict an unsynced bill just to free a canonical number.
         return false;
+      }
+
+      // A synced local record may still carry a legacy/client-generated
+      // number that collides with Windows. Keep the record, but free the
+      // canonical number so its own Windows copy can reconcile later.
+      for (final owner in unrelatedNumberOwners) {
+        await txn.update(
+          'bills',
+          {'bill_number': 'PENDING-${owner['uuid']}'},
+          where: 'id = ?',
+          whereArgs: [owner['id']],
+        );
       }
 
       // Remove losing copies and their items in the same transaction. The
