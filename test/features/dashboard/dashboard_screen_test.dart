@@ -109,13 +109,18 @@ void main() {
       ),
     );
 
-    // sqflite's FFI calls need the real async zone to complete. Do not
-    // call tester.pump() from inside runAsync: pump uses the test binding's
-    // fake-async clock and can deadlock when nested in the real async zone.
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(seconds: 1));
-    });
-    await tester.pump();
+    // sqflite's FFI calls need the real async zone to complete. Poll from
+    // outside runAsync so each real-time wait is followed by a widget rebuild.
+    // A fixed short delay is flaky on slower Windows test environments.
+    for (var attempt = 0; attempt < 50; attempt++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump();
+      if (!tester.any(find.byType(CircularProgressIndicator))) {
+        break;
+      }
+    }
 
     expect(find.text('Dashboard'), findsOneWidget);
     expect(
