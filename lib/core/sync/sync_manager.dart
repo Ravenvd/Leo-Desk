@@ -279,33 +279,33 @@ class SyncManager {
       for (final customer in localCustomers) customer.uuid: customer.id!,
     };
 
-    final recentLocalOrders = await _orderRepository.getRecent(limit: 100);
-    for (final order in recentLocalOrders) {
-      if (order.syncStatus != 'pending') continue;
-
+    // Push every pending order, not only a recent page. Windows resolves
+    // UUID authority and number suffixes and returns the canonical order graph.
+    for (final order in await _orderRepository.getPending()) {
       final customerUuid = customerUuidsById[order.customerId];
       if (customerUuid == null) continue;
 
       final items = await _orderRepository.getItems(order.id!);
-      final pushedOrderNumber = await _client.sendOrder(
+      final canonicalPayload = await _client.sendOrder(
         SyncOrder(
           order: order,
           items: items,
           customerUuid: customerUuid,
         ),
       );
+      if (canonicalPayload == null) continue;
 
-      if (pushedOrderNumber != null) {
-        if (pushedOrderNumber != order.orderNumber) {
-          await _orderRepository.updateOrderNumberAndMarkSynced(
-            order.uuid,
-            pushedOrderNumber,
-          );
-        } else {
-          await _orderRepository.markSynced(order.uuid);
-        }
-        ordersPushed++;
-      }
+      final canonicalOrder = SyncOrder.fromMap(
+        canonicalPayload,
+        customerId: customerIdsByUuid[canonicalPayload['customer_uuid']] ?? 0,
+      );
+      final applied = await _orderRepository.upsertFromSync(
+        canonicalOrder.order,
+        canonicalOrder.items,
+        customerUuid: canonicalOrder.customerUuid,
+        force: true,
+      );
+      if (applied) ordersPushed++;
     }
 
     // Pull the canonical recent Windows window after pushing local changes.
