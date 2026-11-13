@@ -369,8 +369,15 @@ class SyncManager {
     }
 
     // --- Pull Windows inventory snapshot in dependency order ---
+    // Windows is authoritative for inventory UUIDs. If an Android push was
+    // rejected because Windows has its own pending edit for the same UUID,
+    // apply that Windows version rather than retaining the conflicting local
+    // pending copy.
     for (final record in await _client.fetchInventoryRecords()) {
-      final applied = await _consumableRepository.upsertSyncRecord(record);
+      final applied = await _consumableRepository.upsertSyncRecord(
+        record,
+        force: true,
+      );
       if (applied) {
         inventoryPulled++;
         acknowledgedInventory.add({
