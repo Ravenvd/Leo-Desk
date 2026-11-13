@@ -274,7 +274,10 @@ class SyncManager {
 
     // --- Pull customers (before bills, so bill customer links resolve) ---
     for (final customer in await _client.fetchCustomers()) {
-      final applied = await _customerRepository.upsertFromSync(customer);
+      final applied = await _customerRepository.upsertFromSync(
+        customer,
+        force: true,
+      );
       if (applied) {
         customersPulled++;
         acknowledgedCustomers.add(customer.uuid);
