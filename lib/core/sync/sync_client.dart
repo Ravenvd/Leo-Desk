@@ -420,7 +420,11 @@ class SyncClient {
         data['canonical_order'] is! Map) {
       return null;
     }
-    return Map<String, Object?>.from(data['canonical_order'] as Map);
+    final canonical = Map<String, Object?>.from(
+      data['canonical_order'] as Map,
+    );
+    if (canonical['uuid'] != order.order.uuid) return null;
+    return canonical;
   }
 
   Future<List<Expense>> fetchExpenses() async {
