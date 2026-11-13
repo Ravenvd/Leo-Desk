@@ -365,8 +365,19 @@ class SyncClient {
     return invoices;
   }
 
-  Future<bool> sendInvoice(SyncInvoice invoice) async {
-    return _postJson('/api/invoices', invoice.toMap(), invoice.invoice.uuid);
+  Future<Map<String, Object?>?> sendInvoice(SyncInvoice invoice) async {
+    final data = await _postJsonResponse('/api/invoices', invoice.toMap());
+    if (data == null ||
+        data['status'] != 'ok' ||
+        data['uuid'] != invoice.invoice.uuid ||
+        data['canonical_invoice'] is! Map) {
+      return null;
+    }
+    final canonical = Map<String, Object?>.from(
+      data['canonical_invoice'] as Map,
+    );
+    if (canonical['uuid'] != invoice.invoice.uuid) return null;
+    return canonical;
   }
 
   Future<List<SyncBill>> fetchBills() async {
@@ -381,8 +392,19 @@ class SyncClient {
         .toList();
   }
 
-  Future<bool> sendBill(SyncBill bill) async {
-    return _postJson('/api/bills', bill.toMap(), bill.bill.uuid);
+  Future<Map<String, Object?>?> sendBill(SyncBill bill) async {
+    final data = await _postJsonResponse('/api/bills', bill.toMap());
+    if (data == null ||
+        data['status'] != 'ok' ||
+        data['uuid'] != bill.bill.uuid ||
+        data['canonical_bill'] is! Map) {
+      return null;
+    }
+    final canonical = Map<String, Object?>.from(
+      data['canonical_bill'] as Map,
+    );
+    if (canonical['uuid'] != bill.bill.uuid) return null;
+    return canonical;
   }
 
   Future<List<SyncOrder>> fetchOrders({
