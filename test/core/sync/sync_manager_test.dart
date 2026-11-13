@@ -988,9 +988,6 @@ void main() {
     final localCanonicalOrder = localOrders.singleWhere(
       (order) => order.uuid == canonicalOrder.uuid,
     );
-    final localStaleOrder = localOrders.singleWhere(
-      (order) => order.uuid == staleOrder.uuid,
-    );
     expect(localCanonicalOrder.orderNumber, 'ORD-000001');
     expect(localStaleOrder.orderNumber, 'ORD-000001A');
 
