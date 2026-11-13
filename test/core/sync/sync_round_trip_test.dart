@@ -326,17 +326,17 @@ void main() {
     },
   );
 
-  test('locally pending record wins over server copy', () async {
+  test('Windows canonical record wins over locally pending edit', () async {
     // Same customer (by uuid) exists on both sides.
     final customer = makeCustomer('Original Name');
     await clientCustomers.insert(customer);
     await manager.sync();
 
-    // Client edits locally -> pending again.
+    // Android edits locally -> pending again.
     final local = (await clientCustomers.getAll()).single;
     await clientCustomers.update(local.copyWith(name: 'Client Edit'));
 
-    // Server also edits its copy.
+    // Windows also edits its canonical copy.
     final remote = (await serverCustomers.getAll()).single;
     await serverDb.update(
       'customers',
@@ -347,9 +347,9 @@ void main() {
 
     await manager.sync();
 
-    // The client's pending edit was pushed and must survive the pull.
+    // Windows remains canonical; Android applies the server response.
     final after = (await clientCustomers.getAll()).single;
-    expect(after.name, 'Client Edit');
+    expect(after.name, 'Server Edit');
     expect(after.syncStatus, 'synced');
   });
 
