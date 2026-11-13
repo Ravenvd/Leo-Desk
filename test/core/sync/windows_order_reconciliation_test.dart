@@ -208,4 +208,34 @@ void main() {
       itemA.uuid,
     );
   });
+
+  test('concurrent distinct UUID collisions receive different suffixes', () async {
+    final windowsOrder = makeOrder(
+      uuid: 'windows-concurrent-base',
+      number: 'ORD-000088',
+    );
+    await orders.insert(windowsOrder);
+    await orders.markSynced(windowsOrder.uuid);
+
+    final androidA = makeOrder(
+      uuid: 'android-concurrent-a',
+      number: 'ORD-000088',
+    );
+    final androidB = makeOrder(
+      uuid: 'android-concurrent-b',
+      number: 'ORD-000088',
+    );
+
+    final responses = await Future.wait([
+      client.sendOrder(wireOrder(androidA, [makeItem('android-concurrent-item-a')])),
+      client.sendOrder(wireOrder(androidB, [makeItem('android-concurrent-item-b')])),
+    ]);
+
+    expect(responses.every((response) => response != null), isTrue);
+    final assigned = responses
+        .map((response) => response!['order_number'] as String)
+        .toSet();
+    expect(assigned, {'ORD-000088A', 'ORD-000088B'});
+    expect(await orders.getAll(), hasLength(3));
+  });
 }
