@@ -506,6 +506,12 @@ void main() {
     expect(localItems.single.quantity, 1);
     expect(localItems.single.ratePaise, 150000);
     expect(localItems.single.amountPaise, 150000);
+
+    await syncWithRealHttpClient();
+    final repeatedBills = await clientBills.getAll();
+    expect(repeatedBills, hasLength(1));
+    expect(repeatedBills.single.uuid, bill.uuid);
+    expect(repeatedBills.single.billNumber, 'BILL-20260101-000001');
   });
 
   test('replaces a synced bill and its items when Windows sends changes',
@@ -1236,6 +1242,12 @@ void main() {
     expect(localItems.single.uuid, 'order-pull-item');
     expect(localItems.single.workType, 'Aari');
     expect(localItems.single.garmentType, 'Garment piece');
+
+    await syncWithRealHttpClient();
+    final repeatedOrders = await clientOrders.getAll();
+    expect(repeatedOrders, hasLength(1));
+    expect(repeatedOrders.single.uuid, order.uuid);
+    expect(repeatedOrders.single.orderNumber, 'ORD-000101');
   });
 
   test('does not delete a pending local order during reconciliation', () async {
@@ -1620,6 +1632,18 @@ void main() {
     );
     expect(
       localAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
+      'AST-0002',
+    );
+
+    await syncWithRealHttpClient();
+    final repeatedAssets = await androidAssets.getAll();
+    expect(repeatedAssets, hasLength(2));
+    expect(
+      repeatedAssets.singleWhere((asset) => asset.uuid == windowsAsset.uuid).assetCode,
+      'AST-0001',
+    );
+    expect(
+      repeatedAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
       'AST-0002',
     );
   });
