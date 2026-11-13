@@ -67,4 +67,33 @@ void main() {
       'BILL-20261101-000002',
     });
   });
+
+  test('Windows retains the assigned bill number when a UUID is retried', () async {
+    final incoming = Bill(
+      uuid: 'offline-bill-retry',
+      customerId: customerId,
+      customerUuid: 'bill-number-customer',
+      orderUuid: 'bill-number-order-1',
+      billNumber: 'BILL-CLIENT-PROPOSAL',
+      billDate: now,
+      subtotalPaise: 10000,
+      totalPaise: 10000,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    expect(await windowsBills.upsertFromSync(incoming, []), isTrue);
+    final first = (await windowsBills.getAll()).single;
+    expect(first.billNumber, 'BILL-20261101-000001');
+
+    final retry = incoming.copyWith(
+      billNumber: 'BILL-DIFFERENT-PROPOSAL',
+      updatedAt: now.add(const Duration(minutes: 1)),
+    );
+    expect(await windowsBills.upsertFromSync(retry, []), isTrue);
+
+    final saved = (await windowsBills.getAll()).single;
+    expect(saved.uuid, incoming.uuid);
+    expect(saved.billNumber, 'BILL-20261101-000001');
+  });
 }
