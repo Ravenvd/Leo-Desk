@@ -192,10 +192,9 @@ void main() {
     await saveWindowsInvoice(windowsInvoice, windowsItem);
     final saved = (await invoices.getAll()).single;
 
-    final androidInvoice = makeInvoice(
-      uuid: windowsInvoice.uuid,
+    final androidInvoice = windowsInvoice.copyWith(
       orderUuid: 'unknown-order',
-      number: 'INV-999999',
+      invoiceNumber: 'INV-999999',
       notes: 'Android attempted edit',
     );
     final response = await client.sendInvoice(
@@ -334,10 +333,9 @@ void main() {
     );
     final saved = (await bills.getAll()).single;
 
-    final androidBill = makeBill(
-      uuid: windowsBill.uuid,
+    final androidBill = windowsBill.copyWith(
       orderUuid: 'unknown-order',
-      number: 'BILL-999999',
+      billNumber: 'BILL-999999',
       notes: 'Android attempted edit',
     );
     final response = await client.sendBill(
