@@ -237,12 +237,27 @@ class SyncClient {
     return decoded.map((item) => Asset.fromMap(Map<String, Object?>.from(item as Map))).toList();
   }
 
-  Future<bool> sendAsset(Asset asset) async {
-    if (asset.syncStatus == Asset.syncStatusDeletedPending) {
-      return _postJson('/api/assets/delete', {'uuid': asset.uuid}, asset.uuid);
+  Future<Map<String, Object?>?> sendAsset(Asset asset) async {
+    if (asset.syncStatus == Asset.syncStatusDeletedPending) return null;
+    final map = asset.toMap()
+      ..remove('id')
+      ..remove('sync_status');
+    final data = await _postJsonResponse('/api/assets', map);
+    if (data == null ||
+        data['status'] != 'ok' ||
+        data['uuid'] != asset.uuid ||
+        data['canonical_asset'] is! Map) {
+      return null;
     }
-    final map = asset.toMap()..remove('id')..remove('sync_status');
-    return _postJson('/api/assets', map, asset.uuid);
+    final canonical = Map<String, Object?>.from(
+      data['canonical_asset'] as Map,
+    );
+    if (canonical['uuid'] != asset.uuid) return null;
+    return canonical;
+  }
+
+  Future<bool> sendAssetDeletion(String uuid) {
+    return _postJson('/api/assets/delete', {'uuid': uuid}, uuid);
   }
 
   Future<List<Map<String, Object?>>> fetchInventoryRecords() async {
