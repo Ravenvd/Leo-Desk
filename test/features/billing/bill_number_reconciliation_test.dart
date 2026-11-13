@@ -163,8 +163,12 @@ void main() {
     expect(canonical.billNumber, incoming.billNumber);
   });
 
-  test('does not replace a pending bill for the same order', () async {
-    final androidBills = BillRepository(database: database);
+  test('does not replace a pending bill when the incoming bill is later',
+      () async {
+    final androidBills = BillRepository(
+      database: database,
+      isNumberAuthority: false,
+    );
     final pending = Bill(
       uuid: 'zzz-pending-bill',
       syncStatus: 'pending',
@@ -189,8 +193,8 @@ void main() {
       billDate: now,
       subtotalPaise: 12000,
       totalPaise: 12000,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: now.add(const Duration(minutes: 1)),
+      updatedAt: now.add(const Duration(minutes: 1)),
     );
 
     expect(await androidBills.upsertFromSync(incoming, []), isFalse);
