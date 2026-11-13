@@ -48,7 +48,7 @@ void main() {
       customerRepository: CustomerRepository(database: database),
       billRepository: BillRepository(database: database),
       expenseRepository: ExpenseRepository(database: database),
-      assetRepository: AssetRepository(database: database),
+      assetRepository: AssetRepository(database: database, isNumberAuthority: true),
       consumableRepository: ConsumableRepository(database: database),
       maintenanceRepository: MaintenanceRepository(database: database),
       staffRepository: StaffRepository(database: database),
