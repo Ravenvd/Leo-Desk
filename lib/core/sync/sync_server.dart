@@ -399,49 +399,53 @@ class SyncServer {
           return;
         }
 
-        final syncInvoice =
-            SyncInvoice.fromMap(Map<String, Object?>.from(decoded),
-              customerId: 0,
-              orderId: 0,
-            );
-
-        final customerUuid = syncInvoice.invoice.customerUuid;
-        final customer = customerUuid == null
-            ? null
-            : await _customerRepository.getByUuid(customerUuid);
-        final order = (await _orderRepository.getAll())
-            .where((candidate) => candidate.uuid == syncInvoice.invoice.orderUuid)
-            .cast()
-            .toList();
-
-        if (customer == null || order.isEmpty) {
-          await _sendJson(request.response, 409, {
-            'error': 'Invoice customer or order does not exist.',
-            'uuid': syncInvoice.invoice.uuid,
+        final map = Map<String, Object?>.from(decoded);
+        final uuid = map['uuid'];
+        final invoiceNumber = map['invoice_number'];
+        final customerUuid = map['customer_uuid'];
+        final orderUuid = map['order_uuid'];
+        if (uuid is! String ||
+            uuid.trim().isEmpty ||
+            invoiceNumber is! String ||
+            invoiceNumber.trim().isEmpty ||
+            customerUuid is! String ||
+            customerUuid.trim().isEmpty ||
+            orderUuid is! String ||
+            orderUuid.trim().isEmpty) {
+          await _sendJson(request.response, 400, {
+            'error': 'Invoice UUID, number, customer and order are required.',
           });
           return;
         }
 
-        final applied = await _invoiceRepository.upsertFromSync(
-          syncInvoice.invoice.copyWith(
-            customerId: customer.id!,
-            orderId: order.first.id!,
-          ),
-          syncInvoice.items,
+        final syncInvoice = SyncInvoice.fromMap(
+          map,
+          customerId: 0,
+          orderId: 0,
         );
 
-        if (!applied) {
+        try {
+          final canonical = await _invoiceRepository.reconcileFromSync(
+            syncInvoice.invoice,
+            syncInvoice.items,
+          );
+          final canonicalPayload = SyncInvoice(
+            invoice: canonical.invoice,
+            items: canonical.items,
+          ).toMap();
+
+          await _sendJson(request.response, 200, {
+            'status': 'ok',
+            'uuid': canonical.invoice.uuid,
+            'invoice_number': canonical.invoice.invoiceNumber,
+            'canonical_invoice': canonicalPayload,
+          });
+        } on StateError catch (error) {
           await _sendJson(request.response, 409, {
-            'error': 'Invoice could not be applied.',
+            'error': error.message,
             'uuid': syncInvoice.invoice.uuid,
           });
-          return;
         }
-
-        await _sendJson(request.response, 200, {
-          'status': 'ok',
-          'uuid': syncInvoice.invoice.uuid,
-        });
         return;
       }
 
@@ -467,25 +471,48 @@ class SyncServer {
           return;
         }
 
-        final syncBill = SyncBill.fromMap(Map<String, Object?>.from(decoded));
-
-        final applied = await _billRepository.upsertFromSync(
-          syncBill.bill,
-          syncBill.items,
-        );
-
-        if (!applied) {
-          await _sendJson(request.response, 409, {
-            'error': 'Bill could not be applied.',
-            'uuid': syncBill.bill.uuid,
+        final map = Map<String, Object?>.from(decoded);
+        final uuid = map['uuid'];
+        final billNumber = map['bill_number'];
+        final customerUuid = map['customer_uuid'];
+        final orderUuid = map['order_uuid'];
+        if (uuid is! String ||
+            uuid.trim().isEmpty ||
+            billNumber is! String ||
+            billNumber.trim().isEmpty ||
+            customerUuid is! String ||
+            customerUuid.trim().isEmpty ||
+            (orderUuid != null &&
+                (orderUuid is! String || orderUuid.trim().isEmpty))) {
+          await _sendJson(request.response, 400, {
+            'error': 'Bill UUID, number and customer are required.',
           });
           return;
         }
 
-        await _sendJson(request.response, 200, {
-          'status': 'ok',
-          'uuid': syncBill.bill.uuid,
-        });
+        final syncBill = SyncBill.fromMap(map);
+        try {
+          final canonical = await _billRepository.reconcileFromSync(
+            syncBill.bill,
+            syncBill.items,
+          );
+          final canonicalPayload = SyncBill(
+            bill: canonical.bill,
+            items: canonical.items,
+          ).toMap();
+
+          await _sendJson(request.response, 200, {
+            'status': 'ok',
+            'uuid': canonical.bill.uuid,
+            'bill_number': canonical.bill.billNumber,
+            'canonical_bill': canonicalPayload,
+          });
+        } on StateError catch (error) {
+          await _sendJson(request.response, 409, {
+            'error': error.message,
+            'uuid': syncBill.bill.uuid,
+          });
+        }
         return;
       }
 
