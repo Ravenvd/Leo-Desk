@@ -287,100 +287,238 @@ class StaffRepository {
     return true;
   }
 
+  /// Reconciles attendance on the Windows authority.
+  ///
+  /// UUID is checked first. The database also has a natural uniqueness rule
+  /// for one attendance row per staff member per date. If two offline devices
+  /// create that same logical daily entry with different UUIDs, Windows'
+  /// existing row remains canonical and is returned to the submitting device.
+  Future<Map<String, Object?>> reconcileAttendanceFromSync(
+    Map<String, Object?> incoming,
+  ) async {
+    final uuid = incoming['uuid'];
+    final staffUuid = incoming['staff_uuid'];
+    final attendanceDate = incoming['attendance_date'];
+    if (uuid is! String || uuid.isEmpty ||
+        staffUuid is! String || staffUuid.isEmpty ||
+        attendanceDate is! String || attendanceDate.isEmpty) {
+      throw ArgumentError('Attendance UUID, staff UUID, and date are required.');
+    }
+
+    final db = await _db;
+    return db.transaction((txn) async {
+      final byUuid = await txn.query(
+        'staff_attendance',
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
+      );
+      if (byUuid.isNotEmpty) {
+        return Map<String, Object?>.from(byUuid.first);
+      }
+
+      final staff = await txn.query(
+        'staff',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [staffUuid],
+        limit: 1,
+      );
+      if (staff.isEmpty) {
+        throw StateError('Staff profile $staffUuid does not exist on Windows.');
+      }
+
+      final byNaturalKey = await txn.query(
+        'staff_attendance',
+        where: 'staff_uuid = ? AND attendance_date = ?',
+        whereArgs: [staffUuid, attendanceDate],
+        limit: 1,
+      );
+      if (byNaturalKey.isNotEmpty) {
+        return Map<String, Object?>.from(byNaturalKey.first);
+      }
+
+      final value = Map<String, Object?>.from(incoming)
+        ..remove('id')
+        ..['staff_id'] = staff.first['id']
+        ..['sync_status'] = StaffMember.syncStatusPending;
+      final id = await txn.insert('staff_attendance', value);
+      final saved = await txn.query(
+        'staff_attendance',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      return Map<String, Object?>.from(saved.single);
+    });
+  }
+
+  /// Reconciles a payroll payment on the Windows authority.
+  Future<Map<String, Object?>> reconcilePaymentFromSync(
+    Map<String, Object?> incoming,
+  ) async {
+    final uuid = incoming['uuid'];
+    final staffUuid = incoming['staff_uuid'];
+    if (uuid is! String || uuid.isEmpty ||
+        staffUuid is! String || staffUuid.isEmpty) {
+      throw ArgumentError('Payment UUID and staff UUID are required.');
+    }
+
+    final db = await _db;
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        'staff_payments',
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return Map<String, Object?>.from(existing.first);
+      }
+
+      final staff = await txn.query(
+        'staff',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [staffUuid],
+        limit: 1,
+      );
+      if (staff.isEmpty) {
+        throw StateError('Staff profile $staffUuid does not exist on Windows.');
+      }
+
+      final value = Map<String, Object?>.from(incoming)
+        ..remove('id')
+        ..['staff_id'] = staff.first['id']
+        ..['sync_status'] = StaffPayment.syncStatusPending;
+      final id = await txn.insert('staff_payments', value);
+      final saved = await txn.query(
+        'staff_payments',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      return Map<String, Object?>.from(saved.single);
+    });
+  }
+
   Future<bool> upsertAttendanceFromSync(
     Map<String, Object?> record, {
     bool force = false,
   }) async {
+    final uuid = record['uuid'];
+    final staffUuid = record['staff_uuid'];
+    final attendanceDate = record['attendance_date'];
+    if (uuid is! String || staffUuid is! String || attendanceDate is! String) {
+      throw ArgumentError('Invalid canonical attendance record.');
+    }
+
     final db = await _db;
-    final staff = await db.query(
-      'staff',
-      columns: ['id'],
-      where: 'uuid = ?',
-      whereArgs: [record['staff_uuid']],
-      limit: 1,
-    );
-    if (staff.isEmpty) return false;
-    var existing = await db.query(
-      'staff_attendance',
-      columns: ['id', 'uuid', 'sync_status'],
-      where: 'uuid = ?',
-      whereArgs: [record['uuid']],
-      limit: 1,
-    );
-    // One attendance row per staff member per date. If two devices create
-    // the same date offline, reconcile by the natural key instead of failing
-    // the SQLite UNIQUE constraint.
-    if (existing.isEmpty) {
-      existing = await db.query(
-        'staff_attendance',
-        columns: ['id', 'uuid', 'sync_status'],
-        where: 'staff_uuid = ? AND attendance_date = ?',
-        whereArgs: [record['staff_uuid'], record['attendance_date']],
+    return db.transaction((txn) async {
+      final staff = await txn.query(
+        'staff',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [staffUuid],
         limit: 1,
       );
-    }
-    if (existing.isNotEmpty &&
-        !force &&
-        existing.first['sync_status'] == StaffMember.syncStatusPending) {
-      return false;
-    }
-    final value = Map<String, Object?>.from(record)
-      ..remove('id')
-      ..['staff_id'] = staff.first['id']
-      ..['sync_status'] = StaffMember.syncStatusSynced;
-    if (existing.isEmpty) {
-      await db.insert('staff_attendance', value);
-    } else {
-      await db.update(
+      if (staff.isEmpty) return false;
+
+      var existing = await txn.query(
         'staff_attendance',
-        value,
-        where: 'id = ?',
-        whereArgs: [existing.first['id']],
+        columns: ['id', 'uuid', 'sync_status'],
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
       );
-    }
-    return true;
+      if (existing.isEmpty) {
+        // A canonical Windows row may have a different UUID from an offline
+        // Android row for the same staff/date. The unique natural key means
+        // both cannot coexist; adopting the Windows row is the convergence
+        // rule for this logical attendance entry.
+        existing = await txn.query(
+          'staff_attendance',
+          columns: ['id', 'uuid', 'sync_status'],
+          where: 'staff_uuid = ? AND attendance_date = ?',
+          whereArgs: [staffUuid, attendanceDate],
+          limit: 1,
+        );
+      }
+
+      if (existing.isNotEmpty &&
+          !force &&
+          existing.first['sync_status'] == StaffMember.syncStatusPending) {
+        return false;
+      }
+
+      final value = Map<String, Object?>.from(record)
+        ..remove('id')
+        ..['staff_id'] = staff.first['id']
+        ..['sync_status'] = StaffMember.syncStatusSynced;
+      if (existing.isEmpty) {
+        await txn.insert('staff_attendance', value);
+      } else {
+        await txn.update(
+          'staff_attendance',
+          value,
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+      return true;
+    });
   }
 
   Future<bool> upsertPaymentFromSync(
     Map<String, Object?> record, {
     bool force = false,
   }) async {
+    final uuid = record['uuid'];
+    final staffUuid = record['staff_uuid'];
+    if (uuid is! String || staffUuid is! String) {
+      throw ArgumentError('Invalid canonical staff payment record.');
+    }
+
     final db = await _db;
-    final staff = await db.query(
-      'staff',
-      columns: ['id'],
-      where: 'uuid = ?',
-      whereArgs: [record['staff_uuid']],
-      limit: 1,
-    );
-    if (staff.isEmpty) return false;
-    final existing = await db.query(
-      'staff_payments',
-      columns: ['id', 'sync_status'],
-      where: 'uuid = ?',
-      whereArgs: [record['uuid']],
-      limit: 1,
-    );
-    if (existing.isNotEmpty &&
-        !force &&
-        existing.first['sync_status'] == StaffPayment.syncStatusPending) {
-      return false;
-    }
-    final value = Map<String, Object?>.from(record)
-      ..remove('id')
-      ..['staff_id'] = staff.first['id']
-      ..['sync_status'] = StaffPayment.syncStatusSynced;
-    if (existing.isEmpty) {
-      await db.insert('staff_payments', value);
-    } else {
-      await db.update(
-        'staff_payments',
-        value,
-        where: 'id = ?',
-        whereArgs: [existing.first['id']],
+    return db.transaction((txn) async {
+      final staff = await txn.query(
+        'staff',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [staffUuid],
+        limit: 1,
       );
-    }
-    return true;
+      if (staff.isEmpty) return false;
+
+      final existing = await txn.query(
+        'staff_payments',
+        columns: ['id', 'sync_status'],
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
+      );
+      if (existing.isNotEmpty &&
+          !force &&
+          existing.first['sync_status'] == StaffPayment.syncStatusPending) {
+        return false;
+      }
+
+      final value = Map<String, Object?>.from(record)
+        ..remove('id')
+        ..['staff_id'] = staff.first['id']
+        ..['sync_status'] = StaffPayment.syncStatusSynced;
+      if (existing.isEmpty) {
+        await txn.insert('staff_payments', value);
+      } else {
+        await txn.update(
+          'staff_payments',
+          value,
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+      return true;
+    });
   }
 
   Future<void> deleteAllForSyncReplacement() async {
