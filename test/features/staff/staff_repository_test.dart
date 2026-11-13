@@ -179,4 +179,108 @@ void main() {
     expect(savedPayment.single['amount_paise'], 10000);
   });
 
+  test('staff relationships reconcile by UUID across different local IDs', () async {
+    final sourceDb = await AppDatabase.openTestDatabase();
+    final source = StaffRepository(database: sourceDb);
+    final targetDb = await AppDatabase.openTestDatabase();
+    final target = StaffRepository(database: targetDb);
+    final now = DateTime(2026, 11, 5);
+
+    // Advance the target database's staff AUTOINCREMENT sequence so its
+    // local IDs cannot accidentally match the source database's IDs.
+    for (var index = 0; index < 3; index++) {
+      await target.insertStaff(StaffMember(
+        uuid: 'target-only-staff-$index',
+        name: 'Target staff $index',
+        joinedOn: now,
+        createdAt: now,
+        updatedAt: now,
+      ));
+    }
+
+    final sourceStaff = StaffMember(
+      uuid: 'shared-staff-uuid',
+      name: 'Source operator',
+      role: 'Embroidery operator',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final sourceStaffId = await source.insertStaff(sourceStaff);
+
+    final attendance = StaffAttendance(
+      uuid: 'shared-attendance-uuid',
+      staffId: sourceStaffId,
+      staffUuid: sourceStaff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.fullDay,
+      checkIn: '09:30',
+      checkOut: '17:00',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await source.saveAttendance(attendance);
+
+    final payment = StaffPayment(
+      uuid: 'shared-payment-uuid',
+      staffId: sourceStaffId,
+      staffUuid: sourceStaff.uuid,
+      periodStart: DateTime(2026, 11, 1),
+      periodEnd: DateTime(2026, 11, 30),
+      paymentDate: now,
+      amountPaise: 125000,
+      notes: 'November advance',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await source.recordPayment(payment);
+
+    // Mimic transport payloads that contain stale/hostile SQLite IDs.
+    final staffPayload = Map<String, Object?>.from(sourceStaff.toMap())
+      ..['id'] = 9999;
+    expect(await target.upsertStaffFromSync(staffPayload), isTrue);
+
+    final importedStaff = await target.getStaffByUuid(sourceStaff.uuid);
+    expect(importedStaff, isNotNull);
+    expect(importedStaff!.id, isNot(sourceStaffId));
+    expect(importedStaff.id, isNot(9999));
+
+    final attendancePayload = Map<String, Object?>.from(attendance.toMap())
+      ..['id'] = 9999
+      ..['staff_id'] = 9999;
+    expect(
+      await target.upsertAttendanceFromSync(attendancePayload),
+      isTrue,
+    );
+
+    final paymentPayload = Map<String, Object?>.from(payment.toMap())
+      ..['id'] = 9999
+      ..['staff_id'] = 9999;
+    expect(await target.upsertPaymentFromSync(paymentPayload), isTrue);
+
+    final attendanceRows = await targetDb.query(
+      'staff_attendance',
+      where: 'uuid = ?',
+      whereArgs: [attendance.uuid],
+    );
+    expect(attendanceRows, hasLength(1));
+    expect(attendanceRows.single['staff_uuid'], sourceStaff.uuid);
+    expect(attendanceRows.single['staff_id'], importedStaff.id);
+    expect(attendanceRows.single['staff_id'], isNot(9999));
+
+    final paymentRows = await targetDb.query(
+      'staff_payments',
+      where: 'uuid = ?',
+      whereArgs: [payment.uuid],
+    );
+    expect(paymentRows, hasLength(1));
+    expect(paymentRows.single['staff_uuid'], sourceStaff.uuid);
+    expect(paymentRows.single['staff_id'], importedStaff.id);
+    expect(paymentRows.single['staff_id'], isNot(9999));
+    expect(paymentRows.single['amount_paise'], payment.amountPaise);
+
+    await sourceDb.close();
+    await targetDb.close();
+  });
+
 }
