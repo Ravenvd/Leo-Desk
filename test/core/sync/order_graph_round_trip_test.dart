@@ -537,7 +537,7 @@ void main() {
       expect(finalBillItems.single.uuid, 'graph-roundtrip-bill-item');
       expect(finalBillItems.single.billId, finalBill.id);
     },
-
+  );
 
   test('applies Windows-assigned invoice and bill suffixes on Android', () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
@@ -679,5 +679,4 @@ void main() {
       'financial-suffix-android-bill-item',
     );
   });
-  );
 }
