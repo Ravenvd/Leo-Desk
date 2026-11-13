@@ -2,7 +2,7 @@
 
 **Branch:** `feature/windows-authoritative-sync`  
 **Baseline:** `379fa4e84a7ef00b88cc7c580885d76a423bc333` (Phase 1 audit commit)  
-**Status:** Approved policy — allocator and pure reconciliation core added; order server persistence and canonical response path implemented; local verification pending  
+**Status:** Approved policy — order, invoice and bill Windows-authoritative reconciliation implemented; local verification pending  
 **Baseline tests:** User reports `flutter analyze` and `flutter test` pass locally on this baseline.
 
 ## 1. Purpose
@@ -82,6 +82,8 @@ Example:
 | Next | `ORD-000039C` |
 
 The same rule applies to invoice and bill numbers. For example, a colliding bill becomes `BILL-000012A` on both devices.
+
+The current schema also enforces one invoice and one bill per linked order. A different UUID attempting to create a second invoice or bill for an order is therefore rejected explicitly; it is not a number collision and must not replace or delete the existing financial graph. Number suffixing applies when distinct financial records belong to different orders (or a bill has no linked order) but request the same invoice/bill number.
 
 ### 4.3 Suffix sequence and sorting
 
@@ -223,4 +225,4 @@ The following behaviours must be tests before the corresponding implementation i
 
 The Windows-authoritative policy, universal canonical suffix numbering, and deletion-request/tombstone policy in this document have been approved.
 
-Phase 3 added a pure number allocator with focused unit tests. Phase 4 added `SyncEngine`, a pure Windows-authoritative decision core. Phase 5 wires the engine into transactional Windows order persistence: UUID is checked first, all Windows order numbers are considered, suffix allocation and order/item insertion occur in one transaction, and the response includes the complete canonical order graph. The client now applies the returned canonical graph, pushes all pending orders, and pulls the complete Windows order set. Order pull no longer deletes a different UUID's order or its dependent invoices/bills when a local number collision is encountered; it defers that application instead. A focused HTTP reconciliation test covers same-UUID authority, A/B suffix allocation, retries, and preservation of order items. Local Flutter execution is still required. This phase is limited to orders; invoices, bills, assets, other entity adapters, and the full tombstone protocol remain future integration work. No database migration was required.
+Phase 3 added a pure number allocator with focused unit tests. Phase 4 added `SyncEngine`, a pure Windows-authoritative decision core. Phase 5 wired it into transactional Windows order persistence and canonical order responses. The next integration extends the same transaction/UUID-first policy to invoices and bills: Windows returns complete canonical financial graphs, assigns suffixes for distinct-UUID number collisions, and the client applies those canonical responses. The legacy bill timestamp-priority replacement policy has been removed; a different UUID cannot delete or replace a bill already linked to the same order. The schema's one-invoice/one-bill-per-order natural keys are explicit rejection conditions, while invoice/bill number collisions across distinct orders are suffix-resolved. Focused HTTP tests cover same-UUID authority, A/B suffix allocation, timestamp-style bill suffixes, retries, concurrency, and preservation of child items. Local Flutter execution is still required. Assets, other entity adapters, and the full tombstone protocol remain future integration work. No database migration was required.
