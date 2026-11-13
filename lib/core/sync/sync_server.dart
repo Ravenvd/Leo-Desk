@@ -193,13 +193,21 @@ class SyncServer {
           return;
         }
         final record = Map<String, Object?>.from(decoded);
-        final uuid = record['uuid'] as String;
-        final applied = await _staffRepository.upsertAttendanceFromSync(record);
-        if (!applied) {
-          await _sendJson(request.response, 409, {'error': 'Staff attendance could not be applied.', 'uuid': uuid});
-          return;
+        try {
+          final canonical = await _staffRepository.reconcileAttendanceFromSync(record);
+          final canonicalUuid = canonical['uuid'] as String;
+          await _sendJson(request.response, 200, {
+            'status': 'ok',
+            'requested_uuid': record['uuid'],
+            'uuid': canonicalUuid,
+            'canonical_attendance': canonical..remove('id'),
+            'natural_key_conflict': canonicalUuid != record['uuid'],
+          });
+        } on ArgumentError catch (error) {
+          await _sendJson(request.response, 400, {'error': error.message});
+        } on StateError catch (error) {
+          await _sendJson(request.response, 409, {'error': error.message});
         }
-        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
         return;
       }
 
@@ -218,13 +226,19 @@ class SyncServer {
           return;
         }
         final record = Map<String, Object?>.from(decoded);
-        final uuid = record['uuid'] as String;
-        final applied = await _staffRepository.upsertPaymentFromSync(record);
-        if (!applied) {
-          await _sendJson(request.response, 409, {'error': 'Staff payment could not be applied.', 'uuid': uuid});
-          return;
+        try {
+          final canonical = await _staffRepository.reconcilePaymentFromSync(record);
+          final canonicalUuid = canonical['uuid'] as String;
+          await _sendJson(request.response, 200, {
+            'status': 'ok',
+            'uuid': canonicalUuid,
+            'canonical_payment': canonical..remove('id'),
+          });
+        } on ArgumentError catch (error) {
+          await _sendJson(request.response, 400, {'error': error.message});
+        } on StateError catch (error) {
+          await _sendJson(request.response, 409, {'error': error.message});
         }
-        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': uuid});
         return;
       }
 
