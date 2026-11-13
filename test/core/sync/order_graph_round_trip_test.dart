@@ -205,8 +205,8 @@ void main() {
         token: SyncConfig.defaultToken,
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
-      billRepository: BillRepository(database: clientDatabase),
-      invoiceRepository: InvoiceRepository(database: clientDatabase),
+      billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
+      invoiceRepository: InvoiceRepository(database: clientDatabase, isNumberAuthority: false),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
       assetRepository: AssetRepository(database: clientDatabase),
@@ -280,8 +280,8 @@ void main() {
       final clientCustomers = CustomerRepository(database: clientDatabase);
       final clientOrders = OrderRepository(database: clientDatabase);
       final clientOrderItems = OrderItemRepository(database: clientDatabase);
-      final clientInvoices = InvoiceRepository(database: clientDatabase);
-      final clientBills = BillRepository(database: clientDatabase);
+      final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
+      final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
 
       final customer = makeCustomer(
         'graph-roundtrip-customer',
