@@ -26,6 +26,7 @@ import 'package:leo_desk/features/orders/models/order.dart';
 import 'package:leo_desk/features/orders/models/order_item.dart';
 import 'package:leo_desk/features/orders/repositories/order_item_repository.dart';
 import 'package:leo_desk/features/orders/repositories/order_repository.dart';
+import 'package:leo_desk/features/staff/models/staff.dart';
 import 'package:leo_desk/features/staff/repositories/staff_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -260,6 +261,42 @@ void main() {
           RealHttpOverrides().createHttpClient(context),
     );
   }
+
+  test('Windows staff profile wins over an Android pending edit', () async {
+    final now = DateTime.utc(2026, 11, 1);
+    final windowsStaff = StaffMember(
+      uuid: 'staff-manager-canonical',
+      syncStatus: StaffMember.syncStatusPending,
+      name: 'Windows Staff',
+      role: 'Supervisor',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await serverDatabase.insert(
+      'staff',
+      windowsStaff.toMap()..remove('id'),
+    );
+
+    final androidStaff = windowsStaff.copyWith(
+      name: 'Android Edit',
+      role: 'Operator',
+      syncStatus: StaffMember.syncStatusPending,
+    );
+    await StaffRepository(database: clientDatabase).insertStaff(androidStaff);
+
+    final result = await syncWithRealHttpClient();
+    final saved = await StaffRepository(
+      database: clientDatabase,
+    ).getStaffByUuid(windowsStaff.uuid);
+
+    expect(result.connected, isTrue);
+    expect(result.staffRecordsPushed, 1);
+    expect(saved, isNotNull);
+    expect(saved!.name, 'Windows Staff');
+    expect(saved.role, 'Supervisor');
+    expect(saved.syncStatus, StaffMember.syncStatusSynced);
+  });
 
   test('successful customer push marks client customer as synced', () async {
     final clientRepository = CustomerRepository(database: clientDatabase);
