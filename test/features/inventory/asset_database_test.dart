@@ -246,7 +246,7 @@ void main() {
 
   test('asset codes increment and are not reused after deletion', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final firstId = await repository.insert(makeAsset(name: 'Machine 1'));
     final secondId = await repository.insert(makeAsset(name: 'Machine 2'));
@@ -266,7 +266,7 @@ void main() {
 
   test('asset repository reads and updates all asset fields', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final id = await repository.insert(makeAsset());
     final original = await repository.getById(id);
@@ -312,7 +312,7 @@ void main() {
 
   test('asset repository supports lookup by uuid and listing', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final firstId = await repository.insert(makeAsset(name: 'Z Machine'));
     await repository.insert(makeAsset(name: 'A Machine'));
@@ -331,7 +331,7 @@ void main() {
 
   test('deletion is soft until sync acknowledgement', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final id = await repository.insert(makeAsset());
     final asset = await repository.getById(id);
