@@ -1,8 +1,21 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/sync/sync_engine.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
+
+class OrderSyncReconciliation {
+  final Order order;
+  final List<OrderItem> items;
+  final String customerUuid;
+
+  const OrderSyncReconciliation({
+    required this.order,
+    required this.items,
+    required this.customerUuid,
+  });
+}
 
 class OrderRepository {
   final Database? database;
@@ -118,6 +131,89 @@ class OrderRepository {
     );
   }
 
+  /// Reconciles an Android order against Windows authority and persists
+  /// a new order graph atomically. Existing UUIDs are returned unchanged.
+  Future<OrderSyncReconciliation> reconcileFromSync(
+    Order incomingOrder,
+    List<OrderItem> incomingItems, {
+    required String customerUuid,
+  }) async {
+    final db = await _db;
+
+    return db.transaction((txn) async {
+      final customers = await txn.query(
+        'customers',
+        columns: ['id'],
+        where: 'uuid = ?',
+        whereArgs: [customerUuid],
+        limit: 1,
+      );
+      if (customers.isEmpty) {
+        throw StateError('Order customer does not exist on Windows.');
+      }
+
+      final incoming = incomingOrder.copyWith(
+        customerId: customers.first['id'] as int,
+        syncStatus: 'synced',
+      );
+      final rows = await txn.query('orders');
+      final existingOrders = rows.map(Order.fromMap).toList(growable: false);
+      final decision = const SyncEngine().reconcileNumberedRecord<Order>(
+        incomingRecord: incoming,
+        existingRecords: existingOrders,
+        uuidOf: (record) => record.uuid,
+        numberOf: (record) => record.orderNumber,
+        withCanonicalNumber: (record, number) =>
+            record.copyWith(orderNumber: number),
+      );
+
+      if (!decision.isNewRecord) {
+        final canonical = decision.canonicalRecord;
+        final canonicalItems = await txn.query(
+          'order_items',
+          where: 'order_id = ?',
+          whereArgs: [canonical.id],
+          orderBy: 'id ASC',
+        );
+        final canonicalCustomer = await txn.query(
+          'customers',
+          columns: ['uuid'],
+          where: 'id = ?',
+          whereArgs: [canonical.customerId],
+          limit: 1,
+        );
+        if (canonicalCustomer.isEmpty) {
+          throw StateError('Canonical order customer is missing.');
+        }
+        return OrderSyncReconciliation(
+          order: canonical,
+          items: canonicalItems.map(OrderItem.fromMap).toList(),
+          customerUuid: canonicalCustomer.first['uuid'] as String,
+        );
+      }
+
+      final canonical = decision.canonicalRecord;
+      final orderId = await txn.insert(
+        'orders',
+        canonical.toMap()..remove('id'),
+      );
+      for (final item in incomingItems) {
+        await txn.insert(
+          'order_items',
+          item.copyWith(orderId: orderId).toMap()..remove('id'),
+        );
+      }
+
+      return OrderSyncReconciliation(
+        order: canonical.copyWith(id: orderId, syncStatus: 'synced'),
+        items: incomingItems
+            .map((item) => item.copyWith(orderId: orderId))
+            .toList(growable: false),
+        customerUuid: customerUuid,
+      );
+    });
+  }
+
   Future<bool> upsertFromSync(
     Order order,
     List<OrderItem> items, {
@@ -141,13 +237,17 @@ class OrderRepository {
         return false;
       }
 
-      final existingWithOrderNumber = await txn.query(
+      // Never resolve a number conflict by deleting another order or its
+      // dependent invoices/bills. A canonical batch can resolve stale local
+      // numbering once both UUIDs' Windows records are available.
+      final numberOwners = await txn.query(
         'orders',
-        columns: ['id', 'uuid', 'sync_status'],
-        where: 'order_number = ?',
-        whereArgs: [order.orderNumber],
+        columns: ['uuid'],
+        where: 'order_number = ? AND uuid != ?',
+        whereArgs: [order.orderNumber, order.uuid],
         limit: 1,
       );
+      if (numberOwners.isNotEmpty) return false;
 
       var customerId = order.customerId;
       if (customerUuid != null) {
@@ -158,8 +258,10 @@ class OrderRepository {
           whereArgs: [customerUuid],
           limit: 1,
         );
+        if (customers.isEmpty) return false;
         customerId = customers.first['id'] as int;
       }
+
       final map = order.copyWith(
         customerId: customerId,
         syncStatus: 'synced',
@@ -167,33 +269,9 @@ class OrderRepository {
       late final int localOrderId;
 
       if (existing.isEmpty) {
-        // Windows is the canonical allocator for order numbers. If the
-        // canonical number is already occupied locally by a different UUID,
-        // replace that stale local graph with the Windows record.
-        if (existingWithOrderNumber.isNotEmpty) {
-          final conflictingOrder = existingWithOrderNumber.first;
-          if (!force && conflictingOrder['sync_status'] == 'pending') {
-            // Never destroy an unsynced local order. It must be pushed first
-            // so Windows can allocate its canonical order number.
-            return false;
-          }
-          final conflictingOrderId = conflictingOrder['id'] as int;
-          await _deleteOrderGraph(txn, conflictingOrderId);
-        }
         localOrderId = await txn.insert('orders', map);
       } else {
         localOrderId = existing.first['id'] as int;
-
-        if (existingWithOrderNumber.isNotEmpty &&
-            existingWithOrderNumber.first['id'] != localOrderId) {
-          final conflictingOrder = existingWithOrderNumber.first;
-          if (!force && conflictingOrder['sync_status'] == 'pending') {
-            return false;
-          }
-          final conflictingOrderId = conflictingOrder['id'] as int;
-          await _deleteOrderGraph(txn, conflictingOrderId);
-        }
-
         await txn.update(
           'orders',
           map,
@@ -207,55 +285,13 @@ class OrderRepository {
         where: 'order_id = ?',
         whereArgs: [localOrderId],
       );
-
       for (final item in items) {
         final itemMap = item.copyWith(orderId: localOrderId).toMap()
           ..remove('id');
         await txn.insert('order_items', itemMap);
       }
-
       return true;
     });
-  }
-
-
-  /// Removes an order and every local child rooted at that order.
-  ///
-  /// This is used only when Windows sends the canonical record for a UUID
-  /// whose order number is still occupied by a different local UUID.
-  /// Children are removed first because invoices and bills reference orders
-  /// with restrictive foreign keys.
-  Future<void> _deleteOrderGraph(Transaction txn, int orderId) async {
-    await txn.delete(
-      'bill_items',
-      where: 'bill_id IN (SELECT id FROM bills WHERE order_id = ?)',
-      whereArgs: [orderId],
-    );
-    await txn.delete(
-      'bills',
-      where: 'order_id = ?',
-      whereArgs: [orderId],
-    );
-    await txn.delete(
-      'invoice_items',
-      where: 'invoice_id IN (SELECT id FROM invoices WHERE order_id = ?)',
-      whereArgs: [orderId],
-    );
-    await txn.delete(
-      'invoices',
-      where: 'order_id = ?',
-      whereArgs: [orderId],
-    );
-    await txn.delete(
-      'order_items',
-      where: 'order_id = ?',
-      whereArgs: [orderId],
-    );
-    await txn.delete(
-      'orders',
-      where: 'id = ?',
-      whereArgs: [orderId],
-    );
   }
 
   Future<int> updateOrderNumberAndMarkSynced(
