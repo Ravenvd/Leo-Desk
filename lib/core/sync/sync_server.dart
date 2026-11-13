@@ -314,7 +314,19 @@ class SyncServer {
           await _sendJson(request.response, 400, {'error': 'Invalid asset data.'});
           return;
         }
-        final incoming = Asset.fromMap(Map<String, Object?>.from(decoded));
+        final assetMap = Map<String, Object?>.from(decoded);
+        final uuid = assetMap['uuid'];
+        final assetCode = assetMap['asset_code'];
+        if (uuid is! String ||
+            uuid.trim().isEmpty ||
+            assetCode is! String ||
+            assetCode.trim().isEmpty) {
+          await _sendJson(request.response, 400, {
+            'error': 'Asset UUID and asset code are required.',
+          });
+          return;
+        }
+        final incoming = Asset.fromMap(assetMap);
         try {
           final canonical = await _assetRepository.reconcileFromSync(incoming);
           await _sendJson(request.response, 200, {
