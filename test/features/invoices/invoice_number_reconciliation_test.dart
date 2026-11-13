@@ -156,4 +156,98 @@ void main() {
     expect(saved.uuid, incoming.uuid);
     expect(saved.invoiceNumber, 'INV-000042');
   });
+  test('preserves pending invoice number owners and frees synced legacy collisions', () async {
+    final androidSeed = await androidDb.query(
+      'orders',
+      columns: ['id'],
+      where: 'uuid = ?',
+      whereArgs: [orderUuid],
+      limit: 1,
+    );
+    final androidCustomer = await androidDb.query(
+      'customers',
+      columns: ['id'],
+      where: 'uuid = ?',
+      whereArgs: [customerUuid],
+      limit: 1,
+    );
+    final otherOrderId = await androidDb.insert('orders', {
+      'uuid': 'invoice-number-other-order',
+      'sync_status': 'synced',
+      'order_number': 'ORD-000099',
+      'customer_id': androidCustomer.single['id'],
+      'order_date': now.toIso8601String(),
+      'expected_delivery_date': now.add(const Duration(days: 7)).toIso8601String(),
+      'stitching_required': 0,
+      'stitching_price_paise': 0,
+      'status': 'In Progress',
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    });
+
+    final legacyInvoice = Invoice(
+      uuid: 'legacy-invoice-number-owner',
+      syncStatus: 'pending',
+      orderId: otherOrderId,
+      orderUuid: 'invoice-number-other-order',
+      customerId: androidCustomer.single['id'] as int,
+      customerUuid: customerUuid,
+      invoiceNumber: 'INV-000042',
+      invoiceDate: now,
+      subtotalPaise: 10000,
+      totalPaise: 10000,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await androidDb.insert('invoices', legacyInvoice.toMap()..remove('id'));
+
+    final incoming = Invoice(
+      uuid: 'windows-canonical-invoice',
+      orderId: androidSeed.single['id'] as int,
+      orderUuid: orderUuid,
+      customerId: androidCustomer.single['id'] as int,
+      customerUuid: customerUuid,
+      invoiceNumber: 'INV-000042',
+      invoiceDate: now,
+      subtotalPaise: 12000,
+      totalPaise: 12000,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final android = InvoiceRepository(database: androidDb);
+
+    expect(await android.upsertFromSync(incoming, []), isFalse);
+    var savedLegacy = Invoice.fromMap(
+      (await androidDb.query(
+        'invoices',
+        where: 'uuid = ?',
+        whereArgs: [legacyInvoice.uuid],
+      )).single,
+    );
+    expect(savedLegacy.invoiceNumber, 'INV-000042');
+    expect(savedLegacy.syncStatus, 'pending');
+
+    await androidDb.update(
+      'invoices',
+      {'sync_status': 'synced'},
+      where: 'uuid = ?',
+      whereArgs: [legacyInvoice.uuid],
+    );
+    expect(await android.upsertFromSync(incoming, []), isTrue);
+
+    savedLegacy = Invoice.fromMap(
+      (await androidDb.query(
+        'invoices',
+        where: 'uuid = ?',
+        whereArgs: [legacyInvoice.uuid],
+      )).single,
+    );
+    final canonical = (await android.getAll()).singleWhere(
+      (invoice) => invoice.uuid == incoming.uuid,
+    );
+    expect(savedLegacy.invoiceNumber, 'PENDING-${legacyInvoice.uuid}');
+    expect(savedLegacy.uuid, legacyInvoice.uuid);
+    expect(canonical.invoiceNumber, 'INV-000042');
+  });
+
 }
