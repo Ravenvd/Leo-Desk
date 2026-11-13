@@ -101,7 +101,7 @@ void main() {
     );
   }
 
-  test('earliest incoming bill replaces a later pending local bill and items',
+  test('distinct incoming bill cannot replace another UUID for the same order',
       () async {
     await insertLocalBill(
       makeBill(uuid: 'later-local', number: 'BILL-LATE', createdAt: late),
@@ -110,20 +110,19 @@ void main() {
 
     final applied = await bills.upsertFromSync(
       makeBill(uuid: 'earlier-server', number: 'BILL-EARLY', createdAt: early),
-      [makeItem('earlier-server-item', 'Winning item')],
+      [makeItem('earlier-server-item', 'Incoming item')],
+      force: true,
     );
 
-    expect(applied, isTrue);
+    expect(applied, isFalse);
     final allBills = await bills.getAll();
     expect(allBills, hasLength(1));
-    expect(allBills.single.uuid, 'earlier-server');
-    expect(allBills.single.billNumber, 'BILL-EARLY');
-    expect(allBills.single.syncStatus, 'synced');
+    expect(allBills.single.uuid, 'later-local');
+    expect(allBills.single.billNumber, 'BILL-LATE');
 
     final items = await bills.getItems(allBills.single.id!);
     expect(items, hasLength(1));
-    expect(items.single.uuid, 'earlier-server-item');
-    expect(items.single.description, 'Winning item');
+    expect(items.single.uuid, 'later-local-item');
   });
 
   test('later incoming bill cannot replace the earliest local bill', () async {
@@ -148,7 +147,7 @@ void main() {
     expect(items.single.uuid, 'earlier-local-item');
   });
 
-  test('equal timestamps use UUID order as a deterministic tie-breaker',
+  test('equal timestamps do not let a different UUID replace the canonical bill',
       () async {
     await insertLocalBill(
       makeBill(uuid: 'z-local', number: 'BILL-Z', createdAt: early),
@@ -157,14 +156,17 @@ void main() {
 
     final applied = await bills.upsertFromSync(
       makeBill(uuid: 'a-server', number: 'BILL-A', createdAt: early),
-      [makeItem('a-server-item', 'Tie-break winner')],
+      [makeItem('a-server-item', 'Incoming item')],
+      force: true,
     );
 
-    expect(applied, isTrue);
+    expect(applied, isFalse);
     final allBills = await bills.getAll();
     expect(allBills, hasLength(1));
-    expect(allBills.single.uuid, 'a-server');
-    expect(allBills.single.billNumber, 'BILL-A');
+    expect(allBills.single.uuid, 'z-local');
+    expect(allBills.single.billNumber, 'BILL-Z');
+    expect((await bills.getItems(allBills.single.id!)).single.uuid,
+        'z-local-item');
   });
 
   test('does not delete a bill from another order to resolve bill-number clash',
