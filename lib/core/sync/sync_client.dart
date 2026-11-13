@@ -343,11 +343,28 @@ class SyncClient {
     );
   }
 
-  Future<bool> sendCustomer(Customer customer) async {
+  Future<Map<String, Object?>?> sendCustomerCanonical(
+    Customer customer,
+  ) async {
     final map = customer.toMap()
       ..remove('id')
       ..remove('sync_status');
-    return _postJson('/api/customers', map, customer.uuid);
+    final data = await _postJsonResponse('/api/customers', map);
+    if (data == null ||
+        data['status'] != 'ok' ||
+        data['uuid'] != customer.uuid ||
+        data['canonical_customer'] is! Map) {
+      return null;
+    }
+    final canonical = Map<String, Object?>.from(
+      data['canonical_customer'] as Map,
+    );
+    if (canonical['uuid'] != customer.uuid) return null;
+    return canonical;
+  }
+
+  Future<bool> sendCustomer(Customer customer) async {
+    return await sendCustomerCanonical(customer) != null;
   }
 
   Future<List<SyncInvoice>> fetchInvoices({
