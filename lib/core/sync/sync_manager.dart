@@ -269,8 +269,8 @@ class SyncManager {
       }
     }
 
-    // Orders are the core sync graph. Reconcile the recent window by UUID
-    // before syncing invoices and bills, which depend on the order identity.
+    // Orders are the core sync graph. Resolve all pending local orders before
+    // pulling the complete Windows order namespace, then sync dependent records.
     final localCustomers = await _customerRepository.getAll();
     final customerUuidsById = {
       for (final customer in localCustomers) customer.id!: customer.uuid,
@@ -308,11 +308,10 @@ class SyncManager {
       if (applied) ordersPushed++;
     }
 
-    // Pull the canonical recent Windows window after pushing local changes.
-    // UUID is the identity; order number is only a reconciled attribute.
+    // Pull the complete canonical Windows order set. A bounded page could
+    // omit the UUID that owns a colliding number and delay safe reconciliation.
     for (final syncOrder in await _client.fetchOrders(
       customerIdsByUuid: customerIdsByUuid,
-      limit: 100,
     )) {
       final applied = await _orderRepository.upsertFromSync(
         syncOrder.order,
