@@ -43,6 +43,10 @@ void main() {
     );
   }
 
+  Future<void> insertWindowsAsset(Asset asset) async {
+    await database.insert('assets', asset.toMap()..remove('id'));
+  }
+
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
     assets = AssetRepository(database: database);
@@ -77,7 +81,7 @@ void main() {
       name: 'Windows machine',
       syncStatus: Asset.syncStatusPending,
     );
-    await assets.insert(windowsAsset);
+    await insertWindowsAsset(windowsAsset);
 
     final response = await client.sendAsset(
       makeAsset(
@@ -99,7 +103,7 @@ void main() {
   });
 
   test('distinct UUID collisions receive stable A and B suffixes', () async {
-    await assets.insert(makeAsset(
+    await insertWindowsAsset(makeAsset(
       uuid: 'windows-asset-base',
       code: 'AST-0001',
       syncStatus: Asset.syncStatusSynced,
