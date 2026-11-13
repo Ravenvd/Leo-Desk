@@ -302,6 +302,111 @@ void main() {
     expect(saved.syncStatus, StaffMember.syncStatusSynced);
   });
 
+  test('Windows attendance and payroll records remain canonical over Android conflicts', () async {
+    final now = DateTime.utc(2026, 11, 7);
+    final serverStaffRepository = StaffRepository(database: serverDatabase);
+    final clientStaffRepository = StaffRepository(database: clientDatabase);
+    final windowsStaff = StaffMember(
+      uuid: 'staff-attendance-payment-roundtrip',
+      name: 'Windows Staff',
+      role: 'Supervisor',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final windowsStaffId = await serverStaffRepository.insertStaff(windowsStaff);
+    final androidStaff = StaffMember(
+      uuid: windowsStaff.uuid,
+      name: 'Android Staff Edit',
+      role: 'Operator',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final androidStaffId = await clientStaffRepository.insertStaff(androidStaff);
+
+    final windowsAttendance = StaffAttendance(
+      uuid: 'attendance-windows-roundtrip',
+      staffId: windowsStaffId,
+      staffUuid: windowsStaff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.fullDay,
+      notes: 'Windows attendance',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await serverDatabase.insert(
+      'staff_attendance',
+      windowsAttendance.toMap()..remove('id'),
+    );
+    final androidAttendance = StaffAttendance(
+      uuid: 'attendance-android-roundtrip',
+      staffId: androidStaffId,
+      staffUuid: windowsStaff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.absent,
+      notes: 'Android duplicate date',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await clientDatabase.insert(
+      'staff_attendance',
+      androidAttendance.toMap()..remove('id'),
+    );
+
+    final windowsPayment = StaffPayment(
+      uuid: 'payment-windows-roundtrip',
+      staffId: windowsStaffId,
+      staffUuid: windowsStaff.uuid,
+      periodStart: DateTime.utc(2026, 11, 1),
+      periodEnd: DateTime.utc(2026, 11, 30),
+      paymentDate: now,
+      amountPaise: 225000,
+      notes: 'Windows payroll',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await serverDatabase.insert(
+      'staff_payments',
+      windowsPayment.toMap()..remove('id'),
+    );
+    final androidPayment = StaffPayment(
+      uuid: windowsPayment.uuid,
+      staffId: androidStaffId,
+      staffUuid: windowsStaff.uuid,
+      periodStart: DateTime.utc(2026, 11, 1),
+      periodEnd: DateTime.utc(2026, 11, 30),
+      paymentDate: now,
+      amountPaise: 1,
+      notes: 'Android payroll edit',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await clientDatabase.insert(
+      'staff_payments',
+      androidPayment.toMap()..remove('id'),
+    );
+
+    final result = await syncWithRealHttpClient();
+
+    final localStaff = await clientStaffRepository.getStaffByUuid(windowsStaff.uuid);
+    final localAttendance = await clientStaffRepository.getAllAttendanceForSync();
+    final localPayments = await clientStaffRepository.getAllPaymentsForSync();
+
+    expect(result.connected, isTrue);
+    expect(result.staffRecordsPushed, 3);
+    expect(localStaff!.name, 'Windows Staff');
+    expect(localAttendance, hasLength(1));
+    expect(localAttendance.single['uuid'], windowsAttendance.uuid);
+    expect(localAttendance.single['status'], StaffAttendance.fullDay);
+    expect(localAttendance.single['notes'], 'Windows attendance');
+    expect(localPayments, hasLength(1));
+    expect(localPayments.single['uuid'], windowsPayment.uuid);
+    expect(localPayments.single['amount_paise'], 225000);
+    expect(localPayments.single['notes'], 'Windows payroll');
+    expect(localPayments.single['sync_status'], StaffPayment.syncStatusSynced);
+  });
+
   test('successful customer push marks client customer as synced', () async {
     final clientRepository = CustomerRepository(database: clientDatabase);
     final serverRepository = CustomerRepository(database: serverDatabase);
