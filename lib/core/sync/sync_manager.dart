@@ -215,10 +215,16 @@ class SyncManager {
 
     // --- Push and pull staff profiles before their dependent records ---
     for (final staff in await _staffRepository.getPendingStaff()) {
-      if (await _client.sendStaffRecord('staff', staff.toMap())) {
-        await _staffRepository.markSynced('staff', staff.uuid);
-        staffRecordsPushed++;
-      }
+      final canonicalPayload = await _client.sendStaffProfileCanonical(
+        staff.toMap(),
+      );
+      if (canonicalPayload == null) continue;
+
+      final applied = await _staffRepository.upsertStaffFromSync(
+        canonicalPayload,
+        force: true,
+      );
+      if (applied) staffRecordsPushed++;
     }
     for (final record in await _client.fetchStaffRecords('staff')) {
       final applied = await _staffRepository.upsertStaffFromSync(record, force: true);
