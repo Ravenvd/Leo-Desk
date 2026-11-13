@@ -81,9 +81,11 @@ void main() {
       syncStatus: 'pending',
     );
 
-    final sent = await client.sendCustomer(incoming);
+    final canonical = await client.sendCustomerCanonical(incoming);
 
-    expect(sent, isTrue);
+    expect(canonical, isNotNull);
+    expect(canonical!['uuid'], incoming.uuid);
+    expect(canonical['name'], 'Windows Version');
 
     final customers = await repository.getAll();
     expect(customers, hasLength(1));
