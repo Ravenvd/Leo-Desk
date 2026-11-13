@@ -206,9 +206,9 @@ void main() {
 
     expect(response, isNotNull);
     expect(response!['invoice_number'], 'INV-000032');
-    expect(response!['notes'], 'Windows invoice is canonical');
+    expect(response['notes'], 'Windows invoice is canonical');
     expect(
-      (response!['items'] as List).single['uuid'],
+      (response['items'] as List).single['uuid'],
       'windows-canonical-invoice-item',
     );
 
@@ -253,9 +253,9 @@ void main() {
     );
     expect(retryA, isNotNull);
     expect(retryA!['invoice_number'], 'INV-000032A');
-    expect(retryA!['notes'], 'Invoice notes');
+    expect(retryA['notes'], 'Invoice notes');
     expect(
-      (retryA!['items'] as List).single['uuid'],
+      (retryA['items'] as List).single['uuid'],
       'android-invoice-a-item',
     );
 
@@ -347,7 +347,7 @@ void main() {
 
     expect(response, isNotNull);
     expect(response!['bill_number'], 'BILL-000012');
-    expect(response!['notes'], 'Windows bill is canonical');
+    expect(response['notes'], 'Windows bill is canonical');
     expect(
       (response['items'] as List).single['uuid'],
       'windows-canonical-bill-item',
@@ -384,7 +384,7 @@ void main() {
       SyncBill(bill: incomingA, items: [itemA]),
     );
     expect(responseA, isNotNull);
-    expect(responseA!['bill_number'], base + 'A');
+    expect(responseA['bill_number'], '${base}A');
 
     final retryA = await client.sendBill(
       SyncBill(
@@ -393,8 +393,8 @@ void main() {
       ),
     );
     expect(retryA, isNotNull);
-    expect(retryA!['bill_number'], base + 'A');
-    expect(retryA!['notes'], 'Bill notes');
+    expect(retryA['bill_number'], '${base}A');
+    expect(retryA['notes'], 'Bill notes');
     expect(
       (retryA['items'] as List).single['uuid'],
       'android-bill-a-item',
@@ -411,13 +411,13 @@ void main() {
       ),
     );
     expect(responseB, isNotNull);
-    expect(responseB!['bill_number'], base + 'B');
+    expect(responseB['bill_number'], '${base}B');
 
     final saved = await bills.getAll();
     expect(saved, hasLength(3));
     expect(
       saved.map((bill) => bill.billNumber).toSet(),
-      {base, base + 'A', base + 'B'},
+      {base, '${base}A', '${base}B'},
     );
     expect(
       (await bills.getItems(
