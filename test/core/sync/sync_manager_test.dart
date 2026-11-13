@@ -278,10 +278,14 @@ void main() {
       windowsStaff.toMap()..remove('id'),
     );
 
-    final androidStaff = windowsStaff.copyWith(
+    final androidStaff = StaffMember(
+      uuid: windowsStaff.uuid,
+      syncStatus: StaffMember.syncStatusPending,
       name: 'Android Edit',
       role: 'Operator',
-      syncStatus: StaffMember.syncStatusPending,
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
     );
     await StaffRepository(database: clientDatabase).insertStaff(androidStaff);
 
