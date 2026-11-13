@@ -988,8 +988,11 @@ void main() {
     final localCanonicalOrder = localOrders.singleWhere(
       (order) => order.uuid == canonicalOrder.uuid,
     );
+    final reconciledStaleOrder = localOrders.singleWhere(
+      (order) => order.uuid == staleOrder.uuid,
+    );
     expect(localCanonicalOrder.orderNumber, 'ORD-000001');
-    expect(localStaleOrder.orderNumber, 'ORD-000001A');
+    expect(reconciledStaleOrder.orderNumber, 'ORD-000001A');
 
     final canonicalOrderItems =
         await clientOrderItems.getByOrder(localCanonicalOrder.id!);
@@ -997,7 +1000,7 @@ void main() {
     expect(canonicalOrderItems.single.uuid, 'canonical-order-item');
 
     final staleOrderItems =
-        await clientOrderItems.getByOrder(localStaleOrder.id!);
+        await clientOrderItems.getByOrder(reconciledStaleOrder.id!);
     expect(staleOrderItems, hasLength(1));
     expect(staleOrderItems.single.uuid, 'stale-order-item');
 
@@ -1012,7 +1015,7 @@ void main() {
     expect(pulledInvoice.orderUuid, canonicalOrder.uuid);
     expect(pulledInvoice.orderId, localCanonicalOrder.id);
     expect(preservedInvoice.orderUuid, staleOrder.uuid);
-    expect(preservedInvoice.orderId, localStaleOrder.id);
+    expect(preservedInvoice.orderId, reconciledStaleOrder.id);
     expect(
       (await clientInvoices.getItems(pulledInvoice.id!)).single.uuid,
       'canonical-invoice-item',
@@ -1033,7 +1036,7 @@ void main() {
     expect(pulledBill.orderUuid, canonicalOrder.uuid);
     expect(pulledBill.orderId, localCanonicalOrder.id);
     expect(preservedBill.orderUuid, staleOrder.uuid);
-    expect(preservedBill.orderId, localStaleOrder.id);
+    expect(preservedBill.orderId, reconciledStaleOrder.id);
     expect(
       (await clientBills.getItems(pulledBill.id!)).single.uuid,
       'canonical-bill-item',
