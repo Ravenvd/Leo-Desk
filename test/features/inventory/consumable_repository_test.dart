@@ -300,4 +300,48 @@ void main() {
     expect(await repository.getCurrentStock(id), 850);
     await db.close();
   });
+
+  test('UUID sync preserves pending consumables, spools and activity events', () async {
+    final db = await openTestDb();
+    final repository = ConsumableRepository(database: db);
+    final model = item(
+      category: Consumable.categoryEmbroideryThread,
+      name: 'Local black thread',
+      trackingType: Consumable.trackingPercentage,
+      unit: Consumable.unitMetres,
+    );
+    final consumableId = await repository.insertConsumable(model);
+
+    var records = await repository.getAllSyncRecords();
+    final incomingConsumable = Map<String, Object?>.from(records.single)
+      ..['name'] = 'Remote black thread';
+    expect(await repository.upsertSyncRecord(incomingConsumable), isFalse);
+    expect((await repository.getConsumableById(consumableId))!.name,
+        'Local black thread');
+
+    await repository.markSyncRecordSynced('consumables', model.uuid);
+    final saved = (await repository.getConsumableById(consumableId))!;
+    await repository.addThreadSpool(
+      consumable: saved,
+      approximateLengthM: 1000,
+    );
+
+    records = await repository.getAllSyncRecords();
+    final spool = records.singleWhere(
+      (record) => record['record_type'] == 'thread_spools',
+    );
+    final incomingSpool = Map<String, Object?>.from(spool)
+      ..['remaining_percent'] = 50.0;
+    expect(await repository.upsertSyncRecord(incomingSpool), isFalse);
+
+    final activity = records.singleWhere(
+      (record) => record['record_type'] == 'inventory_activities',
+    );
+    final incomingActivity = Map<String, Object?>.from(activity)
+      ..['notes'] = 'Remote replacement';
+    expect(await repository.upsertSyncRecord(incomingActivity), isFalse);
+
+    await db.close();
+  });
+
 }
