@@ -319,10 +319,9 @@ class SyncServer {
         final assetCode = assetMap['asset_code'];
         if (uuid is! String ||
             uuid.trim().isEmpty ||
-            assetCode is! String ||
-            assetCode.trim().isEmpty) {
+            (assetCode != null && assetCode is! String)) {
           await _sendJson(request.response, 400, {
-            'error': 'Asset UUID and asset code are required.',
+            'error': 'A valid asset UUID and optional string asset code are required.',
           });
           return;
         }
@@ -678,7 +677,9 @@ class SyncServer {
       await _sendJson(request.response, 400, {
         'error': 'Malformed request body.',
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // ignore: avoid_print
+      print('SyncServer request failed: $e\n$stackTrace');
       await _sendJson(request.response, 500, {
         'error': 'Internal server error',
       });
