@@ -122,7 +122,7 @@ void main() {
           requestedNumber: 'ORDER-NEW',
           existingNumbers: ['ORDER-NEW'],
         ),
-        throwsFormatException,
+        throwsA(isA<FormatException>()),
       );
     });
 
