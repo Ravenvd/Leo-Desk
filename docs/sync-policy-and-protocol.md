@@ -2,7 +2,7 @@
 
 **Branch:** `feature/windows-authoritative-sync`  
 **Baseline:** `379fa4e84a7ef00b88cc7c580885d76a423bc333` (Phase 1 audit commit)  
-**Status:** Approved policy — implementation not yet started  
+**Status:** Approved policy — pure number allocator added; local test execution pending  
 **Baseline tests:** User reports `flutter analyze` and `flutter test` pass locally on this baseline.
 
 ## 1. Purpose
@@ -223,4 +223,4 @@ The following behaviours must be tests before the corresponding implementation i
 
 The Windows-authoritative policy, universal canonical suffix numbering, and deletion-request/tombstone policy in this document have been approved.
 
-The next implementation phase is to build and test the pure number allocator before introducing the SyncEngine. Application code, migrations and tests remain unchanged at this specification commit.
+Phase 3 has started with a pure number allocator and focused unit tests. The allocator is deliberately not yet wired into repositories or SyncEngine; local Flutter analysis and test execution are still pending. No migrations or existing sync workflows have been changed.
