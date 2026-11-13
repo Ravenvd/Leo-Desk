@@ -269,7 +269,9 @@ void main() {
       expect(await repository.getAll(), hasLength(1));
     });
 
-    test('Windows reconciliation inserts a distinct UUID as a new record', () async {
+    test(
+      'Windows reconciliation inserts a distinct UUID as a new record',
+      () async {
       final incoming = makeCustomer(
         uuid: 'new-android-customer',
         name: 'New customer',
@@ -280,8 +282,9 @@ void main() {
       expect(canonical.uuid, incoming.uuid);
       expect(canonical.name, 'New customer');
       expect(canonical.syncStatus, 'pending');
-      expect(await repository.getAll(), hasLength(1));
-    });
+        expect(await repository.getAll(), hasLength(1));
+      },
+    );
 
     test('marks customer from sync as synced', () async {
       final customer = makeCustomer(name: 'Synced Customer');
