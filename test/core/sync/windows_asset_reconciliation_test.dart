@@ -134,7 +134,7 @@ void main() {
 
   test('concurrent asset collisions receive different canonical suffixes',
       () async {
-    await assets.insert(makeAsset(
+    await insertWindowsAsset(makeAsset(
       uuid: 'windows-concurrent-asset',
       code: 'AST-0009',
       syncStatus: Asset.syncStatusSynced,
