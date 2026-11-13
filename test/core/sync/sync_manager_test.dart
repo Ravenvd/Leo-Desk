@@ -240,8 +240,8 @@ void main() {
         token: SyncConfig.defaultToken,
       ),
       customerRepository: CustomerRepository(database: clientDatabase),
-      billRepository: BillRepository(database: clientDatabase),
-      invoiceRepository: InvoiceRepository(database: clientDatabase),
+      billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
+      invoiceRepository: InvoiceRepository(database: clientDatabase, isNumberAuthority: false),
       expenseRepository: ExpenseRepository(database: clientDatabase),
       orderRepository: OrderRepository(database: clientDatabase),
       assetRepository: AssetRepository(database: clientDatabase),
@@ -367,7 +367,7 @@ void main() {
 
   test('syncs a bill and all line items from Android to Windows', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
 
@@ -428,7 +428,7 @@ void main() {
 
     expect(serverCustomer.uuid, customer.uuid);
     expect(serverBill.uuid, bill.uuid);
-    expect(serverBill.billNumber, 'INV-1001');
+    expect(serverBill.billNumber, 'BILL-20260101-000001');
     expect(serverBill.amountPaidPaise, 50000);
     expect(serverBill.notes, 'Embroidery order');
     expect(serverBill.customerUuid, customer.uuid);
@@ -445,7 +445,7 @@ void main() {
   });
 
   test('pulls a Windows bill and its line items into Android', () async {
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
 
@@ -494,7 +494,7 @@ void main() {
     final localBills = await clientBills.getAll();
     expect(localBills, hasLength(1));
     expect(localBills.single.uuid, bill.uuid);
-    expect(localBills.single.billNumber, 'INV-2001');
+    expect(localBills.single.billNumber, 'BILL-20260101-000001');
     expect(localBills.single.syncStatus, 'synced');
     expect(localBills.single.customerId, localCustomer.id);
     expect(localBills.single.customerUuid, customer.uuid);
@@ -510,7 +510,7 @@ void main() {
 
   test('replaces a synced bill and its items when Windows sends changes',
       () async {
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
 
@@ -600,7 +600,7 @@ void main() {
   });
 
   test('rejected bill push stays pending after full sync', () async {
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
 
@@ -706,8 +706,8 @@ void main() {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final clientOrderItems = OrderItemRepository(database: clientDatabase);
-    final clientInvoices = InvoiceRepository(database: clientDatabase);
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
     final serverInvoices = InvoiceRepository(database: serverDatabase);
@@ -817,8 +817,8 @@ void main() {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final clientOrderItems = OrderItemRepository(database: clientDatabase);
-    final clientInvoices = InvoiceRepository(database: clientDatabase);
-    final clientBills = BillRepository(database: clientDatabase);
+    final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
+    final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
