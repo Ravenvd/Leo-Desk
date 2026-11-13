@@ -3,6 +3,7 @@ import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
 import '../../features/expenses/repositories/expense_repository.dart';
 import '../../features/invoices/repositories/invoice_repository.dart';
+import '../../features/inventory/models/asset.dart';
 import '../../features/inventory/repositories/asset_repository.dart';
 import '../../features/inventory/repositories/consumable_repository.dart';
 import '../../features/inventory/repositories/maintenance_repository.dart';
