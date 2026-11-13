@@ -1316,6 +1316,77 @@ void main() {
     );
   });
 
+  test('retains the Windows order number when a retry proposes a collision', () async {
+    final serverCustomers = CustomerRepository(database: serverDatabase);
+    final serverOrders = OrderRepository(database: serverDatabase);
+    final clientCustomers = CustomerRepository(database: clientDatabase);
+
+    final customer = makeCustomer(
+      uuid: 'order-retry-customer',
+      name: 'Order Retry Customer',
+      syncStatus: 'synced',
+    );
+    await serverCustomers.insert(customer);
+    await serverCustomers.markSynced(customer.uuid);
+
+    final canonicalOrder = makeOrder(
+      uuid: 'retry-canonical-order',
+      customerId: (await serverCustomers.getAll()).single.id!,
+      orderNumber: 'ORD-000001',
+      syncStatus: 'synced',
+    );
+    final otherOrder = makeOrder(
+      uuid: 'retry-number-owner',
+      customerId: canonicalOrder.customerId,
+      orderNumber: 'ORD-000002',
+      syncStatus: 'synced',
+    );
+    await serverOrders.insert(canonicalOrder);
+    await serverOrders.markSynced(canonicalOrder.uuid);
+    await serverOrders.insert(otherOrder);
+    await serverOrders.markSynced(otherOrder.uuid);
+
+    await syncWithRealHttpClient();
+
+    final localCustomer = (await clientCustomers.getAll()).single;
+    final localOrders = OrderRepository(database: clientDatabase);
+    final localCanonicalOrder = (await localOrders.getAll()).singleWhere(
+      (order) => order.uuid == canonicalOrder.uuid,
+    );
+    final retry = localCanonicalOrder.copyWith(
+      orderNumber: 'ORD-000002',
+      syncStatus: 'pending',
+    );
+    final client = SyncClient(
+      serverAddress: '127.0.0.1',
+      port: server.port!,
+      token: SyncConfig.defaultToken,
+    );
+
+    final returnedNumber = await HttpOverrides.runZoned(
+      () => client.sendOrder(
+        SyncOrder(
+          order: retry,
+          items: await localOrders.getItems(localCanonicalOrder.id!),
+          customerUuid: localCustomer.uuid,
+        ),
+      ),
+      createHttpClient: (context) =>
+          RealHttpOverrides().createHttpClient(context),
+    );
+
+    expect(returnedNumber, 'ORD-000001');
+    final windowsOrders = await serverOrders.getAll();
+    expect(
+      windowsOrders.singleWhere((order) => order.uuid == canonicalOrder.uuid).orderNumber,
+      'ORD-000001',
+    );
+    expect(
+      windowsOrders.singleWhere((order) => order.uuid == otherOrder.uuid).orderNumber,
+      'ORD-000002',
+    );
+  });
+
   test(
     'pulls Windows consumables, spools and activity history by UUID',
     () async {
