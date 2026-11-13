@@ -73,15 +73,6 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
 
   String _money(int paise) => 'Rs. ${(paise / 100).toStringAsFixed(2)}';
 
-  String _billNumber() {
-    final now = DateTime.now();
-    return 'BILL-${now.year}'
-        '${now.month.toString().padLeft(2, '0')}'
-        '${now.day.toString().padLeft(2, '0')}-'
-        '${now.hour.toString().padLeft(2, '0')}'
-        '${now.minute.toString().padLeft(2, '0')}'
-        '${now.second.toString().padLeft(2, '0')}';
-  }
 
   Future<void> _saveBill() async {
     if (!_formKey.currentState!.validate()) return;
@@ -102,7 +93,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
       final now = DateTime.now();
       final bill = Bill(
         customerId: widget.customer.id!,
-        billNumber: _billNumber(),
+        billNumber: 'PENDING',
         billDate: _billDate,
         subtotalPaise: _subtotal,
         discountPaise: _discount,
@@ -296,7 +287,7 @@ class _CreateBillScreenState extends State<CreateBillScreen> {
                   labelText: 'Bill Number',
                   border: OutlineInputBorder(),
                 ),
-                child: Text(_billNumber()),
+                child: const Text('Assigned on save by Windows'),
               ),
             ),
             SizedBox(
