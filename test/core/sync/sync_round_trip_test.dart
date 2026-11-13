@@ -74,9 +74,9 @@ void main() {
     );
 
     serverCustomers = CustomerRepository(database: serverDb);
-    serverBills = BillRepository(database: serverDb);
+    serverBills = BillRepository(database: serverDb, isNumberAuthority: true);
     serverExpenses = ExpenseRepository(database: serverDb);
-    serverInvoices = InvoiceRepository(database: serverDb);
+    serverInvoices = InvoiceRepository(database: serverDb, isNumberAuthority: true);
     serverOrders = OrderRepository(database: serverDb);
     clientCustomers = CustomerRepository(database: clientDb);
     clientBills = BillRepository(database: clientDb, isNumberAuthority: false);
