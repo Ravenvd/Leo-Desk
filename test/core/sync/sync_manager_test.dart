@@ -489,7 +489,7 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.billsPushed, 0);
+    expect(result.billsPushed, 1);
     expect(result.billsPulled, 1);
 
     final localBills = await clientBills.getAll();
@@ -600,7 +600,7 @@ void main() {
     expect(localItems.single.amountPaise, 180000);
   });
 
-  test('rejected bill push stays pending after full sync', () async {
+  test('Windows pending bill remains canonical over Android edits', () async {
     final clientBills = BillRepository(database: clientDatabase);
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverBills = BillRepository(database: serverDatabase);
@@ -637,9 +637,9 @@ void main() {
       ],
     );
 
-    // First sync establishes the shared bill on both sides. Then Windows is
-    // deliberately put back into a pending state to simulate a conflicting
-    // Windows-side edit. The next Android push must therefore be rejected.
+    // First sync establishes the shared bill on both sides. Windows is then
+    // marked pending to represent a Windows-side edit. A same-UUID Android
+    // push must receive the complete Windows record as the canonical version.
     await syncWithRealHttpClient();
     await serverDatabase.update(
       'bills',
@@ -686,12 +686,14 @@ void main() {
     final localBills = await clientBills.getAll();
     expect(localBills, hasLength(1));
     expect(localBills.single.uuid, 'bill-conflict');
-    expect(localBills.single.notes, 'Android version');
-    expect(localBills.single.syncStatus, 'pending');
+    expect(localBills.single.billNumber, 'INV-4001');
+    expect(localBills.single.notes, 'Windows version');
+    expect(localBills.single.syncStatus, 'synced');
 
     final localItems = await clientBills.getItems(localBills.single.id!);
     expect(localItems, hasLength(1));
-    expect(localItems.single.uuid, 'bill-conflict-client-item');
+    expect(localItems.single.uuid, 'bill-conflict-server-item');
+    expect(localItems.single.description, 'Windows item');
 
     final serverBillsList = await serverBills.getAll();
     expect(serverBillsList, hasLength(1));
