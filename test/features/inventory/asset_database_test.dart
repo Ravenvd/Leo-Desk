@@ -264,6 +264,27 @@ void main() {
     await database.close();
   });
 
+  test('Windows sync allocation ignores client codes and never reuses deleted numbers', () async {
+    final database = await createCurrentDatabase();
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
+
+    final firstId = await repository.insert(makeAsset(name: 'First machine'));
+    final first = await repository.getById(firstId);
+    expect(first!.assetCode, 'AST-0001');
+    await repository.finalizeDeletion(first.uuid);
+
+    final incoming = makeAsset(
+      name: 'Android machine',
+      assetCode: 'AST-0001',
+    );
+    expect(await repository.upsertFromSync(incoming), isTrue);
+
+    final reconciled = await repository.getByUuid(incoming.uuid);
+    expect(reconciled!.assetCode, 'AST-0002');
+
+    await database.close();
+  });
+
   test('asset repository reads and updates all asset fields', () async {
     final database = await createCurrentDatabase();
     final repository = AssetRepository(database: database, isNumberAuthority: true);
