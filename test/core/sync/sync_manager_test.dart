@@ -319,7 +319,9 @@ void main() {
     expect(localCustomers.single.syncStatus, 'synced');
   });
 
-  test('Windows customer fields win over a same-UUID Android edit', () async {
+  test(
+    'Windows customer fields win over a same-UUID Android edit',
+    () async {
     final clientRepository = CustomerRepository(database: clientDatabase);
     final serverRepository = CustomerRepository(database: serverDatabase);
 
@@ -349,7 +351,8 @@ void main() {
     expect(local.syncStatus, 'synced');
     expect(canonical.name, 'Windows canonical customer');
     expect(canonical.syncStatus, 'synced');
-  });
+    },
+  );
 
   test('Android customer syncs to Windows and later receives Windows changes',
       () async {
