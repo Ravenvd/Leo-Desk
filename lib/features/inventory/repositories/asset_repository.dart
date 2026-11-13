@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/sync/sync_engine.dart';
 import '../models/asset.dart';
 
 class AssetRepository {
@@ -139,6 +140,34 @@ class AssetRepository {
   Future<int> finalizeDeletion(String uuid) async {
     final db = await _db;
     return db.delete('assets', where: 'uuid = ?', whereArgs: [uuid]);
+  }
+
+  /// Reconciles an incoming asset on Windows using UUID identity first and
+  /// the canonical asset-code namespace second. The complete namespace is
+  /// read and the decision plus insert occur in one transaction.
+  Future<Asset> reconcileFromSync(Asset incoming) async {
+    final db = await _db;
+    return db.transaction((txn) async {
+      final rows = await txn.query('assets', orderBy: 'id ASC');
+      final existingAssets = rows.map(Asset.fromMap).toList(growable: false);
+      final result = const SyncEngine().reconcileNumberedRecord<Asset>(
+        incomingRecord: incoming,
+        existingRecords: existingAssets,
+        uuidOf: (asset) => asset.uuid,
+        numberOf: (asset) => asset.assetCode,
+        withCanonicalNumber: (asset, number) =>
+            asset.copyWith(assetCode: number),
+      );
+
+      if (!result.isNewRecord) return result.canonicalRecord;
+
+      final canonical = result.canonicalRecord.copyWith(
+        syncStatus: Asset.syncStatusPending,
+      );
+      final map = canonical.toMap()..remove('id');
+      final id = await txn.insert('assets', map);
+      return canonical.copyWith(id: id);
+    });
   }
 
   Future<bool> upsertFromSync(Asset asset, {bool force = false}) async {
