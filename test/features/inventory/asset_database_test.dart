@@ -223,7 +223,7 @@ void main() {
 
   test('creating an asset generates uuid and automatic asset code', () async {
     final database = await createCurrentDatabase();
-    final repository = AssetRepository(database: database);
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
 
     final id = await repository.insert(
       Asset(
@@ -298,6 +298,15 @@ void main() {
     expect(reloaded.manufacturerModel, 'Updated Model');
     expect(reloaded.syncStatus, Asset.syncStatusPending);
 
+    await database.close();
+  });
+
+  test('non-authority stores a UUID placeholder instead of allocating a suffix', () async {
+    final database = await createCurrentDatabase();
+    final repository = AssetRepository(database: database, isNumberAuthority: false);
+    final id = await repository.insert(makeAsset());
+    final asset = await repository.getById(id);
+    expect(asset!.assetCode, 'PENDING-${asset.uuid}');
     await database.close();
   });
 
