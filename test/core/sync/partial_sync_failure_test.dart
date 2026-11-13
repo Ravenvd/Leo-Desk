@@ -30,8 +30,8 @@ class FailingInvoiceSyncClient extends SyncClient {
   });
 
   @override
-  Future<bool> sendInvoice(SyncInvoice invoice) async {
-    if (failInvoice) return false;
+  Future<Map<String, Object?>?> sendInvoice(SyncInvoice invoice) async {
+    if (failInvoice) return null;
     return super.sendInvoice(invoice);
   }
 }
