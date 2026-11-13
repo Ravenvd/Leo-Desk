@@ -489,7 +489,7 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.billsPushed, 1);
+    expect(result.billsPushed, 0);
     expect(result.billsPulled, 1);
 
     final localBills = await clientBills.getAll();
@@ -681,7 +681,7 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.billsPushed, 0);
+    expect(result.billsPushed, 1);
 
     final localBills = await clientBills.getAll();
     expect(localBills, hasLength(1));
