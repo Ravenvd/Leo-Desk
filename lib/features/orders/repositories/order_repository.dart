@@ -197,6 +197,10 @@ class OrderRepository {
             return false;
           }
           final conflictingOrderId = conflictingOrder['id'] as int;
+          if (!force &&
+              await _hasPendingOrderDependencies(txn, conflictingOrderId)) {
+            return false;
+          }
           await _deleteOrderGraph(txn, conflictingOrderId);
         }
 
