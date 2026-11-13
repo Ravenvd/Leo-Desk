@@ -21,6 +21,31 @@ void main() {
     await db.close();
   });
 
+  test('Windows staff profile remains canonical for an existing UUID', () async {
+    final now = DateTime.utc(2026, 11, 1);
+    final windows = StaffMember(
+      uuid: 'staff-windows-canonical',
+      syncStatus: StaffMember.syncStatusPending,
+      name: 'Windows Staff',
+      role: 'Supervisor',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.insert('staff', windows.toMap()..remove('id'));
+
+    final canonical = await repository.reconcileStaffFromSync({
+      ...windows.toMap(),
+      'name': 'Android Edit',
+      'role': 'Operator',
+    });
+
+    expect(canonical['uuid'], windows.uuid);
+    expect(canonical['name'], 'Windows Staff');
+    expect(canonical['role'], 'Supervisor');
+    expect(canonical['sync_status'], StaffMember.syncStatusPending);
+  });
+
   test('staff and daily attendance are saved and attendance is unique per date', () async {
     final now = DateTime(2026, 10, 31);
     final staff = StaffMember(
