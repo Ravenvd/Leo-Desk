@@ -61,7 +61,7 @@ void main() {
     await database.close();
   });
 
-  test('client keeps customer pending when server rejects a pending conflict', () async {
+  test('Windows customer record remains canonical over Android edits', () async {
     final repository = CustomerRepository(database: database);
     final local = makeCustomer(
       uuid: 'customer-network-conflict',
@@ -83,12 +83,13 @@ void main() {
 
     final sent = await client.sendCustomer(incoming);
 
-    expect(sent, isFalse);
+    expect(sent, isTrue);
 
     final customers = await repository.getAll();
     expect(customers, hasLength(1));
     expect(customers.single.name, 'Windows Version');
     expect(customers.single.syncStatus, 'pending');
+    expect(customers.single.name, 'Windows Version');
   });
   test('syncs assets through the Windows host by UUID', () async {
     final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
