@@ -76,7 +76,7 @@ void main() {
 
       final serverCustomers = CustomerRepository(database: serverDatabase);
       final serverOrders = OrderRepository(database: serverDatabase);
-      final serverInvoices = InvoiceRepository(database: serverDatabase);
+      final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
 
       final now = DateTime.utc(2026, 2, 10, 8);
 
@@ -150,7 +150,7 @@ void main() {
 
       final server = SyncServer(
         customerRepository: serverCustomers,
-        billRepository: BillRepository(database: serverDatabase),
+        billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
         expenseRepository: ExpenseRepository(database: serverDatabase),
         invoiceRepository: serverInvoices,
         orderRepository: serverOrders,
