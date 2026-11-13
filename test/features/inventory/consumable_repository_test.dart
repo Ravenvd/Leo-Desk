@@ -285,22 +285,22 @@ void main() {
       ['consumables', 'thread_spools', 'inventory_activities', 'inventory_activities'],
     );
     for (final record in records) {
-      expect(record, isNot(contains('id')));
+      expect(record.containsKey('id'), isFalse);
     }
     final spoolPayload = records.singleWhere(
       (record) => record['record_type'] == 'thread_spools',
     );
     expect(spoolPayload, containsPair('consumable_uuid', thread.uuid));
-    expect(spoolPayload, isNot(contains('consumable_id')));
+    expect(spoolPayload.containsKey('consumable_id'), isFalse);
 
     final usagePayload = records.singleWhere(
       (record) => record['order_uuid'] == 'order-outside-sync-window',
     );
     expect(usagePayload, containsPair('consumable_uuid', thread.uuid));
     expect(usagePayload, containsPair('spool_uuid', sourceSpool.uuid));
-    expect(usagePayload, isNot(contains('consumable_id')));
-    expect(usagePayload, isNot(contains('spool_id')));
-    expect(usagePayload, isNot(contains('order_id')));
+    expect(usagePayload.containsKey('consumable_id'), isFalse);
+    expect(usagePayload.containsKey('spool_id'), isFalse);
+    expect(usagePayload.containsKey('order_id'), isFalse);
 
     final targetDb = await openTestDb('${directory.path}/target.db');
     final target = ConsumableRepository(database: targetDb);
