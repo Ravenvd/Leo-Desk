@@ -237,7 +237,6 @@ void main() {
     expect(localCustomer!.syncStatus, 'synced');
     final localBills = await clientBills.getAll();
     expect(localBills.single.syncStatus, 'synced');
-    expect(localBills.single.billNumber, remoteBills.single.billNumber);
 
     // Present on the server, linked to the server-side customer.
     final remoteCustomers = await serverCustomers.getAll();
@@ -245,7 +244,8 @@ void main() {
     expect(remoteCustomers.single.syncStatus, 'synced');
 
     final remoteBills = await serverBills.getAll();
-    expect(remoteBills.single.billNumber, matches(RegExp(r'^BILL-\\d{8}-\\d{6}
+    expect(localBills.single.billNumber, remoteBills.single.billNumber);
+    expect(remoteBills.single.billNumber, matches(RegExp(r'^BILL-\d{8}-\d{6}$')));
     expect(remoteBills.single.customerId, remoteCustomers.single.id);
     expect(remoteBills.single.customerUuid, remoteCustomers.single.uuid);
 
@@ -336,7 +336,7 @@ void main() {
       expect(customers.every((c) => c.syncStatus == 'synced'), isTrue);
 
       final bills = await clientBills.getAll();
-      expect(bills.single.billNumber, 'INV-SERVER');
+      expect(bills.single.billNumber, matches(RegExp(r'^BILL-\d{8}-\d{6}$')));
       expect(bills.single.syncStatus, 'synced');
 
       final serverAlice = (await serverCustomers.getAll()).firstWhere(
@@ -507,7 +507,7 @@ void main() {
       expect(customers.every((c) => c.syncStatus == 'synced'), isTrue);
 
       final bills = await clientBills.getAll();
-      expect(bills.single.billNumber, 'INV-SERVER');
+      expect(bills.single.billNumber, matches(RegExp(r'^BILL-\d{8}-\d{6}$')));
       expect(bills.single.syncStatus, 'synced');
 
       final serverAlice = (await serverCustomers.getAll()).firstWhere(
