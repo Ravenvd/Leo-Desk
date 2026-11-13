@@ -13,7 +13,7 @@ class InvoiceRepository {
 
   /// Invoice numbers are derived from the canonical Windows order number.
   InvoiceRepository({this.database, bool? isNumberAuthority})
-      : isNumberAuthority = isNumberAuthority ?? !Platform.isAndroid;
+      : isNumberAuthority = isNumberAuthority ?? Platform.isWindows;
 
   Future<Database> get _db async => database ?? await AppDatabase.database;
 
