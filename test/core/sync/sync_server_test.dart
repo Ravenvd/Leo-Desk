@@ -94,7 +94,9 @@ void main() {
     final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
     final now = DateTime.utc(2026, 10, 30);
     final asset = Asset(uuid: 'asset-sync-test', assetCode: 'AST-SYNC-TEST', name: 'Embroidery machine', createdAt: now, updatedAt: now);
-    expect(await client.sendAsset(asset), isTrue);
+    final canonical = await client.sendAsset(asset);
+    expect(canonical, isNotNull);
+    expect(canonical!['uuid'], asset.uuid);
     final fetched = await client.fetchAssets();
     expect(fetched.single.uuid, asset.uuid);
     expect(fetched.single.name, 'Embroidery machine');
@@ -118,11 +120,13 @@ void main() {
     await repository.insert(Asset(uuid: 'asset-windows-existing', name: 'Existing machine', createdAt: now, updatedAt: now));
     final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
     final offlineAsset = Asset(uuid: 'asset-android-new', assetCode: 'AST-0001', name: 'Offline machine', createdAt: now, updatedAt: now);
-    expect(await client.sendAsset(offlineAsset), isTrue);
+    final canonical = await client.sendAsset(offlineAsset);
+    expect(canonical, isNotNull);
+    expect(canonical!['asset_code'], 'AST-0001A');
     final fetched = await client.fetchAssets();
-    expect(fetched.singleWhere((asset) => asset.uuid == offlineAsset.uuid).assetCode, 'AST-0002');
+    expect(fetched.singleWhere((asset) => asset.uuid == offlineAsset.uuid).assetCode, 'AST-0001A');
     final deleted = offlineAsset.copyWith(syncStatus: Asset.syncStatusDeletedPending);
-    expect(await client.sendAsset(deleted), isTrue);
+    expect(await client.sendAssetDeletion(deleted.uuid), isTrue);
     final tombstone = (await client.fetchAssets()).singleWhere((asset) => asset.uuid == offlineAsset.uuid);
     expect(tombstone.syncStatus, Asset.syncStatusDeletedPending);
   });
@@ -130,7 +134,7 @@ void main() {
     final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
     final now = DateTime.utc(2026, 10, 30);
     final asset = Asset(uuid: 'maintenance-parent-asset', name: 'Machine', createdAt: now, updatedAt: now);
-    expect(await client.sendAsset(asset), isTrue);
+    expect(await client.sendAsset(asset), isNotNull);
     final maintenance = <String, Object?>{
       'uuid': 'maintenance-sync-test',
       'sync_status': 'pending',
