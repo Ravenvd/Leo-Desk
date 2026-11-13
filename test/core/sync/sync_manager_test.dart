@@ -306,6 +306,16 @@ void main() {
     final now = DateTime.utc(2026, 11, 7);
     final serverStaffRepository = StaffRepository(database: serverDatabase);
     final clientStaffRepository = StaffRepository(database: clientDatabase);
+    await clientStaffRepository.insertStaff(
+      StaffMember(
+        uuid: 'client-only-staff-id-offset',
+        syncStatus: StaffMember.syncStatusSynced,
+        name: 'Local-only staff',
+        joinedOn: now,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
     final windowsStaff = StaffMember(
       uuid: 'staff-attendance-payment-roundtrip',
       name: 'Windows Staff',
