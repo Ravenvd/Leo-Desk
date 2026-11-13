@@ -235,6 +235,21 @@ void main() {
     );
     await source.recordPayment(payment);
 
+    // Child records must wait until their parent profile is available.
+    final attendancePayload = Map<String, Object?>.from(attendance.toMap())
+      ..['id'] = 9999
+      ..['staff_id'] = 9999;
+    final paymentPayload = Map<String, Object?>.from(payment.toMap())
+      ..['id'] = 9999
+      ..['staff_id'] = 9999;
+    expect(
+      await target.upsertAttendanceFromSync(attendancePayload),
+      isFalse,
+    );
+    expect(await target.upsertPaymentFromSync(paymentPayload), isFalse);
+    expect(await targetDb.query('staff_attendance'), isEmpty);
+    expect(await targetDb.query('staff_payments'), isEmpty);
+
     // Mimic transport payloads that contain stale/hostile SQLite IDs.
     final staffPayload = Map<String, Object?>.from(sourceStaff.toMap())
       ..['id'] = 9999;
@@ -245,17 +260,10 @@ void main() {
     expect(importedStaff!.id, isNot(sourceStaffId));
     expect(importedStaff.id, isNot(9999));
 
-    final attendancePayload = Map<String, Object?>.from(attendance.toMap())
-      ..['id'] = 9999
-      ..['staff_id'] = 9999;
     expect(
       await target.upsertAttendanceFromSync(attendancePayload),
       isTrue,
     );
-
-    final paymentPayload = Map<String, Object?>.from(payment.toMap())
-      ..['id'] = 9999
-      ..['staff_id'] = 9999;
     expect(await target.upsertPaymentFromSync(paymentPayload), isTrue);
 
     final attendanceRows = await targetDb.query(
