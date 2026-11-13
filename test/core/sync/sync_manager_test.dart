@@ -75,6 +75,7 @@ void main() {
     required int customerId,
     required String customerUuid,
     String syncStatus = 'pending',
+    String invoiceNumber = 'INV-000001',
   }) {
     final now = DateTime.utc(2026, 1, 1);
     return Invoice(
@@ -84,7 +85,7 @@ void main() {
       orderUuid: orderUuid,
       customerId: customerId,
       customerUuid: customerUuid,
-      invoiceNumber: 'INV-000001',
+      invoiceNumber: invoiceNumber,
       invoiceDate: now,
       subtotalPaise: 100000,
       totalPaise: 100000,
@@ -878,7 +879,7 @@ void main() {
       uuid: 'canonical-bill',
       customerId: serverCustomer.id!,
       customerUuid: serverCustomer.uuid,
-      billNumber: 'INV-000001',
+      billNumber: 'INV-000002',
       syncStatus: 'synced',
       amountPaidPaise: 100000,
     ).copyWith(
@@ -931,6 +932,7 @@ void main() {
       customerId: localCustomer.id!,
       customerUuid: localCustomer.uuid,
       syncStatus: 'synced',
+      invoiceNumber: 'INV-000002',
     );
     await clientInvoices.create(
       invoice: staleInvoice,
@@ -978,11 +980,8 @@ void main() {
     expect(result.connected, isTrue);
     expect(result.ordersPushed, 1);
     expect(result.ordersPulled, 2);
-    // Invoice and bill number reconciliation is a later integration phase.
-    // Their existing local graphs must remain intact while their canonical
-    // Windows records are deferred rather than replacing them.
-    expect(result.invoicesPulled, 0);
-    expect(result.billsPulled, 0);
+    expect(result.invoicesPulled, 1);
+    expect(result.billsPulled, 1);
 
     final localOrders = await clientOrders.getAll();
     expect(localOrders, hasLength(2));
@@ -1006,20 +1005,44 @@ void main() {
     expect(staleOrderItems.single.uuid, 'stale-order-item');
 
     final localInvoices = await clientInvoices.getAll();
-    expect(localInvoices, hasLength(1));
-    expect(localInvoices.single.uuid, staleInvoice.uuid);
-    expect(localInvoices.single.orderUuid, staleOrder.uuid);
+    expect(localInvoices, hasLength(2));
+    final pulledInvoice = localInvoices.singleWhere(
+      (invoice) => invoice.uuid == canonicalInvoice.uuid,
+    );
+    final preservedInvoice = localInvoices.singleWhere(
+      (invoice) => invoice.uuid == staleInvoice.uuid,
+    );
+    expect(pulledInvoice.orderUuid, canonicalOrder.uuid);
+    expect(pulledInvoice.orderId, localCanonicalOrder.id);
+    expect(preservedInvoice.orderUuid, staleOrder.uuid);
+    expect(preservedInvoice.orderId, localStaleOrder.id);
     expect(
-      (await clientInvoices.getItems(localInvoices.single.id!)).single.uuid,
+      (await clientInvoices.getItems(pulledInvoice.id!)).single.uuid,
+      'canonical-invoice-item',
+    );
+    expect(
+      (await clientInvoices.getItems(preservedInvoice.id!)).single.uuid,
       'stale-invoice-item',
     );
 
     final localBills = await clientBills.getAll();
-    expect(localBills, hasLength(1));
-    expect(localBills.single.uuid, staleBill.uuid);
-    expect(localBills.single.orderUuid, staleOrder.uuid);
+    expect(localBills, hasLength(2));
+    final pulledBill = localBills.singleWhere(
+      (bill) => bill.uuid == canonicalBill.uuid,
+    );
+    final preservedBill = localBills.singleWhere(
+      (bill) => bill.uuid == staleBill.uuid,
+    );
+    expect(pulledBill.orderUuid, canonicalOrder.uuid);
+    expect(pulledBill.orderId, localCanonicalOrder.id);
+    expect(preservedBill.orderUuid, staleOrder.uuid);
+    expect(preservedBill.orderId, localStaleOrder.id);
     expect(
-      (await clientBills.getItems(localBills.single.id!)).single.uuid,
+      (await clientBills.getItems(pulledBill.id!)).single.uuid,
+      'canonical-bill-item',
+    );
+    expect(
+      (await clientBills.getItems(preservedBill.id!)).single.uuid,
       'stale-bill-item',
     );
   });
