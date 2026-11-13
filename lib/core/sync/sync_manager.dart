@@ -246,7 +246,7 @@ class SyncManager {
         acknowledgedAssets.add(asset.uuid);
         continue;
       }
-      final applied = await _assetRepository.upsertFromSync(asset, force: true);
+      final applied = await _assetRepository.upsertFromSync(asset);
       if (applied) {
         assetsPulled++;
         acknowledgedAssets.add(asset.uuid);
