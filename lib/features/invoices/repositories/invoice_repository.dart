@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
@@ -7,8 +9,11 @@ import '../models/invoice_item.dart';
 
 class InvoiceRepository {
   final Database? database;
+  final bool isNumberAuthority;
 
-  InvoiceRepository({this.database});
+  /// Invoice numbers are derived from the canonical Windows order number.
+  InvoiceRepository({this.database, bool? isNumberAuthority})
+      : isNumberAuthority = isNumberAuthority ?? !Platform.isAndroid;
 
   Future<Database> get _db async => database ?? await AppDatabase.database;
 
@@ -109,14 +114,21 @@ class InvoiceRepository {
 
     final orders = await db.query(
       'orders',
-      columns: ['id'],
+      columns: ['id', 'order_number'],
       where: 'uuid = ?',
       whereArgs: [invoice.orderUuid],
       limit: 1,
     );
     if (orders.isEmpty) return false;
 
-    final map = invoice
+    final canonicalInvoice = isNumberAuthority
+        ? invoice.copyWith(
+            invoiceNumber: _canonicalInvoiceNumber(
+              orders.first['order_number'] as String,
+            ),
+          )
+        : invoice;
+    final map = canonicalInvoice
         .copyWith(
           syncStatus: 'synced',
           customerId: customers.first['id'] as int,
@@ -150,6 +162,13 @@ class InvoiceRepository {
     });
 
     return true;
+  }
+
+  String _canonicalInvoiceNumber(String orderNumber) {
+    final suffix = orderNumber.startsWith('ORD-')
+        ? orderNumber.substring(4)
+        : orderNumber;
+    return 'INV-$suffix';
   }
 
   Future<void> deleteAll() async {
