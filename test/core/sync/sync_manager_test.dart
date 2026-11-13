@@ -212,8 +212,8 @@ void main() {
 
     server = SyncServer(
       customerRepository: CustomerRepository(database: serverDatabase),
-      billRepository: BillRepository(database: serverDatabase),
-      invoiceRepository: InvoiceRepository(database: serverDatabase),
+      billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
+      invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
       expenseRepository: ExpenseRepository(database: serverDatabase),
       orderRepository: OrderRepository(database: serverDatabase),
       assetRepository: AssetRepository(database: serverDatabase),
@@ -369,7 +369,7 @@ void main() {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-push-customer',
@@ -447,7 +447,7 @@ void main() {
   test('pulls a Windows bill and its line items into Android', () async {
     final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-pull-customer',
@@ -512,7 +512,7 @@ void main() {
       () async {
     final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-update-customer',
@@ -602,7 +602,7 @@ void main() {
   test('rejected bill push stays pending after full sync', () async {
     final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverCustomers = CustomerRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'bill-conflict-customer',
@@ -710,8 +710,8 @@ void main() {
     final clientBills = BillRepository(database: clientDatabase, isNumberAuthority: false);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
-    final serverInvoices = InvoiceRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'graph-customer',
@@ -822,8 +822,8 @@ void main() {
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
     final serverOrderItems = OrderItemRepository(database: serverDatabase);
-    final serverInvoices = InvoiceRepository(database: serverDatabase);
-    final serverBills = BillRepository(database: serverDatabase);
+    final serverInvoices = InvoiceRepository(database: serverDatabase, isNumberAuthority: true);
+    final serverBills = BillRepository(database: serverDatabase, isNumberAuthority: true);
 
     final customer = makeCustomer(
       uuid: 'graph-reconcile-customer',
