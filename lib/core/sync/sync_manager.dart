@@ -295,9 +295,13 @@ class SyncManager {
       );
       if (canonicalPayload == null) continue;
 
+      final canonicalCustomerUuid =
+          canonicalPayload['customer_uuid'] as String?;
+      if (canonicalCustomerUuid == null) continue;
+
       final canonicalOrder = SyncOrder.fromMap(
         canonicalPayload,
-        customerId: customerIdsByUuid[canonicalPayload['customer_uuid']] ?? 0,
+        customerId: customerIdsByUuid[canonicalCustomerUuid] ?? 0,
       );
       final applied = await _orderRepository.upsertFromSync(
         canonicalOrder.order,
