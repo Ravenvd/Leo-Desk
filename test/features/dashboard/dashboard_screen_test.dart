@@ -118,10 +118,15 @@ void main() {
     await tester.pump();
 
     expect(find.text('Dashboard'), findsOneWidget);
-    expect(find.text('Customers'), findsOneWidget);
-    expect(find.text('Pending sync'), findsOneWidget);
-
     expect(find.text('Amount to breakeven'), findsOneWidget);
+
+    // The stats are below the breakeven card in a scrollable ListView.
+    // Scroll them into the viewport before asserting their text; ListView
+    // lazily builds children and off-screen stat cards are not in the tree.
+    await tester.scrollUntilVisible(find.text('Customers'), 200);
+    expect(find.text('Customers'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Pending sync'), 200);
+    expect(find.text('Pending sync'), findsOneWidget);
     expect(find.text('₹992000.00 remaining'), findsOneWidget);
 
     await tester.scrollUntilVisible(
