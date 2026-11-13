@@ -314,22 +314,21 @@ class SyncServer {
           await _sendJson(request.response, 400, {'error': 'Invalid asset data.'});
           return;
         }
-        var asset = Asset.fromMap(Map<String, Object?>.from(decoded));
-        final existingAsset = await _assetRepository.getByUuid(asset.uuid);
-        if (existingAsset != null) {
-          // The Windows-generated asset code is canonical for this UUID.
-          asset = asset.copyWith(assetCode: existingAsset.assetCode);
-        } else {
-          // Asset codes are local-ID-derived on each device. Allocate a
-          // Windows code before inserting an offline-created Android asset.
-          asset = asset.copyWith(assetCode: _nextAvailableAssetCode(await _assetRepository.getAllForSync()));
+        final incoming = Asset.fromMap(Map<String, Object?>.from(decoded));
+        try {
+          final canonical = await _assetRepository.reconcileFromSync(incoming);
+          await _sendJson(request.response, 200, {
+            'status': 'ok',
+            'uuid': canonical.uuid,
+            'asset_code': canonical.assetCode,
+            'canonical_asset': canonical.toMap()..remove('id'),
+          });
+        } on StateError catch (error) {
+          await _sendJson(request.response, 409, {
+            'error': error.message,
+            'uuid': incoming.uuid,
+          });
         }
-        final applied = await _assetRepository.upsertFromSync(asset);
-        if (!applied) {
-          await _sendJson(request.response, 409, {'error': 'Asset could not be applied.', 'uuid': asset.uuid});
-          return;
-        }
-        await _sendJson(request.response, 200, {'status': 'ok', 'uuid': asset.uuid});
         return;
       }
       if (request.method == 'GET' && request.uri.path == '/api/customers') {
@@ -672,16 +671,6 @@ class SyncServer {
         'error': 'Internal server error',
       });
     }
-  }
-
-  String _nextAvailableAssetCode(List<Asset> assets) {
-    var highest = 0;
-    for (final asset in assets) {
-      if (!asset.assetCode.startsWith('AST-')) continue;
-      final number = int.tryParse(asset.assetCode.substring(4));
-      if (number != null && number > highest) highest = number;
-    }
-    return 'AST-${(highest + 1).toString().padLeft(4, '0')}';
   }
 
   Future<Object?> _readJsonBody(HttpRequest request) async {
