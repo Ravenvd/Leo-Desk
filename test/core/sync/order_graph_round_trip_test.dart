@@ -444,6 +444,20 @@ void main() {
       expect(pushedServerInvoice.notes, 'Windows invoice');
       expect(pushedServerBill.notes, 'Windows bill');
 
+      // The canonical push response is applied back to Android immediately.
+      final pushedClientInvoice = (await clientInvoices.getAll()).single;
+      final pushedClientBill = (await clientBills.getAll()).single;
+      expect(pushedClientInvoice.notes, 'Windows invoice');
+      expect(pushedClientBill.notes, 'Windows bill');
+      expect(
+        (await clientInvoices.getItems(pushedClientInvoice.id!)).single.uuid,
+        'graph-roundtrip-invoice-item',
+      );
+      expect(
+        (await clientBills.getItems(pushedClientBill.id!)).single.uuid,
+        'graph-roundtrip-bill-item',
+      );
+
       // Windows -> Android: Windows makes the next canonical edit.
       await serverDatabase.update(
         'orders',
