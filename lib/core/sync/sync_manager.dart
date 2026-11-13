@@ -241,6 +241,12 @@ class SyncManager {
     // --- Pull Windows assets; Windows is authoritative after the push attempt ---
     for (final asset in await _client.fetchAssets()) {
       if (asset.syncStatus == 'deleted_pending') {
+        final localAsset = await _assetRepository.getByUuid(asset.uuid);
+        if (localAsset?.syncStatus == Asset.syncStatusPending) {
+          // A failed push must not let a remote tombstone erase unsynced
+          // Android edits. Leave it unacknowledged so reconciliation retries.
+          continue;
+        }
         await _assetRepository.applyDeletionFromSync(asset.uuid);
         assetsPulled++;
         acknowledgedAssets.add(asset.uuid);
