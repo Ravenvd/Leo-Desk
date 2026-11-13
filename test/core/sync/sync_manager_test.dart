@@ -1518,7 +1518,7 @@ void main() {
     );
     expect(
       localAssets.singleWhere((asset) => asset.uuid == androidAsset.uuid).assetCode,
-      'AST-0002',
+      'AST-0001A',
     );
   });
 
