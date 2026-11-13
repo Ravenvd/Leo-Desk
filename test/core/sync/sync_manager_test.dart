@@ -1019,6 +1019,14 @@ void main() {
     expect(localBillItems, hasLength(1));
     expect(localBillItems.single.uuid, 'canonical-bill-item');
     expect(localBillItems.single.billId, localBills.single.id);
+
+    await syncWithRealHttpClient();
+    expect(await clientOrders.getAll(), hasLength(1));
+    expect((await clientOrders.getAll()).single.orderNumber, 'ORD-000001');
+    expect(await clientInvoices.getAll(), hasLength(1));
+    expect((await clientInvoices.getAll()).single.invoiceNumber, 'INV-000001');
+    expect(await clientBills.getAll(), hasLength(1));
+    expect((await clientBills.getAll()).single.billNumber, 'BILL-20260101-000001');
   });
 
   test('preserves pending bills when a stale order number is reconciled', () async {
