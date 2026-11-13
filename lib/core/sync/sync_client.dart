@@ -284,6 +284,45 @@ class SyncClient {
     return decoded.map((item) => Map<String, Object?>.from(item as Map)).toList();
   }
 
+  Future<Map<String, Object?>?> sendStaffRecordCanonical(
+    String table,
+    Map<String, Object?> record,
+  ) async {
+    final paths = {
+      'staff_attendance': (
+        path: '/api/staff/attendance',
+        responseKey: 'canonical_attendance',
+      ),
+      'staff_payments': (
+        path: '/api/staff/payments',
+        responseKey: 'canonical_payment',
+      ),
+    };
+    final endpoint = paths[table];
+    final uuid = record['uuid'];
+    if (endpoint == null || uuid is! String || uuid.isEmpty) return null;
+
+    final payload = Map<String, Object?>.from(record)
+      ..remove('id')
+      ..remove('sync_status');
+    final data = await _postJsonResponse(endpoint.path, payload);
+    if (data == null || data['status'] != 'ok') return null;
+    if (table == 'staff_attendance' && data['requested_uuid'] != uuid) {
+      return null;
+    }
+    if (table == 'staff_payments' && data['uuid'] != uuid) {
+      return null;
+    }
+
+    final canonical = data[endpoint.responseKey];
+    if (canonical is! Map) return null;
+    final result = Map<String, Object?>.from(canonical);
+    final canonicalUuid = result['uuid'];
+    if (canonicalUuid is! String || canonicalUuid.isEmpty) return null;
+    if (table == 'staff_payments' && canonicalUuid != uuid) return null;
+    return result;
+  }
+
   Future<bool> sendStaffRecord(String table, Map<String, Object?> record) async {
     final paths = {
       'staff': '/api/staff',
