@@ -118,6 +118,16 @@ void main() {
     await tester.pump();
 
     expect(find.text('Dashboard'), findsOneWidget);
+    expect(
+      find.byType(CircularProgressIndicator),
+      findsNothing,
+      reason: 'Dashboard is still loading',
+    );
+    expect(
+      find.text('Unable to load the dashboard.'),
+      findsNothing,
+      reason: 'Dashboard failed to load',
+    );
     expect(find.text('Amount to breakeven'), findsOneWidget);
 
     // The stats are below the breakeven card in a scrollable ListView.
