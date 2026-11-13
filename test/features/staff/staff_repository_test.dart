@@ -105,4 +105,78 @@ void main() {
     expect(expenses.single['expense_date'], now.toIso8601String());
     expect(expenses.single['notes'], 'Advance');
   });
+
+  test('UUID sync preserves pending staff, attendance and payment records', () async {
+    final now = DateTime(2026, 11, 1);
+    final staff = StaffMember(
+      name: 'Local staff name',
+      role: 'Operator',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await repository.insertStaff(staff);
+
+    final incomingStaff = Map<String, Object?>.from(staff.toMap())
+      ..['name'] = 'Stale Windows name';
+    expect(await repository.upsertStaffFromSync(incomingStaff), isFalse);
+    expect((await repository.getStaffByUuid(staff.uuid))!.name,
+        'Local staff name');
+
+    final attendance = StaffAttendance(
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.fullDay,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await repository.saveAttendance(attendance);
+
+    final incomingAttendance = Map<String, Object?>.from(attendance.toMap())
+      ..['status'] = StaffAttendance.absent;
+    expect(
+      await repository.upsertAttendanceFromSync(incomingAttendance),
+      isFalse,
+    );
+
+    final duplicateDateAttendance = Map<String, Object?>.from(
+      incomingAttendance,
+    )..['uuid'] = 'other-device-attendance';
+    expect(
+      await repository.upsertAttendanceFromSync(duplicateDateAttendance),
+      isFalse,
+    );
+    final attendanceRows = await db.query(
+      'staff_attendance',
+      where: 'staff_uuid = ? AND attendance_date = ?',
+      whereArgs: [staff.uuid, '2026-11-01'],
+    );
+    expect(attendanceRows, hasLength(1));
+    expect(attendanceRows.single['uuid'], attendance.uuid);
+    expect(attendanceRows.single['status'], StaffAttendance.fullDay);
+
+    final payment = StaffPayment(
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      periodStart: DateTime(2026, 11, 1),
+      periodEnd: DateTime(2026, 11, 30),
+      paymentDate: now,
+      amountPaise: 10000,
+      notes: 'Local advance',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await repository.recordPayment(payment);
+    final incomingPayment = Map<String, Object?>.from(payment.toMap())
+      ..['amount_paise'] = 20000;
+    expect(await repository.upsertPaymentFromSync(incomingPayment), isFalse);
+    final savedPayment = await db.query(
+      'staff_payments',
+      where: 'uuid = ?',
+      whereArgs: [payment.uuid],
+    );
+    expect(savedPayment.single['amount_paise'], 10000);
+  });
+
 }
