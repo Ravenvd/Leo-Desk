@@ -291,5 +291,21 @@ void main() {
     expect(canonical['amount_paise'], 175000);
     expect(canonical['notes'], 'Windows payroll');
     expect((await staffRepository.getAllPaymentsForSync()), hasLength(1));
+
+    final newPayment = {
+      ...windowsPayment.toMap(),
+      'uuid': 'payment-http-new',
+      'amount_paise': 95000,
+      'notes': 'New Android payroll',
+    };
+    final inserted = await client.sendStaffRecordCanonical(
+      'staff_payments',
+      newPayment,
+    );
+    expect(inserted, isNotNull);
+    expect(inserted!['uuid'], 'payment-http-new');
+    expect(inserted['amount_paise'], 95000);
+    expect(inserted['staff_id'], staffId);
+    expect((await staffRepository.getAllPaymentsForSync()), hasLength(2));
   });
 }
