@@ -813,7 +813,7 @@ void main() {
   });
 
 
-  test('replaces a stale order graph with the Windows canonical graph', () async {
+  test('preserves a colliding local order graph alongside Windows canonical data', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final clientOrderItems = OrderItemRepository(database: clientDatabase);
@@ -913,7 +913,6 @@ void main() {
       status: 'In Progress',
     );
     await clientOrders.insert(staleOrder);
-    await clientOrders.markSynced(staleOrder.uuid);
     final localStaleOrder = (await clientOrders.getAll()).single;
 
     await clientOrderItems.insert(
@@ -977,45 +976,55 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.ordersPushed, 0);
-    expect(result.ordersPulled, 1);
-    expect(result.invoicesPulled, 1);
-    expect(result.billsPulled, 1);
+    expect(result.ordersPushed, 1);
+    expect(result.ordersPulled, 2);
+    // Invoice and bill number reconciliation is a later integration phase.
+    // Their existing local graphs must remain intact while their canonical
+    // Windows records are deferred rather than replacing them.
+    expect(result.invoicesPulled, 0);
+    expect(result.billsPulled, 0);
 
     final localOrders = await clientOrders.getAll();
-    expect(localOrders, hasLength(1));
-    expect(localOrders.single.uuid, canonicalOrder.uuid);
-    expect(localOrders.single.orderNumber, 'ORD-000001');
+    expect(localOrders, hasLength(2));
+    final localCanonicalOrder = localOrders.singleWhere(
+      (order) => order.uuid == canonicalOrder.uuid,
+    );
+    final localStaleOrder = localOrders.singleWhere(
+      (order) => order.uuid == staleOrder.uuid,
+    );
+    expect(localCanonicalOrder.orderNumber, 'ORD-000001');
+    expect(localStaleOrder.orderNumber, 'ORD-000001A');
 
-    final localOrderItems = await clientOrderItems.getByOrder(localOrders.single.id!);
-    expect(localOrderItems, hasLength(1));
-    expect(localOrderItems.single.uuid, 'canonical-order-item');
-    expect(localOrderItems.single.orderId, localOrders.single.id);
+    final canonicalOrderItems =
+        await clientOrderItems.getByOrder(localCanonicalOrder.id!);
+    expect(canonicalOrderItems, hasLength(1));
+    expect(canonicalOrderItems.single.uuid, 'canonical-order-item');
+
+    final staleOrderItems =
+        await clientOrderItems.getByOrder(localStaleOrder.id!);
+    expect(staleOrderItems, hasLength(1));
+    expect(staleOrderItems.single.uuid, 'stale-order-item');
 
     final localInvoices = await clientInvoices.getAll();
     expect(localInvoices, hasLength(1));
-    expect(localInvoices.single.uuid, canonicalInvoice.uuid);
-    expect(localInvoices.single.orderUuid, canonicalOrder.uuid);
-    expect(localInvoices.single.orderId, localOrders.single.id);
-
-    final localInvoiceItems = await clientInvoices.getItems(localInvoices.single.id!);
-    expect(localInvoiceItems, hasLength(1));
-    expect(localInvoiceItems.single.uuid, 'canonical-invoice-item');
-    expect(localInvoiceItems.single.invoiceId, localInvoices.single.id);
+    expect(localInvoices.single.uuid, staleInvoice.uuid);
+    expect(localInvoices.single.orderUuid, staleOrder.uuid);
+    expect(
+      (await clientInvoices.getItems(localInvoices.single.id!)).single.uuid,
+      'stale-invoice-item',
+    );
 
     final localBills = await clientBills.getAll();
     expect(localBills, hasLength(1));
-    expect(localBills.single.uuid, canonicalBill.uuid);
-    expect(localBills.single.orderUuid, canonicalOrder.uuid);
-    expect(localBills.single.orderId, localOrders.single.id);
-
-    final localBillItems = await clientBills.getItems(localBills.single.id!);
-    expect(localBillItems, hasLength(1));
-    expect(localBillItems.single.uuid, 'canonical-bill-item');
-    expect(localBillItems.single.billId, localBills.single.id);
+    expect(localBills.single.uuid, staleBill.uuid);
+    expect(localBills.single.orderUuid, staleOrder.uuid);
+    expect(
+      (await clientBills.getItems(localBills.single.id!)).single.uuid,
+      'stale-bill-item',
+    );
   });
 
-  test('pulls an older order when it is among the 100 most recently updated', () async {
+  test('pulls the complete Windows order history, not just a recent page', () async {
     final serverCustomers = CustomerRepository(database: serverDatabase);
     final serverOrders = OrderRepository(database: serverDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
@@ -1055,10 +1064,10 @@ void main() {
     final result = await syncWithRealHttpClient();
 
     expect(result.connected, isTrue);
-    expect(result.ordersPulled, 100);
+    expect(result.ordersPulled, 101);
 
     final localOrders = await clientOrders.getAll();
-    expect(localOrders, hasLength(100));
+    expect(localOrders, hasLength(101));
     final pulledTarget = localOrders.singleWhere((order) => order.uuid == target.uuid);
     expect(pulledTarget.updatedAt, target.updatedAt);
   });
