@@ -130,4 +130,135 @@ void main() {
     expect(expenses.single['expense_date'], now.toIso8601String());
     expect(expenses.single['notes'], 'Advance');
   });
+
+  test('Windows attendance UUID and natural key remain canonical', () async {
+    final now = DateTime.utc(2026, 11, 2);
+    final staff = StaffMember(
+      uuid: 'staff-attendance-canonical',
+      name: 'Windows Staff',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await repository.insertStaff(staff);
+    final windowsAttendance = StaffAttendance(
+      uuid: 'attendance-windows-canonical',
+      syncStatus: StaffMember.syncStatusPending,
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.fullDay,
+      checkIn: '09:00',
+      checkOut: '16:00',
+      notes: 'Windows entry',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.insert(
+      'staff_attendance',
+      windowsAttendance.toMap()..remove('id'),
+    );
+
+    final sameUuid = await repository.reconcileAttendanceFromSync({
+      ...windowsAttendance.toMap(),
+      'status': StaffAttendance.absent,
+      'notes': 'Android edit',
+    });
+    expect(sameUuid['uuid'], windowsAttendance.uuid);
+    expect(sameUuid['status'], StaffAttendance.fullDay);
+    expect(sameUuid['notes'], 'Windows entry');
+
+    final naturalKeyCollision = await repository.reconcileAttendanceFromSync({
+      ...windowsAttendance.toMap(),
+      'uuid': 'attendance-android-duplicate',
+      'status': StaffAttendance.halfDay,
+      'notes': 'Android duplicate',
+    });
+    expect(naturalKeyCollision['uuid'], windowsAttendance.uuid);
+    expect(naturalKeyCollision['status'], StaffAttendance.fullDay);
+    final rows = await db.query('staff_attendance');
+    expect(rows, hasLength(1));
+  });
+
+  test('canonical attendance replaces an Android natural-key duplicate', () async {
+    final now = DateTime.utc(2026, 11, 3);
+    final staff = StaffMember(
+      uuid: 'staff-attendance-apply',
+      name: 'Test Staff',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await repository.insertStaff(staff);
+    final android = StaffAttendance(
+      uuid: 'attendance-android-copy',
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      attendanceDate: now,
+      status: StaffAttendance.absent,
+      notes: 'Android local row',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.insert('staff_attendance', android.toMap()..remove('id'));
+
+    final applied = await repository.upsertAttendanceFromSync({
+      ...android.toMap(),
+      'uuid': 'attendance-windows-copy',
+      'status': StaffAttendance.fullDay,
+      'notes': 'Windows canonical row',
+      'sync_status': StaffMember.syncStatusPending,
+    }, force: true);
+
+    expect(applied, isTrue);
+    final rows = await db.query('staff_attendance');
+    expect(rows, hasLength(1));
+    expect(rows.single['uuid'], 'attendance-windows-copy');
+    expect(rows.single['status'], StaffAttendance.fullDay);
+    expect(rows.single['notes'], 'Windows canonical row');
+    expect(rows.single['sync_status'], StaffMember.syncStatusSynced);
+  });
+
+  test('Windows staff payment reconciliation returns canonical UUID record', () async {
+    final now = DateTime.utc(2026, 11, 4);
+    final staff = StaffMember(
+      uuid: 'staff-payment-canonical',
+      name: 'Payroll Staff',
+      joinedOn: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final staffId = await repository.insertStaff(staff);
+    final payment = StaffPayment(
+      uuid: 'payment-windows-canonical',
+      syncStatus: StaffPayment.syncStatusPending,
+      staffId: staffId,
+      staffUuid: staff.uuid,
+      periodStart: DateTime.utc(2026, 11, 1),
+      periodEnd: DateTime.utc(2026, 11, 30),
+      paymentDate: now,
+      amountPaise: 125000,
+      notes: 'Windows payroll',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.insert('staff_payments', payment.toMap()..remove('id'));
+
+    final canonical = await repository.reconcilePaymentFromSync({
+      ...payment.toMap(),
+      'amount_paise': 1,
+      'notes': 'Android edit',
+    });
+    expect(canonical['uuid'], payment.uuid);
+    expect(canonical['amount_paise'], 125000);
+    expect(canonical['notes'], 'Windows payroll');
+
+    final applied = await repository.upsertPaymentFromSync(canonical, force: true);
+    expect(applied, isTrue);
+    final rows = await db.query('staff_payments');
+    expect(rows, hasLength(1));
+    expect(rows.single['amount_paise'], 125000);
+    expect(rows.single['staff_id'], staffId);
+    expect(rows.single['sync_status'], StaffPayment.syncStatusSynced);
+  });
 }
