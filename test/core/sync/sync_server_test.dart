@@ -46,7 +46,7 @@ void main() {
     database = await AppDatabase.openTestDatabase();
     server = SyncServer(
       customerRepository: CustomerRepository(database: database),
-      billRepository: BillRepository(database: database),
+      billRepository: BillRepository(database: database, isNumberAuthority: true),
       expenseRepository: ExpenseRepository(database: database),
       assetRepository: AssetRepository(database: database, isNumberAuthority: true),
       consumableRepository: ConsumableRepository(database: database),
