@@ -698,7 +698,7 @@ void main() {
     final serverBillsList = await serverBills.getAll();
     expect(serverBillsList, hasLength(1));
     expect(serverBillsList.single.notes, 'Windows version');
-    expect(serverBillsList.single.syncStatus, 'pending');
+    expect(serverBillsList.single.syncStatus, 'synced');
 
     final serverItems = await serverBills.getItems(serverBillsList.single.id!);
     expect(serverItems, hasLength(1));
