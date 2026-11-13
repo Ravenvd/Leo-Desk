@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -10,6 +12,7 @@ void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
+  late Directory testDirectory;
   late Database windowsDb;
   late Database androidDb;
   late int windowsCustomerId;
@@ -43,8 +46,13 @@ void main() {
   }
 
   setUp(() async {
-    windowsDb = await AppDatabase.openTestDatabase();
-    androidDb = await AppDatabase.openTestDatabase();
+    testDirectory = await Directory.systemTemp.createTemp('invoice_number_test_');
+    windowsDb = await AppDatabase.openTestDatabase(
+      path: '${testDirectory.path}${Platform.pathSeparator}windows.db',
+    );
+    androidDb = await AppDatabase.openTestDatabase(
+      path: '${testDirectory.path}${Platform.pathSeparator}android.db',
+    );
     (windowsCustomerId, windowsOrderId) = await seed(windowsDb);
     await seed(androidDb);
   });
@@ -52,6 +60,7 @@ void main() {
   tearDown(() async {
     await windowsDb.close();
     await androidDb.close();
+    await testDirectory.delete(recursive: true);
   });
 
   test('Windows derives invoice number from its canonical order number', () async {
