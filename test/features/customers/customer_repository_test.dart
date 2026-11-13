@@ -7,6 +7,7 @@ import 'package:leo_desk/features/customers/repositories/customer_repository.dar
 
 Customer makeCustomer({
   required String name,
+  String? uuid,
   String? phone,
   String? whatsapp,
   String? email,
@@ -16,6 +17,7 @@ Customer makeCustomer({
   final now = DateTime.now();
 
   return Customer(
+    uuid: uuid,
     name: name,
     phone: phone,
     whatsapp: whatsapp,
@@ -245,6 +247,42 @@ void main() {
       expect(savedCustomer, isNotNull);
       expect(savedCustomer!.syncStatus, 'pending');
     });
+    test('Windows reconciliation preserves an existing UUID record', () async {
+      final windowsCustomer = makeCustomer(
+        uuid: 'shared-customer-uuid',
+        name: 'Windows version',
+      ).copyWith(syncStatus: 'pending');
+      await database.insert(
+        'customers',
+        windowsCustomer.toMap()..remove('id'),
+      );
+
+      final androidSubmission = makeCustomer(
+        uuid: windowsCustomer.uuid,
+        name: 'Android attempted edit',
+      );
+      final canonical = await repository.reconcileFromSync(androidSubmission);
+
+      expect(canonical.uuid, windowsCustomer.uuid);
+      expect(canonical.name, 'Windows version');
+      expect(canonical.syncStatus, 'pending');
+      expect(await repository.getAll(), hasLength(1));
+    });
+
+    test('Windows reconciliation inserts a distinct UUID as a new record', () async {
+      final incoming = makeCustomer(
+        uuid: 'new-android-customer',
+        name: 'New customer',
+      );
+
+      final canonical = await repository.reconcileFromSync(incoming);
+
+      expect(canonical.uuid, incoming.uuid);
+      expect(canonical.name, 'New customer');
+      expect(canonical.syncStatus, 'pending');
+      expect(await repository.getAll(), hasLength(1));
+    });
+
     test('marks customer from sync as synced', () async {
       final customer = makeCustomer(name: 'Synced Customer');
 
