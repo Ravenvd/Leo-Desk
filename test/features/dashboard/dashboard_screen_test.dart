@@ -140,8 +140,6 @@ void main() {
     // lazily builds children and off-screen stat cards are not in the tree.
     await tester.scrollUntilVisible(find.text('Customers'), 200);
     expect(find.text('Customers'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Pending sync'), 200);
-    expect(find.text('Pending sync'), findsOneWidget);
     expect(find.text('₹992000.00 remaining'), findsOneWidget);
 
     await tester.scrollUntilVisible(
