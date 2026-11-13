@@ -1216,7 +1216,7 @@ void main() {
     expect(orders.single.syncStatus, 'pending');
   });
 
-  test('replaces a stale local order when Windows canonical number conflicts', () async {
+  test('preserves a distinct local order when Windows canonical number conflicts', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
 
@@ -1250,16 +1250,16 @@ void main() {
       <OrderItem>[],
     );
 
-    expect(applied, isTrue);
+    expect(applied, isFalse);
 
     final orders = await clientOrders.getAll();
     expect(orders, hasLength(1));
-    expect(orders.single.uuid, 'windows-canonical-order');
+    expect(orders.single.uuid, 'stale-local-order');
     expect(orders.single.orderNumber, 'ORD-000001');
     expect(orders.single.syncStatus, 'synced');
   });
 
-  test('renumbers a new offline order when Windows already uses its order number', () async {
+  test('suffixes a new offline order when Windows already uses its order number', () async {
     final clientCustomers = CustomerRepository(database: clientDatabase);
     final clientOrders = OrderRepository(database: clientDatabase);
     final serverCustomers = CustomerRepository(database: serverDatabase);
@@ -1300,14 +1300,14 @@ void main() {
     final pushedOrder = localOrders.singleWhere(
       (order) => order.uuid == androidOrder.uuid,
     );
-    expect(pushedOrder.orderNumber, 'ORD-000002');
+    expect(pushedOrder.orderNumber, 'ORD-000001A');
     expect(pushedOrder.syncStatus, 'synced');
 
     final serverOrdersAfter = await serverOrders.getAll();
     final serverOrder = serverOrdersAfter.singleWhere(
       (order) => order.uuid == androidOrder.uuid,
     );
-    expect(serverOrder.orderNumber, 'ORD-000002');
+    expect(serverOrder.orderNumber, 'ORD-000001A');
     expect(serverOrder.syncStatus, 'synced');
 
     expect(
