@@ -383,4 +383,27 @@ void main() {
       ]),
     );
   });
+
+  test('Windows retains the assigned asset code when a UUID is retried', () async {
+    final database = await createCurrentDatabase();
+    final repository = AssetRepository(database: database, isNumberAuthority: true);
+    final incoming = makeAsset(name: 'Offline machine', assetCode: 'AST-CLIENT');
+
+    expect(await repository.upsertFromSync(incoming), isTrue);
+    final first = await repository.getByUuid(incoming.uuid);
+    expect(first!.assetCode, 'AST-0001');
+
+    final retry = incoming.copyWith(
+      assetCode: 'AST-9999',
+      name: 'Offline machine updated',
+      updatedAt: DateTime(2026, 10, 3),
+    );
+    expect(await repository.upsertFromSync(retry), isTrue);
+
+    final saved = await repository.getByUuid(incoming.uuid);
+    expect(saved!.assetCode, 'AST-0001');
+    expect(saved.name, 'Offline machine updated');
+
+    await database.close();
+  });
 }
