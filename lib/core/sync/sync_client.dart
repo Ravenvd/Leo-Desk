@@ -409,15 +409,18 @@ class SyncClient {
     return orders;
   }
 
-  Future<String?> sendOrder(SyncOrder order) async {
+  Future<Map<String, Object?>?> sendOrder(SyncOrder order) async {
     final data = await _postJsonResponse(
       '/api/orders',
       order.toMap(),
     );
-    if (data == null || data['status'] != 'ok' || data['uuid'] != order.order.uuid) {
+    if (data == null ||
+        data['status'] != 'ok' ||
+        data['uuid'] != order.order.uuid ||
+        data['canonical_order'] is! Map) {
       return null;
     }
-    return data['order_number'] as String?;
+    return Map<String, Object?>.from(data['canonical_order'] as Map);
   }
 
   Future<List<Expense>> fetchExpenses() async {
