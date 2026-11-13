@@ -20,7 +20,7 @@ void main() {
 
   setUp(() async {
     database = await AppDatabase.openTestDatabase();
-    bills = BillRepository(database: database);
+    bills = BillRepository(database: database, isNumberAuthority: false);
     final now = DateTime.utc(2026, 10, 1);
     final customerId = await database.insert('customers', {
       'uuid': 'bill-conflict-customer',
