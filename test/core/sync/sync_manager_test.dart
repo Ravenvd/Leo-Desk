@@ -1363,11 +1363,12 @@ void main() {
       token: SyncConfig.defaultToken,
     );
 
+    final retryItems = await localOrders.getItems(localCanonicalOrder.id!);
     final returnedNumber = await HttpOverrides.runZoned(
       () => client.sendOrder(
         SyncOrder(
           order: retry,
-          items: await localOrders.getItems(localCanonicalOrder.id!),
+          items: retryItems,
           customerUuid: localCustomer.uuid,
         ),
       ),
