@@ -346,9 +346,16 @@ class SyncManager {
     // --- Pull Windows maintenance records after assets ---
     for (final record in await _client.fetchMaintenanceRecords()) {
       if (record['sync_status'] == 'deleted_pending') {
-        await _maintenanceRepository.applyDeletionFromSync(record['uuid'] as String);
+        final uuid = record['uuid'] as String;
+        final localRecord = await _maintenanceRepository.getByUuid(uuid);
+        if (localRecord?.syncStatus == 'pending') {
+          // A rejected Android edit must not be erased by a Windows
+          // tombstone. Leave it unacknowledged for a later reconciliation.
+          continue;
+        }
+        await _maintenanceRepository.applyDeletionFromSync(uuid);
         maintenancePulled++;
-        acknowledgedMaintenance.add(record['uuid'] as String);
+        acknowledgedMaintenance.add(uuid);
         continue;
       }
       final applied = await _maintenanceRepository.upsertFromSync(record);
