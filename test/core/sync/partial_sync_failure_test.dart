@@ -72,7 +72,7 @@ void main() {
     () async {
       final clientCustomers = CustomerRepository(database: clientDatabase);
       final clientOrders = OrderRepository(database: clientDatabase);
-      final clientInvoices = InvoiceRepository(database: clientDatabase);
+      final clientInvoices = InvoiceRepository(database: clientDatabase, isNumberAuthority: false);
 
       final serverCustomers = CustomerRepository(database: serverDatabase);
       final serverOrders = OrderRepository(database: serverDatabase);
@@ -137,7 +137,7 @@ void main() {
       final manager = SyncManager(
         client: client,
         customerRepository: clientCustomers,
-        billRepository: BillRepository(database: clientDatabase),
+        billRepository: BillRepository(database: clientDatabase, isNumberAuthority: false),
         expenseRepository: ExpenseRepository(database: clientDatabase),
         orderRepository: clientOrders,
         invoiceRepository: clientInvoices,
