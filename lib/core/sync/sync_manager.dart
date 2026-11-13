@@ -1,3 +1,4 @@
+import '../../features/customers/models/customer.dart';
 import '../../features/billing/repositories/bill_repository.dart';
 import '../../features/customers/repositories/customer_repository.dart';
 import '../../features/expenses/models/expense.dart';
@@ -266,10 +267,15 @@ class SyncManager {
     }
     // --- Push pending customers ---
     for (final customer in await _customerRepository.getPending()) {
-      if (await _client.sendCustomer(customer)) {
-        await _customerRepository.markSynced(customer.uuid);
-        customersPushed++;
-      }
+      final canonicalPayload = await _client.sendCustomerCanonical(customer);
+      if (canonicalPayload == null) continue;
+
+      final canonicalCustomer = Customer.fromMap(canonicalPayload);
+      final applied = await _customerRepository.upsertFromSync(
+        canonicalCustomer,
+        force: true,
+      );
+      if (applied) customersPushed++;
     }
 
     // --- Pull customers (before bills, so bill customer links resolve) ---
