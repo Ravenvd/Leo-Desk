@@ -97,7 +97,10 @@ void main() {
     expect(saved.billNumber, 'BILL-20261101-000001');
   });
   test('preserves pending bills and frees synced legacy number collisions', () async {
-    final androidBills = BillRepository(database: database);
+    final androidBills = BillRepository(
+      database: database,
+      isNumberAuthority: false,
+    );
     final legacy = Bill(
       uuid: 'legacy-bill-number-owner',
       syncStatus: 'pending',
