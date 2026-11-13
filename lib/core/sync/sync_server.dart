@@ -525,9 +525,16 @@ class SyncServer {
 
         final map = Map<String, Object?>.from(decoded);
         final customerUuid = map['customer_uuid'] as String?;
-        if (customerUuid == null || map['uuid'] is! String) {
+        final orderUuid = map['uuid'];
+        final orderNumber = map['order_number'];
+        if (customerUuid == null ||
+            customerUuid.trim().isEmpty ||
+            orderUuid is! String ||
+            orderUuid.trim().isEmpty ||
+            orderNumber is! String ||
+            orderNumber.trim().isEmpty) {
           await _sendJson(request.response, 400, {
-            'error': 'Order UUID and customer are required.',
+            'error': 'Order UUID, number and customer are required.',
           });
           return;
         }
