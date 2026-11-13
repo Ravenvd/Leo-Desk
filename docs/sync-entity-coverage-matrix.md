@@ -10,7 +10,8 @@ This document records implementation coverage, not merely whether an entity has 
 ## 1. Executive summary
 
 - All four current human-readable numbering namespaces are covered by the canonical Windows allocator: orders, invoices, bills, and assets.
-- Customers are now integrated with UUID-first Windows-authoritative reconciliation. The user has confirmed the full test suite passes after the latest customer test correction.
+- Customers are integrated with UUID-first Windows-authoritative reconciliation. The user confirmed the full test suite passed after the customer integration.
+- Staff profile reconciliation now has a Windows-authoritative repository path, canonical HTTP response, client decoder, and SyncManager application path. New repository, HTTP, and round-trip tests have been added; local verification is pending.
 - Several other entities already have push/pull endpoints, but those paths still use legacy boolean acknowledgements or non-authoritative upserts.
 - Deletion handling is not compliant with the approved policy yet. In particular, Android deletion requests can currently mark Windows rows as `deleted_pending`, and expense tombstones are physically removed rather than retained as durable authoritative tombstones.
 - No additional numbered namespace was identified in the current schema audit.
@@ -29,7 +30,7 @@ This document records implementation coverage, not merely whether an entity has 
 | Consumables | `/api/inventory` | Legacy | Canonical response and UUID-first Windows reconciliation |
 | Thread spools | `/api/inventory` | Legacy | Canonical response; resolve consumable UUID; reconcile as part of inventory dependency ordering |
 | Inventory activities | `/api/inventory` | Legacy | Canonical response; resolve consumable, optional spool and optional order UUIDs; preserve event history |
-| Staff profiles | `/api/staff` | Legacy | Canonical response and UUID-first Windows reconciliation |
+| Staff profiles | `/api/staff` | Implemented; local verification pending | UUID-first Windows reconciliation and complete canonical response; Android applies the response before acknowledging |
 | Staff attendance | `/api/staff/attendance` | Legacy | Canonical response; Windows-authoritative natural-key handling for staff UUID + attendance date |
 | Staff payments | `/api/staff/payments` | Legacy | Canonical response; preserve staff UUID and linked salary expense relationship |
 
@@ -83,7 +84,7 @@ The approved deletion contract remains:
 
 Implement and test one entity family at a time:
 
-1. Staff profiles, then attendance and payments.
+1. Staff profiles are implemented; verify them locally, then integrate attendance and payments.
 2. Expenses, including the staff-payment relationship.
 3. Consumables, thread spools, and inventory activities.
 4. Maintenance records, after asset reconciliation is confirmed.
