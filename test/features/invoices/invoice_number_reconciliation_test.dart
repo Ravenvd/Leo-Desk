@@ -114,4 +114,46 @@ void main() {
     );
     expect((await android.getAll()).single.invoiceNumber, 'INV-000042');
   });
+
+  test('Windows retains the canonical invoice number when a UUID is retried', () async {
+    final windows = InvoiceRepository(
+      database: windowsDb,
+      isNumberAuthority: true,
+    );
+    final incoming = Invoice(
+      uuid: 'offline-invoice-retry',
+      orderId: windowsOrderId,
+      orderUuid: orderUuid,
+      customerId: windowsCustomerId,
+      customerUuid: customerUuid,
+      invoiceNumber: 'INV-CLIENT-PROPOSAL',
+      invoiceDate: now,
+      subtotalPaise: 10000,
+      totalPaise: 10000,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final items = [
+      InvoiceItem(
+        invoiceId: 0,
+        description: 'Embroidery',
+        quantity: 1,
+        ratePaise: 10000,
+        amountPaise: 10000,
+      ),
+    ];
+
+    expect(await windows.upsertFromSync(incoming, items), isTrue);
+    expect((await windows.getAll()).single.invoiceNumber, 'INV-000042');
+
+    final retry = incoming.copyWith(
+      invoiceNumber: 'INV-DIFFERENT-PROPOSAL',
+      updatedAt: now.add(const Duration(minutes: 1)),
+    );
+    expect(await windows.upsertFromSync(retry, items), isTrue);
+
+    final saved = (await windows.getAll()).single;
+    expect(saved.uuid, incoming.uuid);
+    expect(saved.invoiceNumber, 'INV-000042');
+  });
 }
