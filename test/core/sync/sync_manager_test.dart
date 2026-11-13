@@ -1562,6 +1562,53 @@ void main() {
 
 
   test(
+    'preserves a pending Android asset when its Windows push is rejected',
+    () async {
+      final windowsAssets = AssetRepository(
+        database: serverDatabase,
+        isNumberAuthority: true,
+      );
+      final androidAssets = AssetRepository(
+        database: clientDatabase,
+        isNumberAuthority: false,
+      );
+      final now = DateTime.utc(2026, 11, 1);
+
+      final windowsAsset = Asset(
+        uuid: 'shared-pending-asset',
+        name: 'Windows offline edit',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await windowsAssets.insert(windowsAsset);
+
+      final androidAsset = Asset(
+        uuid: 'shared-pending-asset',
+        name: 'Android offline edit',
+        createdAt: now.add(const Duration(minutes: 1)),
+        updatedAt: now.add(const Duration(minutes: 1)),
+      );
+      await androidAssets.insert(androidAsset);
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.assetsPushed, 0);
+      expect(result.assetsPulled, 0);
+
+      final local = await androidAssets.getByUuid(androidAsset.uuid);
+      expect(local, isNotNull);
+      expect(local!.name, 'Android offline edit');
+      expect(local.syncStatus, Asset.syncStatusPending);
+
+      final windows = await windowsAssets.getByUuid(windowsAsset.uuid);
+      expect(windows, isNotNull);
+      expect(windows!.name, 'Windows offline edit');
+      expect(windows.syncStatus, Asset.syncStatusPending);
+    },
+  );
+
+  test(
     'Windows pending consumable edit wins over an Android conflict',
     () async {
     final windowsInventory = ConsumableRepository(database: serverDatabase);
