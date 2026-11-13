@@ -87,20 +87,6 @@ class InvoiceRepository {
   }) async {
     final db = await _db;
 
-    final existing = await db.query(
-      'invoices',
-      columns: ['id', 'sync_status'],
-      where: 'uuid = ?',
-      whereArgs: [invoice.uuid],
-      limit: 1,
-    );
-
-    if (!force &&
-        existing.isNotEmpty &&
-        existing.first['sync_status'] == 'pending') {
-      return false;
-    }
-
     if (invoice.customerUuid == null) return false;
 
     final customers = await db.query(
@@ -137,12 +123,70 @@ class InvoiceRepository {
         .toMap()
       ..remove('id');
 
-    await db.transaction((txn) async {
+    return db.transaction((txn) async {
+      final sameUuid = await txn.query(
+        'invoices',
+        columns: ['id', 'sync_status'],
+        where: 'uuid = ?',
+        whereArgs: [invoice.uuid],
+        limit: 1,
+      );
+      if (!force &&
+          sameUuid.isNotEmpty &&
+          sameUuid.first['sync_status'] == 'pending') {
+        return false;
+      }
+
+      // An order can have only one invoice. Do not replace an unsynced local
+      // invoice; wait until its push has been resolved. Stale synced copies
+      // may be replaced by the canonical Windows UUID.
+      final orderConflicts = await txn.query(
+        'invoices',
+        columns: ['id', 'uuid', 'sync_status'],
+        where: 'order_uuid = ? AND uuid != ?',
+        whereArgs: [invoice.orderUuid, invoice.uuid],
+      );
+      if (!force &&
+          orderConflicts.any((row) => row['sync_status'] == 'pending')) {
+        return false;
+      }
+      for (final conflict in orderConflicts) {
+        final conflictId = conflict['id'] as int;
+        await txn.delete(
+          'invoice_items',
+          where: 'invoice_id = ?',
+          whereArgs: [conflictId],
+        );
+        await txn.delete('invoices', where: 'id = ?', whereArgs: [conflictId]);
+      }
+
+      // Free a legacy/client-generated number collision without deleting the
+      // unrelated invoice. Its own canonical copy can assign the final number
+      // when it is pulled.
+      final numberOwners = await txn.query(
+        'invoices',
+        columns: ['id', 'uuid', 'sync_status'],
+        where: 'invoice_number = ? AND uuid != ?',
+        whereArgs: [canonicalInvoice.invoiceNumber, invoice.uuid],
+      );
+      if (!force &&
+          numberOwners.any((row) => row['sync_status'] == 'pending')) {
+        return false;
+      }
+      for (final owner in numberOwners) {
+        await txn.update(
+          'invoices',
+          {'invoice_number': 'PENDING-${owner['uuid']}'},
+          where: 'id = ?',
+          whereArgs: [owner['id']],
+        );
+      }
+
       int invoiceId;
-      if (existing.isEmpty) {
+      if (sameUuid.isEmpty) {
         invoiceId = await txn.insert('invoices', map);
       } else {
-        invoiceId = existing.first['id'] as int;
+        invoiceId = sameUuid.first['id'] as int;
         await txn.update('invoices', map, where: 'id = ?', whereArgs: [invoiceId]);
         await txn.delete(
           'invoice_items',
@@ -159,9 +203,10 @@ class InvoiceRepository {
             ..['invoice_id'] = invoiceId,
         );
       }
+
+      return true;
     });
 
-    return true;
   }
 
   String _canonicalInvoiceNumber(String orderNumber) {
