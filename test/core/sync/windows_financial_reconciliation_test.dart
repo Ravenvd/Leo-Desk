@@ -384,7 +384,9 @@ void main() {
       SyncBill(bill: incomingA, items: [itemA]),
     );
     expect(responseA, isNotNull);
-    expect(responseA['bill_number'], '${base}A');
+    final canonicalResponseA = responseA ??
+        (throw StateError('Windows did not return the canonical bill'));
+    expect(canonicalResponseA['bill_number'], '${base}A');
 
     final retryA = await client.sendBill(
       SyncBill(
@@ -393,10 +395,12 @@ void main() {
       ),
     );
     expect(retryA, isNotNull);
-    expect(retryA['bill_number'], '${base}A');
-    expect(retryA['notes'], 'Bill notes');
+    final canonicalRetryA = retryA ??
+        (throw StateError('Windows did not return the retried canonical bill'));
+    expect(canonicalRetryA['bill_number'], '${base}A');
+    expect(canonicalRetryA['notes'], 'Bill notes');
     expect(
-      (retryA['items'] as List).single['uuid'],
+      (canonicalRetryA['items'] as List).single['uuid'],
       'android-bill-a-item',
     );
 
@@ -411,7 +415,9 @@ void main() {
       ),
     );
     expect(responseB, isNotNull);
-    expect(responseB['bill_number'], '${base}B');
+    final canonicalResponseB = responseB ??
+        (throw StateError('Windows did not return the second canonical bill'));
+    expect(canonicalResponseB['bill_number'], '${base}B');
 
     final saved = await bills.getAll();
     expect(saved, hasLength(3));
