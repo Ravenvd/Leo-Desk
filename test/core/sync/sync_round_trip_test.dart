@@ -81,7 +81,7 @@ void main() {
     clientCustomers = CustomerRepository(database: clientDb);
     clientBills = BillRepository(database: clientDb, isNumberAuthority: false);
     clientExpenses = ExpenseRepository(database: clientDb);
-    clientInvoices = InvoiceRepository(database: clientDb);
+    clientInvoices = InvoiceRepository(database: clientDb, isNumberAuthority: false);
     clientOrders = OrderRepository(database: clientDb);
     serverStaff = StaffRepository(database: serverDb);
     clientStaff = StaffRepository(database: clientDb);
