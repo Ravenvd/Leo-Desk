@@ -19,6 +19,7 @@ import 'package:leo_desk/features/invoices/models/invoice_item.dart';
 import 'package:leo_desk/features/invoices/repositories/invoice_repository.dart';
 import 'package:leo_desk/features/inventory/models/asset.dart';
 import 'package:leo_desk/features/inventory/models/consumable.dart';
+import 'package:leo_desk/features/inventory/models/maintenance_record.dart';
 import 'package:leo_desk/features/inventory/repositories/asset_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/consumable_repository.dart';
 import 'package:leo_desk/features/inventory/repositories/maintenance_repository.dart';
@@ -1744,6 +1745,72 @@ void main() {
       expect(local, isNotNull);
       expect(local!.name, 'Android unsynced edit');
       expect(local.syncStatus, Asset.syncStatusPending);
+    },
+  );
+
+  test(
+    'preserves a pending Android maintenance edit when Windows sends a deletion tombstone',
+    () async {
+      final windowsAssets = AssetRepository(
+        database: serverDatabase,
+        isNumberAuthority: true,
+      );
+      final androidAssets = AssetRepository(
+        database: clientDatabase,
+        isNumberAuthority: false,
+      );
+      final windowsMaintenance = MaintenanceRepository(database: serverDatabase);
+      final androidMaintenance = MaintenanceRepository(database: clientDatabase);
+      final now = DateTime.utc(2026, 11, 3);
+
+      final windowsAssetId = await windowsAssets.insert(Asset(
+        uuid: 'maintenance-tombstone-asset',
+        name: 'Machine',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await windowsAssets.markSynced('maintenance-tombstone-asset');
+      final androidAssetId = await androidAssets.insert(Asset(
+        uuid: 'maintenance-tombstone-asset',
+        name: 'Machine',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await androidAssets.markSynced('maintenance-tombstone-asset');
+
+      final windowsRecord = MaintenanceRecord(
+        uuid: 'shared-maintenance-tombstone',
+        assetId: windowsAssetId,
+        assetUuid: 'maintenance-tombstone-asset',
+        maintenanceDate: now,
+        description: 'Windows maintenance record',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await windowsMaintenance.insert(windowsRecord);
+      await windowsMaintenance.markDeletedPendingByUuid(windowsRecord.uuid);
+
+      final androidRecord = MaintenanceRecord(
+        uuid: windowsRecord.uuid,
+        assetId: androidAssetId,
+        assetUuid: 'maintenance-tombstone-asset',
+        maintenanceDate: now,
+        description: 'Android offline edit',
+        createdAt: now,
+        updatedAt: now.add(const Duration(minutes: 1)),
+      );
+      final androidRecordId = await androidMaintenance.insert(androidRecord);
+
+      final result = await syncWithRealHttpClient();
+
+      expect(result.connected, isTrue);
+      expect(result.maintenancePushed, 0);
+      expect(result.maintenancePulled, 0);
+
+      final local = await androidMaintenance.getById(androidRecordId);
+      expect(local, isNotNull);
+      expect(local!.description, 'Android offline edit');
+      expect(local.syncStatus, MaintenanceRecord.syncStatusPending);
     },
   );
 
