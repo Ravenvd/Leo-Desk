@@ -96,9 +96,9 @@ void main() {
 
       final server = SyncServer(
         customerRepository: CustomerRepository(database: serverDatabase),
-        billRepository: BillRepository(database: serverDatabase),
+        billRepository: BillRepository(database: serverDatabase, isNumberAuthority: true),
         expenseRepository: serverExpenses,
-        invoiceRepository: InvoiceRepository(database: serverDatabase),
+        invoiceRepository: InvoiceRepository(database: serverDatabase, isNumberAuthority: true),
         orderRepository: OrderRepository(database: serverDatabase),
       assetRepository: AssetRepository(database: serverDatabase),
       maintenanceRepository: MaintenanceRepository(database: serverDatabase),
