@@ -547,10 +547,17 @@ class SyncManager {
 
     // --- Staff attendance and payments depend on staff profiles ---
     for (final attendance in await _staffRepository.getPendingAttendance()) {
-      if (await _client.sendStaffRecord('staff_attendance', attendance.toMap())) {
-        await _staffRepository.markSynced('staff_attendance', attendance.uuid);
-        staffRecordsPushed++;
-      }
+      final canonicalPayload = await _client.sendStaffRecordCanonical(
+        'staff_attendance',
+        attendance.toMap(),
+      );
+      if (canonicalPayload == null) continue;
+
+      final applied = await _staffRepository.upsertAttendanceFromSync(
+        canonicalPayload,
+        force: true,
+      );
+      if (applied) staffRecordsPushed++;
     }
     for (final record in await _client.fetchStaffRecords('staff_attendance')) {
       final applied = await _staffRepository.upsertAttendanceFromSync(record, force: true);
@@ -561,10 +568,17 @@ class SyncManager {
     }
 
     for (final payment in await _staffRepository.getPendingPayments()) {
-      if (await _client.sendStaffRecord('staff_payments', payment.toMap())) {
-        await _staffRepository.markSynced('staff_payments', payment.uuid);
-        staffRecordsPushed++;
-      }
+      final canonicalPayload = await _client.sendStaffRecordCanonical(
+        'staff_payments',
+        payment.toMap(),
+      );
+      if (canonicalPayload == null) continue;
+
+      final applied = await _staffRepository.upsertPaymentFromSync(
+        canonicalPayload,
+        force: true,
+      );
+      if (applied) staffRecordsPushed++;
     }
     for (final record in await _client.fetchStaffRecords('staff_payments')) {
       final applied = await _staffRepository.upsertPaymentFromSync(record, force: true);
