@@ -93,6 +93,41 @@ void main() {
     expect(customers.single.syncStatus, 'pending');
     expect(customers.single.name, 'Windows Version');
   });
+  test('staff push returns the complete canonical Windows profile', () async {
+    final now = DateTime.utc(2026, 11, 1);
+    final windowsStaff = <String, Object?>{
+      'uuid': 'staff-server-canonical',
+      'sync_status': 'pending',
+      'name': 'Windows Staff',
+      'phone': '1111111111',
+      'role': 'Supervisor',
+      'joined_on': '2026-01-01',
+      'is_active': 1,
+      'notes': 'Windows notes',
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    };
+    await database.insert('staff', windowsStaff);
+
+    final client = SyncClient(
+      serverAddress: '127.0.0.1',
+      port: server.port!,
+      token: SyncConfig.defaultToken,
+    );
+    final canonical = await client.sendStaffProfileCanonical({
+      ...windowsStaff,
+      'name': 'Android Edit',
+      'role': 'Operator',
+      'notes': 'Android notes',
+    });
+
+    expect(canonical, isNotNull);
+    expect(canonical!['uuid'], windowsStaff['uuid']);
+    expect(canonical['name'], 'Windows Staff');
+    expect(canonical['role'], 'Supervisor');
+    expect(canonical['notes'], 'Windows notes');
+  });
+
   test('syncs assets through the Windows host by UUID', () async {
     final client = SyncClient(serverAddress: '127.0.0.1', port: server.port!, token: SyncConfig.defaultToken);
     final now = DateTime.utc(2026, 10, 30);
