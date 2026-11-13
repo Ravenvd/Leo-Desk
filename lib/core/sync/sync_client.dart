@@ -73,6 +73,7 @@ class SyncBill {
     final billMap = bill.toMap()
       ..remove('id')
       ..remove('customer_id')
+      ..remove('order_id')
       ..remove('sync_status');
     return {
       ...billMap,
