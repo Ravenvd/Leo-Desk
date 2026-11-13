@@ -189,11 +189,9 @@ class BillRepository {
 
       for (final conflictMap in orderConflicts) {
         final conflict = Bill.fromMap(conflictMap);
-        if (!force && conflict.syncStatus == 'pending') {
-          // A pending local bill must be pushed before a competing canonical
-          // copy can replace it. Defer reconciliation rather than lose edits.
-          return false;
-        }
+        // Different UUIDs claiming the same order are resolved by the
+        // established creation-time/UUID priority, even if the local copy is
+        // pending. A pending copy with the same UUID is still protected above.
         if (_compareBillPriority(bill, conflict) >= 0) {
           // ignore: avoid_print
           print(
