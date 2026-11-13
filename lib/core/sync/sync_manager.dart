@@ -421,19 +421,31 @@ class SyncManager {
     }
 
     // --- Pull canonical Windows invoices ---
-    for (final syncInvoice in await _client.fetchInvoices(
+    var deferredWindowsInvoices = await _client.fetchInvoices(
       customerIdsByUuid: customerIdsByUuid,
       orderIdsByUuid: localOrderIdsByUuid,
-    )) {
-      final applied = await _invoiceRepository.upsertFromSync(
-        syncInvoice.invoice,
-        syncInvoice.items,
-        force: true,
-      );
-      if (applied) {
-        invoicesPulled++;
-        acknowledgedInvoices.add(syncInvoice.invoice.uuid);
+    );
+    while (deferredWindowsInvoices.isNotEmpty) {
+      final deferredNextPass = <SyncInvoice>[];
+      var appliedAny = false;
+
+      for (final syncInvoice in deferredWindowsInvoices) {
+        final applied = await _invoiceRepository.upsertFromSync(
+          syncInvoice.invoice,
+          syncInvoice.items,
+          force: true,
+        );
+        if (applied) {
+          appliedAny = true;
+          invoicesPulled++;
+          acknowledgedInvoices.add(syncInvoice.invoice.uuid);
+        } else {
+          deferredNextPass.add(syncInvoice);
+        }
       }
+
+      if (!appliedAny) break;
+      deferredWindowsInvoices = deferredNextPass;
     }
 
     // --- Push pending bills ---
@@ -454,16 +466,28 @@ class SyncManager {
     }
 
     // --- Pull canonical Windows bills ---
-    for (final syncBill in await _client.fetchBills()) {
-      final applied = await _billRepository.upsertFromSync(
-        syncBill.bill,
-        syncBill.items,
-        force: true,
-      );
-      if (applied) {
-        billsPulled++;
-        acknowledgedBills.add(syncBill.bill.uuid);
+    var deferredWindowsBills = await _client.fetchBills();
+    while (deferredWindowsBills.isNotEmpty) {
+      final deferredNextPass = <SyncBill>[];
+      var appliedAny = false;
+
+      for (final syncBill in deferredWindowsBills) {
+        final applied = await _billRepository.upsertFromSync(
+          syncBill.bill,
+          syncBill.items,
+          force: true,
+        );
+        if (applied) {
+          appliedAny = true;
+          billsPulled++;
+          acknowledgedBills.add(syncBill.bill.uuid);
+        } else {
+          deferredNextPass.add(syncBill);
+        }
       }
+
+      if (!appliedAny) break;
+      deferredWindowsBills = deferredNextPass;
     }
 
     // --- Push pending expenses ---
